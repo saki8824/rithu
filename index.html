@@ -129,8 +129,11 @@
   /* ---------- profile ---------- */
   .bubble-row{display:flex;align-items:flex-end;gap:8px}
   .u-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:1.5px solid var(--saki-blue)}
+  .r-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:1.5px solid var(--ritsu-pink)}
   .icon-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .u-prev{width:52px;height:52px;border-radius:50%;object-fit:cover;border:1.5px solid var(--saki-blue);display:none}
+  .r-prev{width:52px;height:52px;border-radius:50%;object-fit:cover;border:1.5px solid var(--ritsu-pink);display:none}
+  .avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
   .icon-pick .btn{width:auto;flex:0 0 auto;padding:10px 14px}
   /* ---------- settings ---------- */
   #settings{
@@ -205,7 +208,7 @@
 </div>
 
 <header>
-  <div class="avatar">律</div>
+  <div class="avatar" id="r-head-av">律</div>
   <div>
     <div class="head-name">天川 律</div>
     <div class="head-sub"><span class="heart">♥</span><span id="bpm">心拍共有中</span></div>
@@ -287,6 +290,16 @@
   </div>
 
   <div class="field">
+    <label>律くんのアイコン</label>
+    <div class="icon-pick">
+      <img id="aicon-prev" class="r-prev" alt="">
+      <button class="btn ghost" id="pick-aicon">画像を選ぶ</button>
+      <button class="btn ghost danger" id="clear-aicon">消す</button>
+    </div>
+    <input type="file" id="aicon-file" accept="image/*" hidden>
+  </div>
+
+  <div class="field">
     <label>システムプロンプト(律くんの設定をここに貼る)</label>
     <textarea id="set-system" placeholder="ここでは、あなたは天川 律です。…"></textarea>
   </div>
@@ -343,7 +356,7 @@ const store = {
 let settings = {
   key:"", model:"claude-opus-4-8", customModel:"",
   think:true, budget:3000, window:30, system:"", pinHash:"",
-  memory:"", autoMemory:true, uname:"", uinfo:"", uicon:"", selfMemory:true,
+  memory:"", autoMemory:true, uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
   proactive:false, proMin:3
 };
 let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
@@ -386,6 +399,11 @@ function renderMsg(m){
       const row = el("div","bubble-row");
       row.appendChild(el("div","bubble",m.text));
       const av = el("img","u-avatar"); av.src = settings.uicon; row.appendChild(av);
+      wrap.appendChild(row);
+    } else if(m.role==="assistant" && settings.aicon){
+      const row = el("div","bubble-row");
+      const av = el("img","r-avatar"); av.src = settings.aicon; row.appendChild(av);
+      row.appendChild(el("div","bubble",m.text));
       wrap.appendChild(row);
     } else {
       wrap.appendChild(el("div","bubble",m.text));
@@ -667,6 +685,8 @@ function openSettings(){
   $("set-uinfo").value = settings.uinfo;
   if(settings.uicon){ $("uicon-prev").src = settings.uicon; $("uicon-prev").style.display = "block"; }
   else { $("uicon-prev").src = ""; $("uicon-prev").style.display = "none"; }
+  if(settings.aicon){ $("aicon-prev").src = settings.aicon; $("aicon-prev").style.display = "block"; }
+  else { $("aicon-prev").src = ""; $("aicon-prev").style.display = "none"; }
   $("set-system").value = settings.system;
   $("set-automem").checked = settings.autoMemory;
   $("set-selfmem").checked = settings.selfMemory;
@@ -727,6 +747,17 @@ $("clear-uicon").addEventListener("click", ()=>{
   settings.uicon = ""; store.set("ritsu-settings", JSON.stringify(settings));
   $("uicon-prev").src = ""; $("uicon-prev").style.display = "none";
 });
+$("pick-aicon").addEventListener("click", ()=> $("aicon-file").click());
+$("aicon-file").addEventListener("change", async e=>{
+  const f = e.target.files[0]; e.target.value = "";
+  if(!f) return;
+  const d = await readIcon(f);
+  if(d){ settings.aicon = d; store.set("ritsu-settings", JSON.stringify(settings)); $("aicon-prev").src = d; $("aicon-prev").style.display = "block"; applyHeadAvatar(); renderAll(); }
+});
+$("clear-aicon").addEventListener("click", ()=>{
+  settings.aicon = ""; store.set("ritsu-settings", JSON.stringify(settings));
+  $("aicon-prev").src = ""; $("aicon-prev").style.display = "none"; applyHeadAvatar(); renderAll();
+});
 $("clear-chat").addEventListener("click", ()=>{
   if(confirm("会話をぜんぶ消す?この操作は戻せないよ")){
     history=[]; store.del("ritsu-history"); summarized=0; saveMeta(); renderAll();
@@ -777,6 +808,19 @@ function afterUnlock(){ if(!settings.key) openSettings(); }
 function initLock(){ if(settings.pinHash) showLock(); else afterUnlock(); }
 
 /* ---------- init ---------- */
+function applyHeadAvatar(){
+  const a = $("r-head-av");
+  if(!a) return;
+  if(settings.aicon){
+    a.textContent = "";
+    a.innerHTML = "";
+    const im = el("img"); im.src = settings.aicon; im.alt = "律";
+    a.appendChild(im);
+  } else {
+    a.textContent = "律";
+  }
+}
+applyHeadAvatar();
 renderAll();
 initLock();
 scheduleProactive();
