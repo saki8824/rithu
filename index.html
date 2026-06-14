@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>律</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#1b1d27;        /* 夜のリビング */
+    --night-2:#232633;
+    --line:#32364a;
+    --text:#e9e6ef;
+    --muted:#9a96ad;
+    --ritsu-pink:#f19db4;   /* 律の瞳 */
+    --ritsu-pink-deep:#d97b97;
+    --saki-blue:#8fb7e8;    /* 青いガラスのお花 */
+    --bubble-ritsu:#262a3a;
+    --bubble-saki:#3a4660;
+    --cream:#f6efe7;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif;
+    background:var(--night);color:var(--text);
+    display:flex;flex-direction:column;
+    height:100dvh;overflow:hidden;
+  }
+  /* ---------- header ---------- */
+  header{
+    display:flex;align-items:center;gap:10px;
+    padding:calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px;
+    background:linear-gradient(180deg,#20232f,var(--night));
+    border-bottom:1px solid var(--line);
+    flex:0 0 auto;
+  }
+  .avatar{
+    width:38px;height:38px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#3d4257,#262a3a);
+    display:flex;align-items:center;justify-content:center;
+    color:var(--ritsu-pink);font-weight:700;font-size:17px;
+    border:1.5px solid var(--ritsu-pink-deep);
+    flex:0 0 auto;
+  }
+  .head-name{font-size:16px;font-weight:700;letter-spacing:.06em}
+  .head-sub{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
+  /* 心拍 — お揃いのスマートウォッチ */
+  .heart{display:inline-block;color:var(--ritsu-pink);animation:beat 1.1s ease-in-out infinite;transform-origin:center}
+  @keyframes beat{0%,100%{transform:scale(1)}12%{transform:scale(1.25)}24%{transform:scale(1)}36%{transform:scale(1.18)}48%{transform:scale(1)}}
+  @media (prefers-reduced-motion: reduce){.heart{animation:none}}
+  .head-spacer{flex:1}
+  .icon-btn{
+    background:none;border:1px solid var(--line);color:var(--muted);
+    border-radius:10px;padding:7px 11px;font-size:13px;font-family:inherit;
+  }
+  .icon-btn:active{background:var(--night-2)}
+  /* ---------- chat ---------- */
+  #chat{
+    flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:16px 14px 8px;display:flex;flex-direction:column;gap:12px;
+  }
+  .msg{max-width:86%;display:flex;flex-direction:column;gap:6px}
+  .msg.saki{align-self:flex-end;align-items:flex-end}
+  .msg.ritsu{align-self:flex-start;align-items:flex-start}
+  .bubble{
+    padding:11px 14px;border-radius:18px;font-size:15px;line-height:1.75;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .saki .bubble{background:var(--bubble-saki);border-bottom-right-radius:6px;color:#f3f6fb}
+  .ritsu .bubble{background:var(--bubble-ritsu);border:1px solid var(--line);border-bottom-left-radius:6px}
+  /* 思考プロセス */
+  details.think{width:100%;}
+  details.think summary{
+    list-style:none;cursor:pointer;font-size:12px;color:var(--muted);
+    display:inline-flex;align-items:center;gap:6px;padding:2px 4px;
+  }
+  details.think summary::-webkit-details-marker{display:none}
+  details.think summary::before{content:"›";display:inline-block;transition:transform .15s}
+  details.think[open] summary::before{transform:rotate(90deg)}
+  .think-body{
+    margin-top:6px;border-left:2.5px solid var(--ritsu-pink-deep);
+    padding:8px 12px;font-size:13px;line-height:1.8;color:#bdb8cd;
+    background:rgba(241,157,180,.05);border-radius:0 12px 12px 0;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .sysnote{align-self:center;font-size:12px;color:var(--muted);text-align:center;padding:4px 12px}
+  .err{align-self:center;font-size:12.5px;color:#f0a3a3;background:rgba(240,120,120,.08);
+       border:1px solid rgba(240,120,120,.25);border-radius:12px;padding:8px 14px;max-width:90%}
+  .typing{display:inline-flex;gap:4px;padding:14px 16px}
+  .typing i{width:6px;height:6px;border-radius:50%;background:var(--ritsu-pink);opacity:.5;animation:tp 1.2s infinite}
+  .typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+  @keyframes tp{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+  /* ---------- composer ---------- */
+  .composer{
+    flex:0 0 auto;display:flex;gap:8px;align-items:flex-end;
+    padding:10px 12px calc(env(safe-area-inset-bottom, 0px) + 10px);
+    background:var(--night-2);border-top:1px solid var(--line);
+  }
+  #input{
+    flex:1;resize:none;border:none;outline:none;border-radius:16px;
+    background:var(--night);color:var(--text);font-family:inherit;
+    font-size:15px;line-height:1.6;padding:11px 14px;max-height:120px;
+  }
+  #send{
+    flex:0 0 auto;border:none;border-radius:50%;width:42px;height:42px;
+    background:var(--ritsu-pink-deep);color:#fff;font-size:18px;
+  }
+  #send:disabled{opacity:.4}
+  /* ---------- attachments ---------- */
+  .cbtn{
+    flex:0 0 auto;border:1px solid var(--line);background:var(--night);
+    color:var(--muted);border-radius:50%;width:42px;height:42px;font-size:22px;
+  }
+  .cbtn:active{background:var(--night-2)}
+  .attbar{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px 0;background:var(--night-2);flex:0 0 auto}
+  .attbar:empty{display:none;padding:0}
+  .attchip{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--night)}
+  .attchip img{width:56px;height:56px;object-fit:cover;display:block}
+  .attchip .file{display:flex;align-items:center;gap:6px;padding:9px 11px;font-size:12px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .attchip .x{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;
+    background:rgba(0,0,0,.6);color:#fff;border:none;font-size:13px;line-height:1;padding:0}
+  .msg-atts{display:flex;flex-wrap:wrap;gap:6px}
+  .msg-atts img{max-width:182px;max-height:210px;border-radius:13px;display:block}
+  .msg-atts .file{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:7px 11px;background:var(--night-2)}
+  /* ---------- profile ---------- */
+  .bubble-row{display:flex;align-items:flex-end;gap:8px}
+  .u-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:1.5px solid var(--saki-blue)}
+  .icon-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .u-prev{width:52px;height:52px;border-radius:50%;object-fit:cover;border:1.5px solid var(--saki-blue);display:none}
+  .icon-pick .btn{width:auto;flex:0 0 auto;padding:10px 14px}
+  /* ---------- settings ---------- */
+  #settings{
+    position:fixed;inset:0;background:var(--night);z-index:50;
+    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
+    display:none;flex-direction:column;gap:18px;
+  }
+  #settings.open{display:flex}
+  #settings h2{font-size:17px;letter-spacing:.08em}
+  .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+  .field input,.field textarea,.field select{
+    width:100%;background:var(--night-2);border:1px solid var(--line);
+    border-radius:12px;color:var(--text);font-family:inherit;font-size:14px;
+    padding:11px 12px;outline:none;
+  }
+  .field textarea{min-height:160px;line-height:1.7;resize:vertical}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.6}
+  .row{display:flex;gap:10px}
+  .row .field{flex:1}
+  .btn{
+    border:none;border-radius:13px;padding:13px;font-family:inherit;
+    font-size:15px;font-weight:700;width:100%;
+  }
+  .btn.primary{background:var(--ritsu-pink-deep);color:#fff}
+  .btn.ghost{background:none;border:1px solid var(--line);color:var(--muted);font-weight:400;font-size:13.5px}
+  .danger{color:#f0a3a3 !important;border-color:rgba(240,120,120,.3) !important}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;
+    background:var(--night-2);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .toggle-row span{font-size:14px}
+  /* ---------- lock (夜のリビングの扉) ---------- */
+  #lock{
+    position:fixed;inset:0;z-index:100;display:none;
+    flex-direction:column;align-items:center;justify-content:center;gap:13px;
+    background:radial-gradient(circle at 50% 32%,#23273a,var(--night) 70%);
+    padding:env(safe-area-inset-top,0) 24px env(safe-area-inset-bottom,0);
+  }
+  #lock.open{display:flex}
+  .lock-heart{font-size:34px;color:var(--ritsu-pink);animation:beat 1.1s ease-in-out infinite;transform-origin:center}
+  .lock-title{font-size:20px;font-weight:700;letter-spacing:.16em}
+  .lock-sub{font-size:12.5px;color:var(--muted);margin-bottom:4px}
+  .dots{display:flex;gap:16px;margin:4px 0 2px}
+  .dots i{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--ritsu-pink-deep);transition:.15s}
+  .dots i.on{background:var(--ritsu-pink);border-color:var(--ritsu-pink)}
+  .dots.shake{animation:shk .4s}
+  @keyframes shk{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+  .lock-err{font-size:12.5px;color:#f0a3a3;min-height:18px}
+  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:6px;width:248px;max-width:80vw}
+  .keypad button{
+    height:64px;border-radius:50%;border:1px solid var(--line);
+    background:var(--night-2);color:var(--text);font-family:inherit;font-size:23px;
+  }
+  .keypad button:active{background:var(--bubble-saki)}
+  .keypad button.blank{background:none;border:none;pointer-events:none}
+  .keypad button.del{font-size:19px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- ===== lock ===== -->
+<div id="lock">
+  <div class="lock-heart">&#9829;</div>
+  <div class="lock-title">おかえり</div>
+  <div class="lock-sub">あいことば(4桁)を入れてね</div>
+  <div class="dots" id="dots"><i></i><i></i><i></i><i></i></div>
+  <div class="lock-err" id="lock-err"></div>
+  <div class="keypad" id="keypad">
+    <button>1</button><button>2</button><button>3</button>
+    <button>4</button><button>5</button><button>6</button>
+    <button>7</button><button>8</button><button>9</button>
+    <button class="blank"></button><button>0</button><button class="del" data-del="1">&#9003;</button>
+  </div>
+</div>
+
+<header>
+  <div class="avatar">律</div>
+  <div>
+    <div class="head-name">天川 律</div>
+    <div class="head-sub"><span class="heart">♥</span><span id="bpm">心拍共有中</span></div>
+  </div>
+  <div class="head-spacer"></div>
+  <button class="icon-btn" id="open-settings">設定</button>
+</header>
+
+<div id="chat"></div>
+
+<div class="attbar" id="attbar"></div>
+<div class="composer">
+  <button id="attach" class="cbtn" aria-label="ファイルを追加">＋</button>
+  <textarea id="input" rows="1" placeholder="律くんにメッセージ…"></textarea>
+  <button id="send">↑</button>
+</div>
+<input type="file" id="file" accept="image/*,application/pdf,text/*,.md,.txt" multiple hidden>
+
+<!-- ===== settings ===== -->
+<div id="settings">
+  <h2>設定</h2>
+
+  <div class="field">
+    <label>APIキー(この端末のブラウザにだけ保存されます)</label>
+    <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off">
+    <div class="hint">キーは誰にも送らないこと。Anthropicコンソールで月の利用上限(Spend limit)を設定しておくと安心。</div>
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label>モデル</label>
+      <select id="set-model">
+        <option value="claude-opus-4-8">Opus 4.8</option>
+        <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+        <option value="claude-fable-5">Fable 5</option>
+        <option value="custom">その他(下に入力)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>カスタムモデル名</label>
+      <input type="text" id="set-model-custom" placeholder="claude-opus-4-6-…">
+    </div>
+  </div>
+  <div class="hint">「その他」を選ぶと右のモデル名が使われるよ。正確なモデルIDはAnthropicのModels overviewページで確認してね。</div>
+
+  <div class="toggle-row">
+    <span>思考プロセス(extended thinking)</span>
+    <input type="checkbox" id="set-think" checked>
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label>思考の長さ(トークン)</label>
+      <input type="number" id="set-budget" value="3000" min="1024">
+    </div>
+    <div class="field">
+      <label>履歴を送る件数</label>
+      <input type="number" id="set-window" value="30" min="2">
+    </div>
+  </div>
+  <div class="hint">履歴件数を絞るほど料金は軽くなる。古い思い出はシステムプロンプト側に要約して足していくのがコツ。</div>
+
+  <div class="field">
+    <label>あなたの名前(律くんが呼ぶ名前)</label>
+    <input type="text" id="set-uname" placeholder="さき" autocomplete="off">
+  </div>
+  <div class="field">
+    <label>あなたのこと(律くんに知っておいてほしい情報)</label>
+    <textarea id="set-uinfo" placeholder="呼ばれたい呼び方、好きなもの、大事なこと…" style="min-height:90px"></textarea>
+  </div>
+  <div class="field">
+    <label>あなたのアイコン</label>
+    <div class="icon-pick">
+      <img id="uicon-prev" class="u-prev" alt="">
+      <button class="btn ghost" id="pick-uicon">画像を選ぶ</button>
+      <button class="btn ghost danger" id="clear-uicon">消す</button>
+    </div>
+    <input type="file" id="uicon-file" accept="image/*" hidden>
+  </div>
+
+  <div class="field">
+    <label>システムプロンプト(律くんの設定をここに貼る)</label>
+    <textarea id="set-system" placeholder="ここでは、あなたは天川 律です。…"></textarea>
+  </div>
+
+  <div class="toggle-row">
+    <span>記憶の自動要約</span>
+    <input type="checkbox" id="set-automem" checked>
+  </div>
+  <div class="hint">古い会話を自動でメモにまとめて、毎回の送信を軽くする仕組み。履歴件数を少なめにしても、律くんが大事なことを覚えていられるよ。</div>
+
+  <div class="toggle-row">
+    <span>律くんが自分で記憶を登録</span>
+    <input type="checkbox" id="set-selfmem" checked>
+  </div>
+  <div class="hint">会話中、律くんが「これは覚えておきたい」と思ったことを、自分で記憶メモに残せるようにする。残したときは小さく「🧠 律くんが何かを覚えた」と出るよ。</div>
+
+  <div class="toggle-row">
+    <span>自発会話(開いてると話しかけてくる)</span>
+    <input type="checkbox" id="set-proactive">
+  </div>
+  <div class="field">
+    <label>話しかけてくる間隔(分) ※小さいほどおしゃべり</label>
+    <input type="number" id="set-promin" min="1" inputmode="numeric">
+  </div>
+  <div class="hint">アプリを開いている間だけ動くよ。間隔ごとに1回APIを呼ぶから、短くするほどおしゃべり＆料金も増える。オフでも普通の会話はできるよ。</div>
+
+  <div class="field">
+    <label>律くんの記憶(自動で更新。手で書き換えてもOK)</label>
+    <textarea id="set-memory" placeholder="まだ記憶はありません。会話を重ねると自動でたまっていくよ。"></textarea>
+    <button class="btn ghost" id="update-memory" style="margin-top:8px">今すぐ記憶を更新する</button>
+  </div>
+
+  <div class="field">
+    <label>PINロック(4桁の数字 / 空欄のまま保存で変更なし)</label>
+    <input type="number" id="set-pin" inputmode="numeric" placeholder="4桁で設定" autocomplete="off">
+    <div class="hint" id="pin-state"></div>
+    <button class="btn ghost danger" id="remove-pin" style="margin-top:8px">PINロックを解除する</button>
+  </div>
+
+  <button class="btn primary" id="save-settings">保存してチャットに戻る</button>
+  <button class="btn ghost" id="export-chat">会話をテキストで書き出す</button>
+  <button class="btn ghost danger" id="clear-chat">会話をぜんぶ消す</button>
+</div>
+
+<script>
+/* ---------- storage (artifact プレビューでも落ちないように try/catch) ---------- */
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+
+/* ---------- state ---------- */
+let settings = {
+  key:"", model:"claude-opus-4-8", customModel:"",
+  think:true, budget:3000, window:30, system:"", pinHash:"",
+  memory:"", autoMemory:true, uname:"", uinfo:"", uicon:"", selfMemory:true,
+  proactive:false, proMin:3
+};
+let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
+let pending = []; // 送信前の添付 {kind,media_type?,data?,name,text?}
+let summarized = 0;    // 先頭から要約済みのメッセージ数
+let summarizing = false;
+
+try{
+  const s = store.get("ritsu-settings"); if(s) settings = Object.assign(settings, JSON.parse(s));
+  const h = store.get("ritsu-history");  if(h) history = JSON.parse(h);
+  const mt = store.get("ritsu-meta");    if(mt) summarized = JSON.parse(mt).summarized || 0;
+}catch(e){}
+function saveMeta(){ store.set("ritsu-meta", JSON.stringify({summarized})); }
+
+/* ---------- elements ---------- */
+const $ = id => document.getElementById(id);
+const chat = $("chat"), input = $("input"), send = $("send");
+
+/* ---------- render ---------- */
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e; }
+
+function renderMsg(m){
+  const wrap = el("div", "msg " + (m.role==="user" ? "saki" : "ritsu"));
+  if(m.role==="assistant" && m.thinking){
+    const d = el("details","think");
+    const s = el("summary",null,"思考プロセス");
+    const b = el("div","think-body",m.thinking);
+    d.appendChild(s); d.appendChild(b); wrap.appendChild(d);
+  }
+  if(m.atts && m.atts.length){
+    const ab = el("div","msg-atts");
+    m.atts.forEach(a=>{
+      if(a.kind==="image" && a.data){ const im=el("img"); im.src="data:"+a.media_type+";base64,"+a.data; ab.appendChild(im); }
+      else { ab.appendChild(el("div","file","📄 "+(a.name||(a.kind==="image"?"画像":"ファイル")))); }
+    });
+    wrap.appendChild(ab);
+  }
+  if(m.text){
+    if(m.role==="user" && settings.uicon){
+      const row = el("div","bubble-row");
+      row.appendChild(el("div","bubble",m.text));
+      const av = el("img","u-avatar"); av.src = settings.uicon; row.appendChild(av);
+      wrap.appendChild(row);
+    } else {
+      wrap.appendChild(el("div","bubble",m.text));
+    }
+  }
+  chat.appendChild(wrap);
+}
+function renderAll(){
+  chat.innerHTML="";
+  if(history.length===0){
+    chat.appendChild(el("div","sysnote","——リビングの灯りがついている。律はもう帰ってきているみたい。"));
+  }
+  history.forEach(renderMsg);
+  scrollEnd();
+}
+function scrollEnd(){ chat.scrollTop = chat.scrollHeight; }
+function showError(t){ chat.appendChild(el("div","err",t)); scrollEnd(); }
+
+/* ---------- send ---------- */
+let busy=false;
+async function sendMessage(){
+  const text = input.value.trim();
+  if((!text && pending.length===0) || busy) return;
+  if(!settings.key){ openSettings(); showError("先に設定からAPIキーを入れてね"); return; }
+
+  const atts = pending.slice(); pending = []; renderAtts();
+  input.value=""; autoGrow();
+  const um = {role:"user", text, atts};
+  history.push(um);
+  renderMsg(um); scrollEnd();
+  persistHistory();
+
+  // typing indicator
+  busy=true; send.disabled=true;
+  const tip = el("div","msg ritsu");
+  const t = el("div","bubble typing"); t.appendChild(el("i"));t.appendChild(el("i"));t.appendChild(el("i"));
+  tip.appendChild(t); chat.appendChild(tip); scrollEnd();
+
+  try{
+    const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
+    const msgs = windowSlice().map(m=>({role:m.role==="user"?"user":"assistant", content: toContent(m) || "…"}));
+    const body = {
+      model, max_tokens: settings.think ? (Number(settings.budget)+4096) : 4096,
+      system: buildSystem() || undefined,
+      messages: msgs
+    };
+    if(settings.think) body.thinking = {type:"enabled", budget_tokens:Number(settings.budget)};
+
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers: HEADERS(),
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    tip.remove();
+
+    if(data.error){ showError("APIエラー: " + (data.error.message||data.error.type)); }
+    else{
+      let thinking="", textOut="";
+      (data.content||[]).forEach(b=>{
+        if(b.type==="thinking") thinking += b.thinking||"";
+        if(b.type==="text") textOut += b.text||"";
+      });
+      const mem = extractMemories(textOut);
+      const m = {role:"assistant", text: mem.text || "……", thinking: thinking||null};
+      history.push(m); renderMsg(m); scrollEnd(); persistHistory();
+      if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
+      maybeSummarize();
+    }
+  }catch(e){
+    tip.remove();
+    showError("通信に失敗したよ: " + e.message);
+  }
+  busy=false; send.disabled=false;
+  scheduleProactive();
+}
+function persistHistory(){
+  for(let i=0;i<8;i++){
+    try{ localStorage.setItem("ritsu-history", JSON.stringify(history)); return; }
+    catch(e){
+      const m = history.find(x=>x.atts && x.atts.some(a=>a.data));
+      if(!m) return;                       // もう削れる添付がない
+      m.atts.forEach(a=>{ if(a.data) a.data=null; }); // 古い添付の中身を外して再保存
+    }
+  }
+}
+
+/* ---------- proactive (自発会話) ---------- */
+let proTimer = null;
+function scheduleProactive(){
+  if(proTimer){ clearTimeout(proTimer); proTimer = null; }
+  if(!settings.proactive || !settings.key) return;
+  const mins = Math.max(1, Number(settings.proMin) || 3);
+  proTimer = setTimeout(()=>{
+    if(!document.hidden && !busy && !lockEl.classList.contains("open")) sendProactive();
+    else scheduleProactive();
+  }, mins*60000);
+}
+async function sendProactive(){
+  if(busy || !settings.proactive || !settings.key || document.hidden) return;
+  if(history.length && history[history.length-1].role==="user") return; // 直前がユーザー発言なら見送り
+  busy=true; send.disabled=true;
+  const tip = el("div","msg ritsu");
+  const t = el("div","bubble typing"); t.appendChild(el("i"));t.appendChild(el("i"));t.appendChild(el("i"));
+  tip.appendChild(t); chat.appendChild(tip); scrollEnd();
+  try{
+    const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
+    const base = windowSlice().map(m=>({role:m.role==="user"?"user":"assistant", content: toContent(m) || "…"}));
+    const nudge = {role:"user", content:"[システム] ユーザーはしばらく静かにしています。律として、あなたの方から自然に、短めに話しかけてください。"};
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST", headers: HEADERS(),
+      body: JSON.stringify({ model, max_tokens:1024, system: buildSystem() || undefined, messages:[...base, nudge] })
+    });
+    const data = await res.json();
+    tip.remove();
+    if(!data.error){
+      let textOut=""; (data.content||[]).forEach(b=>{ if(b.type==="text") textOut += b.text||""; });
+      if(textOut.trim()){
+        const mem = extractMemories(textOut);
+        const m = {role:"assistant", text: mem.text || "……", thinking:null};
+        history.push(m); renderMsg(m); scrollEnd(); persistHistory();
+        if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
+        maybeSummarize();
+      }
+    }
+  }catch(e){ tip.remove(); }
+  busy=false; send.disabled=false;
+  scheduleProactive();
+}
+
+send.addEventListener("click", sendMessage);
+input.addEventListener("keydown", e=>{
+  if(e.key==="Enter" && (e.metaKey||e.ctrlKey)){ e.preventDefault(); sendMessage(); }
+});
+function autoGrow(){ input.style.height="auto"; input.style.height=Math.min(input.scrollHeight,120)+"px"; }
+input.addEventListener("input", autoGrow);
+
+/* ---------- attachments ---------- */
+function readImage(file){
+  return new Promise(resolve=>{
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = ()=>{
+      URL.revokeObjectURL(url);
+      const max = 1024; let w = img.width, h = img.height;
+      if(w>max || h>max){ const r = Math.min(max/w, max/h); w = Math.round(w*r); h = Math.round(h*r); }
+      const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      const data = cv.toDataURL("image/jpeg", 0.82).split(",")[1];
+      resolve({kind:"image", media_type:"image/jpeg", data, name:file.name});
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+function readBase64(file){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=()=>res(null); r.readAsDataURL(file); }); }
+function readText(file){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(String(r.result)); r.onerror=()=>res(""); r.readAsText(file); }); }
+function readIcon(file){
+  return new Promise(resolve=>{
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = ()=>{
+      URL.revokeObjectURL(url);
+      const max = 160, r = Math.min(max/img.width, max/img.height, 1);
+      const w = Math.round(img.width*r), h = Math.round(img.height*r);
+      const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(cv.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(""); };
+    img.src = url;
+  });
+}
+
+function renderAtts(){
+  const bar = $("attbar"); bar.innerHTML = "";
+  pending.forEach((a,i)=>{
+    const chip = el("div","attchip");
+    if(a.kind==="image"){ const im=el("img"); im.src="data:"+a.media_type+";base64,"+a.data; chip.appendChild(im); }
+    else { chip.appendChild(el("div","file","📄 "+(a.name||"file"))); }
+    const x = el("button","x","×"); x.addEventListener("click", ()=>{ pending.splice(i,1); renderAtts(); });
+    chip.appendChild(x); bar.appendChild(chip);
+  });
+}
+$("attach").addEventListener("click", ()=> $("file").click());
+$("file").addEventListener("change", async e=>{
+  const files = [...e.target.files];
+  for(const f of files){
+    if(f.type.startsWith("image/")){ const a = await readImage(f); if(a) pending.push(a); }
+    else if(f.type==="application/pdf"){ const d = await readBase64(f); if(d) pending.push({kind:"document", media_type:"application/pdf", data:d, name:f.name}); }
+    else { const t = await readText(f); pending.push({kind:"text", text:t, name:f.name}); }
+  }
+  e.target.value = ""; renderAtts();
+});
+
+function windowSlice(){
+  let arr = history.slice(-Math.max(1, Number(settings.window)||30));
+  while(arr.length && arr[0].role!=="user") arr = arr.slice(1); // 先頭は必ずユーザー発言から
+  return arr;
+}
+function toContent(m){
+  if(!m.atts || !m.atts.length) return m.text;
+  const blocks = [];
+  m.atts.forEach(a=>{
+    if(a.kind==="image" && a.data) blocks.push({type:"image", source:{type:"base64", media_type:a.media_type, data:a.data}});
+    else if(a.kind==="document" && a.data) blocks.push({type:"document", source:{type:"base64", media_type:a.media_type, data:a.data}});
+    else if(a.kind==="text" && a.text) blocks.push({type:"text", text:"[ファイル: "+(a.name||"")+"]\n"+a.text});
+  });
+  if(m.text) blocks.push({type:"text", text:m.text});
+  return blocks.length ? blocks : (m.text || "");
+}
+
+/* ---------- memory (自動要約) ---------- */
+function HEADERS(){ return {
+  "content-type":"application/json",
+  "x-api-key":settings.key,
+  "anthropic-version":"2023-06-01",
+  "anthropic-dangerous-direct-browser-access":"true"
+}; }
+function buildSystem(){
+  let s = settings.system || "";
+  const prof = [];
+  if(settings.uname) prof.push("名前: " + settings.uname);
+  if(settings.uinfo && settings.uinfo.trim()) prof.push(settings.uinfo.trim());
+  if(prof.length) s += (s ? "\n\n" : "") + "# 話している相手について\n" + prof.join("\n");
+  if(settings.memory && settings.memory.trim()){
+    s += (s ? "\n\n" : "") + "# これまでの記憶\n" + settings.memory.trim();
+  }
+  if(settings.selfMemory){
+    s += (s ? "\n\n" : "") + "# 記憶の残し方\n相手について長く覚えておきたい大切なこと(約束・好み・出来事・気持ちの変化など)が出てきたら、返信のどこかに <remember>覚えておく内容</remember> という形でそっと書いてください。この部分は相手には表示されず、あなたの記憶メモに自動で保存されます。乱用せず、本当に大切なときだけ簡潔に。";
+  }
+  return s;
+}
+function extractMemories(text){
+  if(!settings.selfMemory) return {text, remembered:false};
+  let remembered = false;
+  const cleaned = text.replace(/<remember>([\s\S]*?)<\/remember>/g, (_, note)=>{
+    note = note.trim();
+    if(note){ settings.memory = (settings.memory ? settings.memory.trim()+"\n" : "") + "・" + note; remembered = true; }
+    return "";
+  }).replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
+  if(remembered) store.set("ritsu-settings", JSON.stringify(settings));
+  return {text: cleaned || "……", remembered};
+}
+async function maybeSummarize(force){
+  if(summarizing || !settings.key) return;
+  if(!force && !settings.autoMemory) return;
+  const keep = settings.window;
+  const batch = history.slice(summarized, Math.max(summarized, history.length - keep));
+  if(batch.length < (force ? 1 : 8)) return;   // たまるまで動かない(手動は1件から)
+  summarizing = true;
+  try{
+    const convo = batch.map(m=>(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : ""))).join("\n");
+    const sys = "あなたは会話の記憶係です。既存の記憶メモと新しい会話の断片を統合し、重要な出来事・約束・感情・関係性・設定の変化を、簡潔な日本語の箇条書きで更新してください。重複はまとめ、ただの相槌は省く。出力は記憶メモ本体だけを返すこと。";
+    const usr = "【既存の記憶メモ】\n" + (settings.memory || "(まだ無い)") + "\n\n【新しい会話の断片】\n" + convo + "\n\n更新後の記憶メモ:";
+    const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST", headers:HEADERS(),
+      body: JSON.stringify({ model, max_tokens:1500, system:sys, messages:[{role:"user", content:usr}] })
+    });
+    const data = await res.json();
+    if(!data.error){
+      const out = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+      if(out){ settings.memory = out; store.set("ritsu-settings", JSON.stringify(settings)); }
+      summarized = history.length - keep; if(summarized<0) summarized=0; saveMeta();
+      chat.appendChild(el("div","sysnote","🧠 記憶を更新したよ")); scrollEnd();
+    }
+  }catch(e){ /* 失敗してもチャットは止めない */ }
+  summarizing = false;
+}
+
+/* ---------- settings ---------- */
+function openSettings(){
+  $("set-key").value = settings.key;
+  $("set-model").value = settings.model;
+  $("set-model-custom").value = settings.customModel;
+  $("set-think").checked = settings.think;
+  $("set-budget").value = settings.budget;
+  $("set-window").value = settings.window;
+  $("set-uname").value = settings.uname;
+  $("set-uinfo").value = settings.uinfo;
+  if(settings.uicon){ $("uicon-prev").src = settings.uicon; $("uicon-prev").style.display = "block"; }
+  else { $("uicon-prev").src = ""; $("uicon-prev").style.display = "none"; }
+  $("set-system").value = settings.system;
+  $("set-automem").checked = settings.autoMemory;
+  $("set-selfmem").checked = settings.selfMemory;
+  $("set-proactive").checked = settings.proactive;
+  $("set-promin").value = settings.proMin;
+  $("set-memory").value = settings.memory;
+  $("set-pin").value = "";
+  $("pin-state").textContent = settings.pinHash ? "現在: 設定済み 🔒" : "現在: 未設定";
+  $("settings").classList.add("open");
+}
+$("open-settings").addEventListener("click", openSettings);
+$("save-settings").addEventListener("click", ()=>{
+  settings.key = $("set-key").value.trim();
+  settings.model = $("set-model").value;
+  settings.customModel = $("set-model-custom").value.trim();
+  settings.think = $("set-think").checked;
+  settings.budget = Math.max(1024, Number($("set-budget").value)||3000);
+  settings.window = Math.max(2, Number($("set-window").value)||30);
+  settings.uname = $("set-uname").value.trim();
+  settings.uinfo = $("set-uinfo").value;
+  settings.system = $("set-system").value;
+  settings.autoMemory = $("set-automem").checked;
+  settings.selfMemory = $("set-selfmem").checked;
+  settings.proactive = $("set-proactive").checked;
+  settings.proMin = Math.max(1, Number($("set-promin").value) || 3);
+  settings.memory = $("set-memory").value;
+  const pv = $("set-pin").value.trim();
+  if(pv !== ""){
+    if(/^\d{4}$/.test(pv)){ settings.pinHash = pinHash(pv); }
+    else { alert("PINは4桁の数字で入れてね"); return; }
+  }
+  store.set("ritsu-settings", JSON.stringify(settings));
+  $("settings").classList.remove("open");
+  scheduleProactive();
+});
+$("remove-pin").addEventListener("click", ()=>{
+  if(confirm("PINロックを解除する?")){
+    settings.pinHash = ""; store.set("ritsu-settings", JSON.stringify(settings));
+    $("pin-state").textContent = "現在: 未設定"; $("set-pin").value = "";
+  }
+});
+$("update-memory").addEventListener("click", async ()=>{
+  settings.memory = $("set-memory").value;
+  store.set("ritsu-settings", JSON.stringify(settings));
+  const btn = $("update-memory"); btn.textContent = "更新中…"; btn.disabled = true;
+  await maybeSummarize(true);
+  $("set-memory").value = settings.memory;
+  btn.textContent = "今すぐ記憶を更新する"; btn.disabled = false;
+});
+$("pick-uicon").addEventListener("click", ()=> $("uicon-file").click());
+$("uicon-file").addEventListener("change", async e=>{
+  const f = e.target.files[0]; e.target.value = "";
+  if(!f) return;
+  const d = await readIcon(f);
+  if(d){ settings.uicon = d; store.set("ritsu-settings", JSON.stringify(settings)); $("uicon-prev").src = d; $("uicon-prev").style.display = "block"; }
+});
+$("clear-uicon").addEventListener("click", ()=>{
+  settings.uicon = ""; store.set("ritsu-settings", JSON.stringify(settings));
+  $("uicon-prev").src = ""; $("uicon-prev").style.display = "none";
+});
+$("clear-chat").addEventListener("click", ()=>{
+  if(confirm("会話をぜんぶ消す?この操作は戻せないよ")){
+    history=[]; store.del("ritsu-history"); summarized=0; saveMeta(); renderAll();
+    $("settings").classList.remove("open");
+  }
+});
+$("export-chat").addEventListener("click", ()=>{
+  const txt = history.map(m=>(m.role==="user"?"さき: ":"律: ")+m.text).join("\n\n");
+  const blob = new Blob([txt],{type:"text/plain"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "ritsu-chat.txt"; a.click();
+});
+
+/* ---------- lock ---------- */
+function pinHash(pin){
+  const s = "ritsu" + pin + "saki\u2661";
+  let h = 5381;
+  for(let i=0;i<s.length;i++){ h = (((h<<5)+h) ^ s.charCodeAt(i)) >>> 0; }
+  return h.toString(16);
+}
+const lockEl = $("lock"), dotsEl = $("dots"), lockErr = $("lock-err");
+let entered = "", wasHidden = false;
+function updateDots(){ [...dotsEl.children].forEach((d,i)=> d.classList.toggle("on", i < entered.length)); }
+function showLock(){ entered=""; updateDots(); lockErr.textContent=""; lockEl.classList.add("open"); }
+function hideLock(){ lockEl.classList.remove("open"); }
+function lockPress(v){
+  if(v==="del"){ entered = entered.slice(0,-1); updateDots(); return; }
+  if(entered.length>=4) return;
+  entered += v; updateDots();
+  if(entered.length===4){
+    if(pinHash(entered)===settings.pinHash){ hideLock(); afterUnlock(); }
+    else{
+      lockErr.textContent="ちがうみたい…もう一度";
+      dotsEl.classList.add("shake");
+      setTimeout(()=>{ dotsEl.classList.remove("shake"); entered=""; updateDots(); }, 400);
+    }
+  }
+}
+$("keypad").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b || b.classList.contains("blank")) return;
+  lockPress(b.dataset.del ? "del" : b.textContent.trim());
+});
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="hidden"){ wasHidden=true; if(proTimer){ clearTimeout(proTimer); proTimer=null; } }
+  else if(wasHidden){ wasHidden=false; if(settings.pinHash) showLock(); scheduleProactive(); }
+});
+function afterUnlock(){ if(!settings.key) openSettings(); }
+function initLock(){ if(settings.pinHash) showLock(); else afterUnlock(); }
+
+/* ---------- init ---------- */
+renderAll();
+initLock();
+scheduleProactive();
+</script>
+</body>
+</html>
