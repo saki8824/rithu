@@ -156,6 +156,11 @@
   .u-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:1.5px solid var(--saki-blue)}
   .r-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:1.5px solid var(--ritsu-pink)}
   .msg-time{font-size:10.5px;color:var(--muted);align-self:flex-end;padding-bottom:2px;flex:0 0 auto;white-space:nowrap;opacity:.85}
+  .msg-actions{display:none;gap:8px;margin-top:6px}
+  .msg-actions.open{display:flex}
+  .msg-act-btn{background:var(--night-2);border:1px solid var(--line);color:var(--muted);
+    border-radius:10px;padding:6px 13px;font-family:inherit;font-size:12.5px;font-weight:500;width:auto;flex:0 0 auto}
+  .msg-act-btn:active{background:var(--bubble-saki)}
   .icon-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .u-prev{width:52px;height:52px;border-radius:50%;object-fit:cover;border:1.5px solid var(--saki-blue);display:none}
   .r-prev{width:52px;height:52px;border-radius:50%;object-fit:cover;border:1.5px solid var(--ritsu-pink);display:none}
@@ -635,6 +640,33 @@ const chat = $("chat"), input = $("input"), send = $("send");
 function el(tag, cls, text){ const e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e; }
 function fmtTime(ts){ const d=new Date(ts); return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0"); }
 
+async function copyText(t){
+  try{ if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(t); return true; } }catch(e){}
+  try{
+    const ta = document.createElement("textarea"); ta.value = t;
+    ta.style.position="fixed"; ta.style.top="0"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const ok = document.execCommand("copy"); document.body.removeChild(ta); return ok;
+  }catch(e){ return false; }
+}
+function attachActions(wrap, bub, text){
+  const bar = el("div","msg-actions");
+  const copyBtn = el("button","msg-act-btn","📋 コピー");
+  copyBtn.addEventListener("click", async e=>{
+    e.stopPropagation();
+    const ok = await copyText(text);
+    copyBtn.textContent = ok ? "✓ コピーしたよ" : "コピー失敗…";
+    setTimeout(()=>{ copyBtn.textContent = "📋 コピー"; }, 1500);
+  });
+  bar.appendChild(copyBtn);
+  wrap.appendChild(bar);
+  bub.style.cursor = "pointer";
+  bub.addEventListener("click", ()=>{
+    const open = bar.classList.contains("open");
+    document.querySelectorAll(".msg-actions.open").forEach(b=>{ if(b!==bar) b.classList.remove("open"); });
+    bar.classList.toggle("open", !open);
+  });
+}
 function renderMsg(m){
   const wrap = el("div", "msg " + (m.role==="user" ? "saki" : "ritsu"));
   if(m.role==="assistant" && m.thinking){
@@ -665,6 +697,7 @@ function renderMsg(m){
       if(tm) row.appendChild(tm);
     }
     wrap.appendChild(row);
+    attachActions(wrap, bub, m.text);
   }
   chat.appendChild(wrap);
 }
