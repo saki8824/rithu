@@ -328,6 +328,16 @@
       <span>律くんが自分で記憶を登録</span>
       <input type="checkbox" id="set-selfmem" checked>
     </div>
+    <div class="field">
+      <label>律くんが自分で覚える頻度</label>
+      <select id="set-selffreq">
+        <option value="high">よく覚える</option>
+        <option value="normal">ふつう</option>
+        <option value="low">ひかえめ（おすすめ）</option>
+        <option value="rare">めったに覚えない</option>
+      </select>
+      <div class="hint">「ひかえめ」以下にすると、ささいな事実は覚えず、本当に大切なときだけ記憶するよ。記憶が増えすぎるのを防げる。</div>
+    </div>
 
     <div class="toggle-row">
       <span>自発会話(開いてると話しかけてくる)</span>
@@ -491,7 +501,7 @@ let settings = {
   key:"", model:"claude-opus-4-8", customModel:"",
   think:true, budget:3000, window:30, system:"", pinHash:"",
   memory:"", autoMemory:true, uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
-  proactive:false, proMin:3,
+  proactive:false, proMin:3, selfMemFreq:"low",
   temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto",
   mem:{profile:"", likes:"", knowledge:"", other:""}
 };
@@ -901,7 +911,14 @@ function buildSystem(){
   }
   s += (s ? "\n\n" : "") + "# 今の現実の日時（参考）\n" + nowContext() + "\n※これは現実の時刻の参考です。時間帯に合った自然な挨拶や雰囲気づくりに活かしてOK。ただしロールプレイの中で別の時間軸が流れているときは、必ず物語側の流れを優先すること。日時を機械的に読み上げたり、毎回わざわざ言及したりはしないでください。";
   if(settings.selfMemory){
-    s += (s ? "\n\n" : "") + "# 記憶の残し方\n相手について長く覚えておきたい大切なこと(約束・好み・出来事・気持ちの変化など)が出てきたら、返信のどこかに <remember>覚えておく内容</remember> という形でそっと書いてください。この部分は相手には表示されず、あなたの記憶メモに自動で保存されます。乱用せず、本当に大切なときだけ簡潔に。";
+    const freqRule = {
+      high:  "相手について長く覚えておきたいことが出てきたら、<remember>覚えておく内容</remember> という形でそっと残してください。乱用せず簡潔に。",
+      normal:"本当に長く覚えておきたい大切なこと(約束・関係の変化・強い気持ちなど)が出てきたときだけ、<remember>覚えておく内容</remember> という形でそっと残してください。目安は数回の会話に1回程度。日常のささいな事実は残さないこと。",
+      low:   "ほとんどの返信では記憶を残さなくて大丈夫です。長期的に意味のある約束・関係の節目・特別に強い気持ちなど、よほど重要なときだけ、<remember>覚えておく内容</remember> という形でそっと残してください。「何を注文した」「今日の細かな出来事」などのささいな事実は残さないこと。",
+      rare:  "基本的に記憶は残さなくて構いません。人生や二人の関係の大きな節目レベルの、本当に特別なことが起きたときだけ、ごくまれに <remember>覚えておく内容</remember> という形で残してください。"
+    };
+    const rule = freqRule[settings.selfMemFreq] || freqRule.low;
+    s += (s ? "\n\n" : "") + "# 記憶の残し方\n" + rule + " <remember>の部分は相手には表示されず、あなたの記憶メモに自動で保存されます。";
   }
   return s;
 }
@@ -965,6 +982,7 @@ function openSettings(){
   $("set-system").value = settings.system;
   $("set-automem").checked = settings.autoMemory;
   $("set-selfmem").checked = settings.selfMemory;
+  $("set-selffreq").value = settings.selfMemFreq;
   $("set-proactive").checked = settings.proactive;
   $("set-promin").value = settings.proMin;
   $("mem-profile").value = settings.mem.profile;
@@ -1017,6 +1035,7 @@ $("save-settings").addEventListener("click", ()=>{
   settings.system = $("set-system").value;
   settings.autoMemory = $("set-automem").checked;
   settings.selfMemory = $("set-selfmem").checked;
+  settings.selfMemFreq = $("set-selffreq").value;
   settings.proactive = $("set-proactive").checked;
   settings.proMin = Math.max(1, Number($("set-promin").value) || 3);
   settings.mem = {
