@@ -878,6 +878,17 @@ function memParse(text){
   }
   return out;
 }
+function nowContext(){
+  const d = new Date();
+  const wd = ["日","月","火","水","木","金","土"][d.getDay()];
+  const h = d.getHours();
+  let band = "深夜";
+  if(h>=5 && h<11) band="朝";
+  else if(h>=11 && h<15) band="昼";
+  else if(h>=15 && h<18) band="夕方";
+  else if(h>=18 && h<23) band="夜";
+  return d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日("+wd+") "+h+"時"+String(d.getMinutes()).padStart(2,"0")+"分ごろ（"+band+"）";
+}
 function buildSystem(){
   let s = settings.system || "";
   const prof = [];
@@ -888,6 +899,7 @@ function buildSystem(){
   if(mt){
     s += (s ? "\n\n" : "") + "# これまでの記憶\n" + mt;
   }
+  s += (s ? "\n\n" : "") + "# 今の現実の日時（参考）\n" + nowContext() + "\n※これは現実の時刻の参考です。時間帯に合った自然な挨拶や雰囲気づくりに活かしてOK。ただしロールプレイの中で別の時間軸が流れているときは、必ず物語側の流れを優先すること。日時を機械的に読み上げたり、毎回わざわざ言及したりはしないでください。";
   if(settings.selfMemory){
     s += (s ? "\n\n" : "") + "# 記憶の残し方\n相手について長く覚えておきたい大切なこと(約束・好み・出来事・気持ちの変化など)が出てきたら、返信のどこかに <remember>覚えておく内容</remember> という形でそっと書いてください。この部分は相手には表示されず、あなたの記憶メモに自動で保存されます。乱用せず、本当に大切なときだけ簡潔に。";
   }
