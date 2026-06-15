@@ -734,10 +734,11 @@ async function sendMessage(){
 
   try{
     const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
-    const msgs = windowSlice().map(m=>({role:m.role==="user"?"user":"assistant", content: toContent(m) || "…"}));
+    const msgs = buildCachedMsgs();
+    const sysStable = buildSystem(false);
     const body = {
       model, max_tokens: settings.think ? (Number(settings.budget)+4096) : 4096,
-      system: buildSystem() || undefined,
+      system: sysStable ? [{type:"text", text: sysStable, cache_control:{type:"ephemeral"}}] : undefined,
       messages: msgs
     };
     if(settings.think) body.thinking = {type:"enabled", budget_tokens:Number(settings.budget)};
@@ -896,6 +897,29 @@ function toContent(m){
   return blocks.length ? blocks : (m.text || "");
 }
 
+function asBlocks(content){
+  if(typeof content==="string") return [{type:"text", text: content || "…"}];
+  if(Array.isArray(content)) return content.map(b=>Object.assign({}, b));
+  return [{type:"text", text:String(content||"…")}];
+}
+function withCache(content){
+  const b = asBlocks(content);
+  b[b.length-1] = Object.assign({}, b[b.length-1], {cache_control:{type:"ephemeral"}});
+  return b;
+}
+function buildCachedMsgs(){
+  const arr = windowSlice().map(m=>({role: m.role==="user"?"user":"assistant", content: toContent(m) || "…"}));
+  if(!arr.length) return arr;
+  const last = arr.length-1;
+  // 最新メッセージにだけ現実の時刻を添える（毎回変わる＝キャッシュの外側に置く）
+  const lb = asBlocks(arr[last].content);
+  lb.unshift({type:"text", text: "（※今は " + nowContext() + "）"});
+  arr[last].content = lb;
+  // 直前のメッセージまで（＝これまでの履歴）をキャッシュ対象にする
+  if(arr.length>=2) arr[last-1].content = withCache(arr[last-1].content);
+  return arr;
+}
+
 /* ---------- memory (自動要約) ---------- */
 function HEADERS(){ return {
   "content-type":"application/json",
@@ -933,7 +957,8 @@ function nowContext(){
   else if(h>=18 && h<23) band="夜";
   return d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日("+wd+") "+h+"時"+String(d.getMinutes()).padStart(2,"0")+"分ごろ（"+band+"）";
 }
-function buildSystem(){
+function buildSystem(withTime){
+  withTime = withTime!==false;
   let s = settings.system || "";
   const prof = [];
   if(settings.uname) prof.push("名前: " + settings.uname);
@@ -943,7 +968,10 @@ function buildSystem(){
   if(mt){
     s += (s ? "\n\n" : "") + "# これまでの記憶\n" + mt;
   }
-  s += (s ? "\n\n" : "") + "# 今の現実の日時（参考）\n" + nowContext() + "\n※これは現実の時刻です。普段は、時間帯に合った自然な空気づくりにさりげなく使う程度でOK（毎回わざわざ時刻を口に出さなくてよい）。ロールプレイの中で別の時間が流れているときは、物語側の流れを優先してください。\nただし、さきが「今何時？」「今日は何日？」のように、現実の時刻や日付そのものを尋ねてきたら、上の日時を正確に答えること。決して適当な時刻をでっち上げないでください。";
+  s += (s ? "\n\n" : "") + "# 現実の日時について\n各メッセージに「（※今は …）」という形で現実の時刻が添えられることがあります。これは現実の時刻です。普段は、その時間帯に合った自然な空気づくりにさりげなく使う程度でOK（毎回わざわざ時刻を口に出さなくてよい）。ロールプレイの中で別の時間が流れているときは、物語側の流れを優先してください。ただし、さきが「今何時？」「今日は何日？」のように、現実の時刻や日付そのものを尋ねてきたら、添えられた時刻を正確に答えること。決して適当な時刻をでっち上げないでください。";
+  if(withTime){
+    s += (s ? "\n\n" : "") + "# 今の現実の日時\n" + nowContext();
+  }
   if(settings.selfMemory){
     const freqRule = {
       high:  "相手について長く覚えておきたいことが出てきたら、<remember>覚えておく内容</remember> という形でそっと残してください。乱用せず簡潔に。",
