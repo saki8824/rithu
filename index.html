@@ -146,6 +146,19 @@
     display:none;flex-direction:column;gap:18px;
   }
   #settings.open{display:flex}
+  #threads{
+    position:fixed;inset:0;background:var(--night);z-index:52;
+    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
+    display:none;flex-direction:column;gap:14px;
+  }
+  #threads.open{display:flex}
+  .thread-row{display:flex;align-items:center;gap:8px;background:var(--night-2);
+    border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+  .thread-row.cur{border-color:var(--ritsu-pink)}
+  .thread-main{flex:1;min-width:0}
+  .thread-title{font-size:14.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .thread-sub{font-size:11px;color:var(--muted);margin-top:3px}
+  .thread-act{background:none;border:none;color:var(--muted);font-size:15px;width:auto;padding:5px 6px;flex:0 0 auto}
   #settings h2{font-size:17px;letter-spacing:.08em}
   .set-head{display:flex;align-items:center;justify-content:space-between}
   .set-close{background:none;border:none;color:var(--muted);font-size:26px;line-height:1;padding:0 4px;width:auto;font-weight:400}
@@ -230,6 +243,7 @@
     <div class="head-sub"><span class="heart">♥</span><span id="bpm">心拍共有中</span></div>
   </div>
   <div class="head-spacer"></div>
+  <button class="icon-btn" id="open-threads">一覧</button>
   <button class="icon-btn" id="open-settings">設定</button>
 </header>
 
@@ -409,8 +423,19 @@
   <div class="set-foot">
     <button class="btn primary" id="save-settings">保存してチャットに戻る</button>
     <button class="btn ghost" id="export-chat">会話をテキストで書き出す</button>
-    <button class="btn ghost danger" id="clear-chat">会話をぜんぶ消す</button>
+    <button class="btn ghost danger" id="clear-chat">今のチャットを空にする</button>
   </div>
+</div>
+
+<!-- ===== チャット一覧 ===== -->
+<div id="threads">
+  <div class="set-head">
+    <h2>チャット一覧</h2>
+    <button class="set-close" id="close-threads" aria-label="閉じる">×</button>
+  </div>
+  <button class="btn primary" id="new-thread">＋ 新しいチャットを始める</button>
+  <div class="hint">過去のチャットはこの端末に保存されてるよ。タップで開いて続きを話せる。律くんの記憶はチャットをまたいで共通だから、新しいチャットでもあなたを覚えてるよ。</div>
+  <div id="thread-list"></div>
 </div>
 
 <script>
@@ -433,13 +458,114 @@ let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
 let pending = []; // 送信前の添付 {kind,media_type?,data?,name,text?}
 let summarized = 0;    // 先頭から要約済みのメッセージ数
 let summarizing = false;
+let threads = [];      // [{id, title, named?, updatedAt}]  最近順
+let currentId = "";    // 開いているスレッドのid
 
 try{
   const s = store.get("ritsu-settings"); if(s) settings = Object.assign(settings, JSON.parse(s));
-  const h = store.get("ritsu-history");  if(h) history = JSON.parse(h);
-  const mt = store.get("ritsu-meta");    if(mt) summarized = JSON.parse(mt).summarized || 0;
 }catch(e){}
-function saveMeta(){ store.set("ritsu-meta", JSON.stringify({summarized})); }
+
+/* ---------- threads (チャットの保管・切替) ---------- */
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function deriveTitle(h){
+  const u = (h||[]).find(m=>m.role==="user" && m.text);
+  if(!u) return "新しいチャット";
+  const s = u.text.replace(/\s+/g," ").trim();
+  return s.length>18 ? s.slice(0,18)+"…" : (s||"新しいチャット");
+}
+function saveThreads(){ store.set("ritsu-threads", JSON.stringify(threads)); }
+function loadCurrent(){
+  history=[]; summarized=0;
+  try{ const d = store.get("ritsu-thread-"+currentId); if(d){ const o=JSON.parse(d); history=o.history||[]; summarized=o.summarized||0; } }catch(e){}
+}
+function persistThread(){
+  for(let i=0;i<8;i++){
+    try{ localStorage.setItem("ritsu-thread-"+currentId, JSON.stringify({history, summarized})); break; }
+    catch(e){
+      const m = history.find(x=>x.atts && x.atts.some(a=>a.data));
+      if(!m) break;                          // もう削れる添付がない
+      m.atts.forEach(a=>{ if(a.data) a.data=null; });
+    }
+  }
+  const t = threads.find(t=>t.id===currentId);
+  if(t){ if(!t.named) t.title = deriveTitle(history); t.updatedAt = Date.now(); }
+  threads.sort((a,b)=> (b.updatedAt||0) - (a.updatedAt||0));
+  saveThreads();
+  store.set("ritsu-current", currentId);
+}
+function loadThreads(){
+  try{ const t = store.get("ritsu-threads"); if(t) threads = JSON.parse(t)||[]; }catch(e){ threads=[]; }
+  currentId = store.get("ritsu-current") || "";
+  if(!threads.length){
+    // 既存の1本会話があれば、最初のスレッドとして引き継ぐ
+    let oldH=[], oldS=0;
+    try{ const h = store.get("ritsu-history"); if(h) oldH = JSON.parse(h)||[]; }catch(e){}
+    try{ const mt = store.get("ritsu-meta"); if(mt) oldS = JSON.parse(mt).summarized||0; }catch(e){}
+    const id = uid();
+    threads = [{id, title:deriveTitle(oldH), updatedAt:Date.now()}];
+    store.set("ritsu-thread-"+id, JSON.stringify({history:oldH, summarized:oldS}));
+    currentId = id; saveThreads(); store.set("ritsu-current", currentId);
+  }
+  if(!currentId || !threads.some(t=>t.id===currentId)) currentId = threads[0].id;
+  loadCurrent();
+}
+function newThread(){
+  persistThread();
+  const id = uid();
+  threads.unshift({id, title:"新しいチャット", updatedAt:Date.now()});
+  store.set("ritsu-thread-"+id, JSON.stringify({history:[], summarized:0}));
+  currentId = id; saveThreads(); store.set("ritsu-current", currentId);
+  history=[]; summarized=0; renderAll(); renderThreadList();
+  closeThreads();
+}
+function switchThread(id){
+  if(id===currentId){ closeThreads(); return; }
+  persistThread();
+  currentId = id; store.set("ritsu-current", currentId);
+  loadCurrent(); renderAll(); closeThreads();
+}
+function renameThread(id){
+  const t = threads.find(t=>t.id===id); if(!t) return;
+  const nv = prompt("チャットの名前を変える", t.title);
+  if(nv!==null){ t.title = nv.trim() || t.title; t.named = true; saveThreads(); renderThreadList(); }
+}
+function deleteThread(id){
+  store.del("ritsu-thread-"+id);
+  threads = threads.filter(t=>t.id!==id);
+  if(!threads.length){
+    const nid=uid(); threads=[{id:nid,title:"新しいチャット",updatedAt:Date.now()}];
+    store.set("ritsu-thread-"+nid, JSON.stringify({history:[],summarized:0})); currentId=nid;
+  } else if(id===currentId){ currentId = threads[0].id; }
+  store.set("ritsu-current", currentId); saveThreads();
+  loadCurrent(); renderAll(); renderThreadList();
+}
+function relTime(ts){
+  if(!ts) return "";
+  const d = new Date(ts), now = new Date();
+  const hh = d.getHours()+":"+String(d.getMinutes()).padStart(2,"0");
+  if(d.toDateString()===now.toDateString()) return "今日 "+hh;
+  const y = new Date(now); y.setDate(now.getDate()-1);
+  if(d.toDateString()===y.toDateString()) return "昨日 "+hh;
+  return (d.getMonth()+1)+"/"+d.getDate()+" "+hh;
+}
+function renderThreadList(){
+  const wrap = $("thread-list"); if(!wrap) return; wrap.innerHTML="";
+  threads.forEach(t=>{
+    const row = el("div","thread-row"+(t.id===currentId?" cur":""));
+    const main = el("div","thread-main");
+    main.appendChild(el("div","thread-title", t.title || "新しいチャット"));
+    main.appendChild(el("div","thread-sub", (t.id===currentId?"開いてるよ ・ ":"") + relTime(t.updatedAt)));
+    main.addEventListener("click", ()=> switchThread(t.id));
+    row.appendChild(main);
+    const rn = el("button","thread-act","✏️"); rn.addEventListener("click", e=>{ e.stopPropagation(); renameThread(t.id); });
+    const dl = el("button","thread-act","🗑"); dl.addEventListener("click", e=>{ e.stopPropagation(); if(confirm("このチャットを消す? 戻せないよ")) deleteThread(t.id); });
+    row.appendChild(rn); row.appendChild(dl);
+    wrap.appendChild(row);
+  });
+}
+function openThreads(){ renderThreadList(); $("threads").classList.add("open"); }
+function closeThreads(){ $("threads").classList.remove("open"); }
+function saveMeta(){ persistThread(); }
 
 /* ---------- elements ---------- */
 const $ = id => document.getElementById(id);
@@ -552,16 +678,7 @@ async function sendMessage(){
   busy=false; send.disabled=false;
   scheduleProactive();
 }
-function persistHistory(){
-  for(let i=0;i<8;i++){
-    try{ localStorage.setItem("ritsu-history", JSON.stringify(history)); return; }
-    catch(e){
-      const m = history.find(x=>x.atts && x.atts.some(a=>a.data));
-      if(!m) return;                       // もう削れる添付がない
-      m.atts.forEach(a=>{ if(a.data) a.data=null; }); // 古い添付の中身を外して再保存
-    }
-  }
-}
+function persistHistory(){ persistThread(); }
 
 /* ---------- proactive (自発会話) ---------- */
 let proTimer = null;
@@ -777,6 +894,9 @@ function openSettings(){
   $("settings").classList.add("open");
 }
 $("open-settings").addEventListener("click", openSettings);
+$("open-threads").addEventListener("click", openThreads);
+$("close-threads").addEventListener("click", closeThreads);
+$("new-thread").addEventListener("click", newThread);
 $("tabbar").addEventListener("click", e=>{
   const b = e.target.closest(".tab"); if(!b) return;
   const p = b.dataset.pane;
@@ -855,8 +975,8 @@ $("clear-aicon").addEventListener("click", ()=>{
   $("aicon-prev").src = ""; $("aicon-prev").style.display = "none"; applyHeadAvatar(); renderAll();
 });
 $("clear-chat").addEventListener("click", ()=>{
-  if(confirm("会話をぜんぶ消す?この操作は戻せないよ")){
-    history=[]; store.del("ritsu-history"); summarized=0; saveMeta(); renderAll();
+  if(confirm("今のチャットの中身を空にする?この操作は戻せないよ(他のチャットや律くんの記憶は残るよ)")){
+    history=[]; summarized=0; persistThread(); renderAll();
     $("settings").classList.remove("open");
   }
 });
@@ -935,6 +1055,7 @@ function applyHeadAvatar(){
 }
 applyHeadAvatar();
 applyFontScale(settings.fontScale);
+loadThreads();
 renderAll();
 initLock();
 scheduleProactive();
