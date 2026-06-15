@@ -161,6 +161,11 @@
   .msg-act-btn{background:var(--night-2);border:1px solid var(--line);color:var(--muted);
     border-radius:10px;padding:6px 13px;font-family:inherit;font-size:12.5px;font-weight:500;width:auto;flex:0 0 auto}
   .msg-act-btn:active{background:var(--bubble-saki)}
+  .usage{align-self:flex-start;max-width:88%;margin-top:5px;background:var(--night-2);
+    border:1px solid var(--line);border-radius:11px;padding:8px 12px}
+  .usage-row{font-size:12px;color:var(--text);opacity:.92;font-weight:500}
+  .usage-sub{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35}
+  .usage-tag{margin-top:4px;font-weight:600}
   .icon-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .u-prev{width:52px;height:52px;border-radius:50%;object-fit:cover;border:1.5px solid var(--saki-blue);display:none}
   .r-prev{width:52px;height:52px;border-radius:50%;object-fit:cover;border:1.5px solid var(--ritsu-pink);display:none}
@@ -314,6 +319,12 @@
       <input type="number" id="set-window" value="30" min="2">
       <div class="hint">少なくするほど料金は軽くなる。減らしても下の「自動要約」で大事な思い出は残るよ。</div>
     </div>
+
+    <div class="toggle-row">
+      <span>返事ごとに料金・トークンを表示</span>
+      <input type="checkbox" id="set-usage">
+    </div>
+    <div class="field"><div class="hint">オンにすると、律くんの返事の下に「入力／出力トークン・推定料金・キャッシュが効いてるか」が出るよ🔍 原因の特定に便利。いらなくなったらオフにすればOK。</div></div>
 
     <div class="toggle-row">
       <span>記憶の自動要約</span>
@@ -508,7 +519,7 @@ let settings = {
   think:true, budget:3000, window:30, system:"", pinHash:"",
   memory:"", autoMemory:true, uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
   proactive:false, proMin:3, selfMemFreq:"low",
-  temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto",
+  temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto", showUsage:false,
   mem:{profile:"", likes:"", knowledge:"", other:""}
 };
 let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
@@ -639,6 +650,35 @@ const chat = $("chat"), input = $("input"), send = $("send");
 /* ---------- render ---------- */
 function el(tag, cls, text){ const e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e; }
 function fmtTime(ts){ const d=new Date(ts); return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0"); }
+function fmtN(n){ return Number(n||0).toLocaleString("en-US"); }
+function modelRates(model){
+  const s = String(model||"").toLowerCase();
+  // [入力, 出力, キャッシュ読込, キャッシュ書込]  $ / 100万トークン
+  if(s.includes("haiku"))  return [1, 5, 0.10, 1.25];
+  if(s.includes("sonnet")) return [3, 15, 0.30, 3.75];
+  return [5, 25, 0.50, 6.25]; // opus系＆不明はOpus相当で推定
+}
+function usageNote(u){
+  const inp = u.input_tokens||0;          // 新規入力（非キャッシュ）
+  const out = u.output_tokens||0;          // 出力
+  const cr  = u.cache_read_input_tokens||0;     // キャッシュ読込（割引）
+  const cw  = u.cache_creation_input_tokens||0; // キャッシュ作成（書込）
+  const model = settings.model==="custom" ? settings.customModel : settings.model;
+  const [ri,ro,rcr,rcw] = modelRates(model);
+  const usd = (inp*ri + out*ro + cr*rcr + cw*rcw)/1e6;
+  const yen = Math.round(usd*150);
+  const tag = cr>0 ? "✅ キャッシュ効いてる" : (cw>0 ? "🟡 キャッシュ作成中（次の数分以内なら割引）" : "⚠️ キャッシュ未ヒット");
+  const box = el("div","usage");
+  box.appendChild(el("div","usage-row", "入力 "+fmtN(inp+cr+cw)+"　/　出力 "+fmtN(out)+"　トークン"));
+  const sub = [];
+  if(cr>0) sub.push("割引読込 "+fmtN(cr));
+  if(cw>0) sub.push("新規キャッシュ "+fmtN(cw));
+  if(inp>0) sub.push("非キャッシュ入力 "+fmtN(inp));
+  if(sub.length) box.appendChild(el("div","usage-sub", sub.join("　/　")));
+  box.appendChild(el("div","usage-sub", "推定 約 $"+usd.toFixed(4)+"（〜"+yen+"円）"));
+  box.appendChild(el("div","usage-sub usage-tag", tag));
+  return box;
+}
 
 async function copyText(t){
   try{ if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(t); return true; } }catch(e){}
@@ -698,6 +738,9 @@ function renderMsg(m){
     }
     wrap.appendChild(row);
     attachActions(wrap, bub, m.text);
+  }
+  if(m.role==="assistant" && m.usage && settings.showUsage){
+    wrap.appendChild(usageNote(m.usage));
   }
   chat.appendChild(wrap);
 }
@@ -760,7 +803,7 @@ async function sendMessage(){
         if(b.type==="text") textOut += b.text||"";
       });
       const mem = extractMemories(textOut);
-      const m = {role:"assistant", text: mem.text || "……", thinking: thinking||null, ts:Date.now()};
+      const m = {role:"assistant", text: mem.text || "……", thinking: thinking||null, ts:Date.now(), usage: data.usage||null};
       history.push(m); renderMsg(m); scrollEnd(); persistHistory();
       if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
       maybeSummarize();
@@ -1075,6 +1118,7 @@ function openSettings(){
   $("set-selffreq").value = settings.selfMemFreq;
   $("set-proactive").checked = settings.proactive;
   $("set-promin").value = settings.proMin;
+  $("set-usage").checked = settings.showUsage;
   $("mem-profile").value = settings.mem.profile;
   $("mem-likes").value = settings.mem.likes;
   $("mem-knowledge").value = settings.mem.knowledge;
@@ -1128,6 +1172,7 @@ $("save-settings").addEventListener("click", ()=>{
   settings.selfMemFreq = $("set-selffreq").value;
   settings.proactive = $("set-proactive").checked;
   settings.proMin = Math.max(1, Number($("set-promin").value) || 3);
+  settings.showUsage = $("set-usage").checked;
   settings.mem = {
     profile: $("mem-profile").value,
     likes: $("mem-likes").value,
@@ -1148,6 +1193,7 @@ $("save-settings").addEventListener("click", ()=>{
   $("settings").classList.remove("open");
   applyFontScale(settings.fontScale);
   applyTheme();
+  renderAll();
   armIdle();
   scheduleProactive();
 });
