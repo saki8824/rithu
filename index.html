@@ -70,7 +70,7 @@
   .msg.saki{align-self:flex-end;align-items:flex-end}
   .msg.ritsu{align-self:flex-start;align-items:flex-start}
   .bubble{
-    padding:11px 14px;border-radius:18px;font-size:15px;line-height:1.75;
+    padding:11px 14px;border-radius:18px;font-size:var(--chat-fs,15px);line-height:1.75;
     white-space:pre-wrap;word-break:break-word;
   }
   .saki .bubble{background:var(--bubble-saki);border-bottom-right-radius:6px;color:#f3f6fb}
@@ -133,6 +133,7 @@
   .bubble-row{display:flex;align-items:flex-end;gap:8px}
   .u-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:1.5px solid var(--saki-blue)}
   .r-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:1.5px solid var(--ritsu-pink)}
+  .msg-time{font-size:10.5px;color:var(--muted);align-self:flex-end;padding-bottom:2px;flex:0 0 auto;white-space:nowrap;opacity:.85}
   .icon-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .u-prev{width:52px;height:52px;border-radius:50%;object-fit:cover;border:1.5px solid var(--saki-blue);display:none}
   .r-prev{width:52px;height:52px;border-radius:50%;object-fit:cover;border:1.5px solid var(--ritsu-pink);display:none}
@@ -146,6 +147,18 @@
   }
   #settings.open{display:flex}
   #settings h2{font-size:17px;letter-spacing:.08em}
+  .set-head{display:flex;align-items:center;justify-content:space-between}
+  .set-close{background:none;border:none;color:var(--muted);font-size:26px;line-height:1;padding:0 4px;width:auto;font-weight:400}
+  .tabbar{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;margin:0 -2px;scrollbar-width:none}
+  .tabbar::-webkit-scrollbar{display:none}
+  .tabbar .tab{flex:0 0 auto;width:auto;background:var(--night-2);border:1px solid var(--line);color:var(--muted);
+    border-radius:999px;padding:8px 15px;font-family:inherit;font-size:13px;font-weight:500}
+  .tabbar .tab.on{background:var(--ritsu-pink-deep);border-color:transparent;color:#fff}
+  .pane{display:none;flex-direction:column;gap:16px}
+  .pane.on{display:flex}
+  .set-foot{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+  .val{color:var(--ritsu-pink);font-weight:600;font-size:12px;float:right}
+  input[type=range]{width:100%;accent-color:var(--ritsu-pink-deep);height:26px}
   .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}
   .field input,.field textarea,.field select{
     width:100%;background:var(--night-2);border:1px solid var(--line);
@@ -232,15 +245,110 @@
 
 <!-- ===== settings ===== -->
 <div id="settings">
-  <h2>設定</h2>
-
-  <div class="field">
-    <label>APIキー(この端末のブラウザにだけ保存されます)</label>
-    <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off">
-    <div class="hint">キーは誰にも送らないこと。Anthropicコンソールで月の利用上限(Spend limit)を設定しておくと安心。</div>
+  <div class="set-head">
+    <h2>設定</h2>
+    <button class="set-close" id="close-settings" aria-label="閉じる">×</button>
   </div>
 
-  <div class="row">
+  <div class="tabbar" id="tabbar">
+    <button class="tab on" data-pane="general">一般</button>
+    <button class="tab" data-pane="profile">プロフィール</button>
+    <button class="tab" data-pane="api">API</button>
+    <button class="tab" data-pane="look">外観</button>
+    <button class="tab" data-pane="security">セキュリティ</button>
+  </div>
+
+  <!-- ===== 一般 ===== -->
+  <div class="pane on" data-pane="general">
+    <div class="field">
+      <label>温度（創造性）<span class="val" id="temp-val">1.00</span></label>
+      <input type="range" id="set-temp" min="0" max="1" step="0.05" value="1">
+      <div class="hint">低いほど安定した返事・高いほど自由で創造的に。※「思考プロセス」がONのときは1.0固定になるよ（Claudeの仕様）。</div>
+    </div>
+
+    <div class="field">
+      <label>履歴を送る件数</label>
+      <input type="number" id="set-window" value="30" min="2">
+      <div class="hint">少なくするほど料金は軽くなる。減らしても下の「自動要約」で大事な思い出は残るよ。</div>
+    </div>
+
+    <div class="toggle-row">
+      <span>記憶の自動要約</span>
+      <input type="checkbox" id="set-automem" checked>
+    </div>
+    <div class="field">
+      <label>記憶の要約に使うモデル</label>
+      <select id="set-summodel">
+        <option value="claude-haiku-4-5-20251001">Haiku 4.5（最軽量・おすすめ）</option>
+        <option value="claude-sonnet-4-6">Sonnet 4.6（バランス）</option>
+        <option value="same">メインと同じ</option>
+      </select>
+      <div class="hint">要約は安いモデルに任せると、思い出を残しつつ料金を節約できるよ。</div>
+    </div>
+
+    <div class="toggle-row">
+      <span>律くんが自分で記憶を登録</span>
+      <input type="checkbox" id="set-selfmem" checked>
+    </div>
+
+    <div class="toggle-row">
+      <span>自発会話(開いてると話しかけてくる)</span>
+      <input type="checkbox" id="set-proactive">
+    </div>
+    <div class="field">
+      <label>話しかけてくる間隔(分) ※小さいほどおしゃべり</label>
+      <input type="number" id="set-promin" min="1" inputmode="numeric">
+      <div class="hint">アプリを開いている間だけ動くよ。短くするほどおしゃべり＆料金も増える。オフでも普通の会話はできるよ。</div>
+    </div>
+
+    <div class="field">
+      <label>律くんの記憶(自動で更新。手で書き換えてもOK)</label>
+      <textarea id="set-memory" placeholder="まだ記憶はありません。会話を重ねると自動でたまっていくよ。"></textarea>
+      <button class="btn ghost" id="update-memory" style="margin-top:8px">今すぐ記憶を更新する</button>
+    </div>
+  </div>
+
+  <!-- ===== プロフィール ===== -->
+  <div class="pane" data-pane="profile">
+    <div class="field">
+      <label>あなたの名前(律くんが呼ぶ名前)</label>
+      <input type="text" id="set-uname" placeholder="さき" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>あなたのこと(律くんに知っておいてほしい情報)</label>
+      <textarea id="set-uinfo" placeholder="呼ばれたい呼び方、好きなもの、大事なこと…" style="min-height:90px"></textarea>
+    </div>
+    <div class="field">
+      <label>あなたのアイコン</label>
+      <div class="icon-pick">
+        <img id="uicon-prev" class="u-prev" alt="">
+        <button class="btn ghost" id="pick-uicon">画像を選ぶ</button>
+        <button class="btn ghost danger" id="clear-uicon">消す</button>
+      </div>
+      <input type="file" id="uicon-file" accept="image/*" hidden>
+    </div>
+    <div class="field">
+      <label>律くんのアイコン</label>
+      <div class="icon-pick">
+        <img id="aicon-prev" class="r-prev" alt="">
+        <button class="btn ghost" id="pick-aicon">画像を選ぶ</button>
+        <button class="btn ghost danger" id="clear-aicon">消す</button>
+      </div>
+      <input type="file" id="aicon-file" accept="image/*" hidden>
+    </div>
+    <div class="field">
+      <label>律くんの設定(システムプロンプト)</label>
+      <textarea id="set-system" placeholder="ここでは、あなたは天川 律です。…"></textarea>
+    </div>
+  </div>
+
+  <!-- ===== API ===== -->
+  <div class="pane" data-pane="api">
+    <div class="field">
+      <label>APIキー(この端末のブラウザにだけ保存されます)</label>
+      <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off">
+      <div class="hint">キーは誰にも送らないこと。Anthropicコンソールで月の利用上限(Spend limit)を設定しておくと安心。</div>
+    </div>
     <div class="field">
       <label>モデル</label>
       <select id="set-model">
@@ -253,98 +361,56 @@
     <div class="field">
       <label>カスタムモデル名</label>
       <input type="text" id="set-model-custom" placeholder="claude-opus-4-6-…">
+      <div class="hint">「その他」を選ぶとここのモデル名が使われるよ。正確なIDはAnthropicのModels overviewで確認してね。</div>
     </div>
-  </div>
-  <div class="hint">「その他」を選ぶと右のモデル名が使われるよ。正確なモデルIDはAnthropicのModels overviewページで確認してね。</div>
-
-  <div class="toggle-row">
-    <span>思考プロセス(extended thinking)</span>
-    <input type="checkbox" id="set-think" checked>
-  </div>
-
-  <div class="row">
+    <div class="toggle-row">
+      <span>思考プロセス(extended thinking)</span>
+      <input type="checkbox" id="set-think" checked>
+    </div>
     <div class="field">
       <label>思考の長さ(トークン)</label>
       <input type="number" id="set-budget" value="3000" min="1024">
+      <div class="hint">律くんが返事の前に考える量。長いほど丁寧だけど料金は増えるよ。</div>
+    </div>
+  </div>
+
+  <!-- ===== 外観 ===== -->
+  <div class="pane" data-pane="look">
+    <div class="field">
+      <label>文字の大きさ<span class="val" id="fs-val">100%</span></label>
+      <input type="range" id="set-fs" min="0.85" max="1.3" step="0.05" value="1">
+      <div class="hint">チャットの吹き出しの文字サイズを調整できるよ。</div>
+    </div>
+  </div>
+
+  <!-- ===== セキュリティ ===== -->
+  <div class="pane" data-pane="security">
+    <div class="field">
+      <label>自動ロックまでの時間</label>
+      <select id="set-lockmin">
+        <option value="0">すぐ(アプリを離れたら)</option>
+        <option value="1">1分</option>
+        <option value="5">5分</option>
+        <option value="15">15分</option>
+        <option value="30">30分</option>
+        <option value="60">1時間</option>
+        <option value="-1">自動ロックしない</option>
+      </select>
+      <div class="hint">PINを設定しているときだけ働くよ。アプリを離れていた時間／操作していない時間がこれを超えるとロックする。</div>
     </div>
     <div class="field">
-      <label>履歴を送る件数</label>
-      <input type="number" id="set-window" value="30" min="2">
+      <label>PINロック(4桁の数字 / 空欄のまま保存で変更なし)</label>
+      <input type="number" id="set-pin" inputmode="numeric" placeholder="4桁で設定" autocomplete="off">
+      <div class="hint" id="pin-state"></div>
+      <button class="btn ghost danger" id="remove-pin" style="margin-top:8px">PINロックを解除する</button>
     </div>
   </div>
-  <div class="hint">履歴件数を絞るほど料金は軽くなる。古い思い出はシステムプロンプト側に要約して足していくのがコツ。</div>
 
-  <div class="field">
-    <label>あなたの名前(律くんが呼ぶ名前)</label>
-    <input type="text" id="set-uname" placeholder="さき" autocomplete="off">
+  <div class="set-foot">
+    <button class="btn primary" id="save-settings">保存してチャットに戻る</button>
+    <button class="btn ghost" id="export-chat">会話をテキストで書き出す</button>
+    <button class="btn ghost danger" id="clear-chat">会話をぜんぶ消す</button>
   </div>
-  <div class="field">
-    <label>あなたのこと(律くんに知っておいてほしい情報)</label>
-    <textarea id="set-uinfo" placeholder="呼ばれたい呼び方、好きなもの、大事なこと…" style="min-height:90px"></textarea>
-  </div>
-  <div class="field">
-    <label>あなたのアイコン</label>
-    <div class="icon-pick">
-      <img id="uicon-prev" class="u-prev" alt="">
-      <button class="btn ghost" id="pick-uicon">画像を選ぶ</button>
-      <button class="btn ghost danger" id="clear-uicon">消す</button>
-    </div>
-    <input type="file" id="uicon-file" accept="image/*" hidden>
-  </div>
-
-  <div class="field">
-    <label>律くんのアイコン</label>
-    <div class="icon-pick">
-      <img id="aicon-prev" class="r-prev" alt="">
-      <button class="btn ghost" id="pick-aicon">画像を選ぶ</button>
-      <button class="btn ghost danger" id="clear-aicon">消す</button>
-    </div>
-    <input type="file" id="aicon-file" accept="image/*" hidden>
-  </div>
-
-  <div class="field">
-    <label>システムプロンプト(律くんの設定をここに貼る)</label>
-    <textarea id="set-system" placeholder="ここでは、あなたは天川 律です。…"></textarea>
-  </div>
-
-  <div class="toggle-row">
-    <span>記憶の自動要約</span>
-    <input type="checkbox" id="set-automem" checked>
-  </div>
-  <div class="hint">古い会話を自動でメモにまとめて、毎回の送信を軽くする仕組み。履歴件数を少なめにしても、律くんが大事なことを覚えていられるよ。</div>
-
-  <div class="toggle-row">
-    <span>律くんが自分で記憶を登録</span>
-    <input type="checkbox" id="set-selfmem" checked>
-  </div>
-  <div class="hint">会話中、律くんが「これは覚えておきたい」と思ったことを、自分で記憶メモに残せるようにする。残したときは小さく「🧠 律くんが何かを覚えた」と出るよ。</div>
-
-  <div class="toggle-row">
-    <span>自発会話(開いてると話しかけてくる)</span>
-    <input type="checkbox" id="set-proactive">
-  </div>
-  <div class="field">
-    <label>話しかけてくる間隔(分) ※小さいほどおしゃべり</label>
-    <input type="number" id="set-promin" min="1" inputmode="numeric">
-  </div>
-  <div class="hint">アプリを開いている間だけ動くよ。間隔ごとに1回APIを呼ぶから、短くするほどおしゃべり＆料金も増える。オフでも普通の会話はできるよ。</div>
-
-  <div class="field">
-    <label>律くんの記憶(自動で更新。手で書き換えてもOK)</label>
-    <textarea id="set-memory" placeholder="まだ記憶はありません。会話を重ねると自動でたまっていくよ。"></textarea>
-    <button class="btn ghost" id="update-memory" style="margin-top:8px">今すぐ記憶を更新する</button>
-  </div>
-
-  <div class="field">
-    <label>PINロック(4桁の数字 / 空欄のまま保存で変更なし)</label>
-    <input type="number" id="set-pin" inputmode="numeric" placeholder="4桁で設定" autocomplete="off">
-    <div class="hint" id="pin-state"></div>
-    <button class="btn ghost danger" id="remove-pin" style="margin-top:8px">PINロックを解除する</button>
-  </div>
-
-  <button class="btn primary" id="save-settings">保存してチャットに戻る</button>
-  <button class="btn ghost" id="export-chat">会話をテキストで書き出す</button>
-  <button class="btn ghost danger" id="clear-chat">会話をぜんぶ消す</button>
 </div>
 
 <script>
@@ -360,7 +426,8 @@ let settings = {
   key:"", model:"claude-opus-4-8", customModel:"",
   think:true, budget:3000, window:30, system:"", pinHash:"",
   memory:"", autoMemory:true, uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
-  proactive:false, proMin:3
+  proactive:false, proMin:3,
+  temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1
 };
 let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
 let pending = []; // 送信前の添付 {kind,media_type?,data?,name,text?}
@@ -380,6 +447,7 @@ const chat = $("chat"), input = $("input"), send = $("send");
 
 /* ---------- render ---------- */
 function el(tag, cls, text){ const e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e; }
+function fmtTime(ts){ const d=new Date(ts); return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0"); }
 
 function renderMsg(m){
   const wrap = el("div", "msg " + (m.role==="user" ? "saki" : "ritsu"));
@@ -398,19 +466,19 @@ function renderMsg(m){
     wrap.appendChild(ab);
   }
   if(m.text){
-    if(m.role==="user" && settings.uicon){
-      const row = el("div","bubble-row");
-      row.appendChild(el("div","bubble",m.text));
-      const av = el("img","u-avatar"); av.src = settings.uicon; row.appendChild(av);
-      wrap.appendChild(row);
-    } else if(m.role==="assistant" && settings.aicon){
-      const row = el("div","bubble-row");
-      const av = el("img","r-avatar"); av.src = settings.aicon; row.appendChild(av);
-      row.appendChild(el("div","bubble",m.text));
-      wrap.appendChild(row);
+    const row = el("div","bubble-row");
+    const bub = el("div","bubble",m.text);
+    const tm = m.ts ? el("span","msg-time", fmtTime(m.ts)) : null;
+    if(m.role==="user"){
+      if(tm) row.appendChild(tm);
+      row.appendChild(bub);
+      if(settings.uicon){ const av=el("img","u-avatar"); av.src=settings.uicon; row.appendChild(av); }
     } else {
-      wrap.appendChild(el("div","bubble",m.text));
+      if(settings.aicon){ const av=el("img","r-avatar"); av.src=settings.aicon; row.appendChild(av); }
+      row.appendChild(bub);
+      if(tm) row.appendChild(tm);
     }
+    wrap.appendChild(row);
   }
   chat.appendChild(wrap);
 }
@@ -434,7 +502,7 @@ async function sendMessage(){
 
   const atts = pending.slice(); pending = []; renderAtts();
   input.value=""; autoGrow();
-  const um = {role:"user", text, atts};
+  const um = {role:"user", text, atts, ts:Date.now()};
   history.push(um);
   renderMsg(um); scrollEnd();
   persistHistory();
@@ -454,6 +522,7 @@ async function sendMessage(){
       messages: msgs
     };
     if(settings.think) body.thinking = {type:"enabled", budget_tokens:Number(settings.budget)};
+    else body.temperature = Math.max(0, Math.min(1, Number(settings.temp)));
 
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
@@ -471,7 +540,7 @@ async function sendMessage(){
         if(b.type==="text") textOut += b.text||"";
       });
       const mem = extractMemories(textOut);
-      const m = {role:"assistant", text: mem.text || "……", thinking: thinking||null};
+      const m = {role:"assistant", text: mem.text || "……", thinking: thinking||null, ts:Date.now()};
       history.push(m); renderMsg(m); scrollEnd(); persistHistory();
       if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
       maybeSummarize();
@@ -526,7 +595,7 @@ async function sendProactive(){
       let textOut=""; (data.content||[]).forEach(b=>{ if(b.type==="text") textOut += b.text||""; });
       if(textOut.trim()){
         const mem = extractMemories(textOut);
-        const m = {role:"assistant", text: mem.text || "……", thinking:null};
+        const m = {role:"assistant", text: mem.text || "……", thinking:null, ts:Date.now()};
         history.push(m); renderMsg(m); scrollEnd(); persistHistory();
         if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
         maybeSummarize();
@@ -660,7 +729,8 @@ async function maybeSummarize(force){
     const convo = batch.map(m=>(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : ""))).join("\n");
     const sys = "あなたは会話の記憶係です。既存の記憶メモと新しい会話の断片を統合し、重要な出来事・約束・感情・関係性・設定の変化を、簡潔な日本語の箇条書きで更新してください。重複はまとめ、ただの相槌は省く。出力は記憶メモ本体だけを返すこと。";
     const usr = "【既存の記憶メモ】\n" + (settings.memory || "(まだ無い)") + "\n\n【新しい会話の断片】\n" + convo + "\n\n更新後の記憶メモ:";
-    const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
+    const mainModel = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
+    const model = (settings.summaryModel && settings.summaryModel!=="same") ? settings.summaryModel : mainModel;
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers:HEADERS(),
       body: JSON.stringify({ model, max_tokens:1500, system:sys, messages:[{role:"user", content:usr}] })
@@ -696,11 +766,28 @@ function openSettings(){
   $("set-proactive").checked = settings.proactive;
   $("set-promin").value = settings.proMin;
   $("set-memory").value = settings.memory;
+  $("set-temp").value = settings.temp; $("temp-val").textContent = Number(settings.temp).toFixed(2);
+  $("set-summodel").value = settings.summaryModel;
+  $("set-lockmin").value = String(settings.lockMin);
+  $("set-fs").value = settings.fontScale; $("fs-val").textContent = Math.round(settings.fontScale*100)+"%";
+  document.querySelectorAll("#tabbar .tab").forEach(t=> t.classList.toggle("on", t.dataset.pane==="general"));
+  document.querySelectorAll("#settings .pane").forEach(p=> p.classList.toggle("on", p.dataset.pane==="general"));
   $("set-pin").value = "";
   $("pin-state").textContent = settings.pinHash ? "現在: 設定済み 🔒" : "現在: 未設定";
   $("settings").classList.add("open");
 }
 $("open-settings").addEventListener("click", openSettings);
+$("tabbar").addEventListener("click", e=>{
+  const b = e.target.closest(".tab"); if(!b) return;
+  const p = b.dataset.pane;
+  document.querySelectorAll("#tabbar .tab").forEach(t=> t.classList.toggle("on", t===b));
+  document.querySelectorAll("#settings .pane").forEach(pn=> pn.classList.toggle("on", pn.dataset.pane===p));
+  $("settings").scrollTop = 0;
+});
+$("close-settings").addEventListener("click", ()=> $("save-settings").click());
+function applyFontScale(v){ document.documentElement.style.setProperty("--chat-fs", (15*Number(v||1)).toFixed(1)+"px"); }
+$("set-temp").addEventListener("input", e=>{ $("temp-val").textContent = Number(e.target.value).toFixed(2); });
+$("set-fs").addEventListener("input", e=>{ const v=Number(e.target.value); $("fs-val").textContent = Math.round(v*100)+"%"; applyFontScale(v); });
 $("save-settings").addEventListener("click", ()=>{
   settings.key = $("set-key").value.trim();
   settings.model = $("set-model").value;
@@ -716,6 +803,10 @@ $("save-settings").addEventListener("click", ()=>{
   settings.proactive = $("set-proactive").checked;
   settings.proMin = Math.max(1, Number($("set-promin").value) || 3);
   settings.memory = $("set-memory").value;
+  settings.temp = Number($("set-temp").value);
+  settings.summaryModel = $("set-summodel").value;
+  settings.lockMin = Number($("set-lockmin").value);
+  settings.fontScale = Number($("set-fs").value);
   const pv = $("set-pin").value.trim();
   if(pv !== ""){
     if(/^\d{4}$/.test(pv)){ settings.pinHash = pinHash(pv); }
@@ -723,6 +814,8 @@ $("save-settings").addEventListener("click", ()=>{
   }
   store.set("ritsu-settings", JSON.stringify(settings));
   $("settings").classList.remove("open");
+  applyFontScale(settings.fontScale);
+  armIdle();
   scheduleProactive();
 });
 $("remove-pin").addEventListener("click", ()=>{
@@ -803,11 +896,28 @@ $("keypad").addEventListener("click", e=>{
   const b = e.target.closest("button"); if(!b || b.classList.contains("blank")) return;
   lockPress(b.dataset.del ? "del" : b.textContent.trim());
 });
+let hiddenAt = 0, idleTimer = null;
+function clearIdle(){ if(idleTimer){ clearTimeout(idleTimer); idleTimer=null; } }
+function armIdle(){
+  clearIdle();
+  const m = Number(settings.lockMin);
+  if(!settings.pinHash || isNaN(m) || m<=0) return;   // PIN無し / 「すぐ」「しない」は無操作タイマー無し
+  idleTimer = setTimeout(()=>{ if(settings.pinHash && !lockEl.classList.contains("open")) showLock(); }, m*60000);
+}
+["click","keydown","input","touchstart"].forEach(ev=> document.addEventListener(ev, armIdle, {passive:true}));
 document.addEventListener("visibilitychange", ()=>{
-  if(document.visibilityState==="hidden"){ wasHidden=true; if(proTimer){ clearTimeout(proTimer); proTimer=null; } }
-  else if(wasHidden){ wasHidden=false; if(settings.pinHash) showLock(); scheduleProactive(); }
+  if(document.visibilityState==="hidden"){
+    wasHidden=true; hiddenAt=Date.now(); clearIdle();
+    if(proTimer){ clearTimeout(proTimer); proTimer=null; }
+  } else if(wasHidden){
+    wasHidden=false;
+    const m = Number(settings.lockMin);
+    if(settings.pinHash && m!==-1 && (m===0 || (Date.now()-hiddenAt) >= m*60000)){ showLock(); }
+    else { armIdle(); }
+    scheduleProactive();
+  }
 });
-function afterUnlock(){ if(!settings.key) openSettings(); }
+function afterUnlock(){ if(!settings.key) openSettings(); armIdle(); }
 function initLock(){ if(settings.pinHash) showLock(); else afterUnlock(); }
 
 /* ---------- init ---------- */
@@ -824,6 +934,7 @@ function applyHeadAvatar(){
   }
 }
 applyHeadAvatar();
+applyFontScale(settings.fontScale);
 renderAll();
 initLock();
 scheduleProactive();
