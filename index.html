@@ -188,6 +188,8 @@
   .pane.on{display:flex}
   .set-foot{display:flex;flex-direction:column;gap:10px;margin-top:4px}
   .val{color:var(--ritsu-pink);font-weight:600;font-size:12px;float:right}
+  .mem-lbl{display:block;font-size:12px;color:var(--muted);margin:11px 0 4px}
+  .field textarea.mem-box{min-height:66px}
   input[type=range]{width:100%;accent-color:var(--ritsu-pink-deep);height:26px}
   .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}
   .field input,.field textarea,.field select{
@@ -333,9 +335,16 @@
     </div>
 
     <div class="field">
-      <label>律くんの記憶(自動で更新。手で書き換えてもOK)</label>
-      <textarea id="set-memory" placeholder="まだ記憶はありません。会話を重ねると自動でたまっていくよ。"></textarea>
-      <button class="btn ghost" id="update-memory" style="margin-top:8px">今すぐ記憶を更新する</button>
+      <label>律くんの記憶（カテゴリ別・自動で更新。手で書き換えてもOK）</label>
+      <label class="mem-lbl">👤 プロフィール</label>
+      <textarea id="mem-profile" class="mem-box" placeholder="名前・関係・人物設定など"></textarea>
+      <label class="mem-lbl">💕 好み</label>
+      <textarea id="mem-likes" class="mem-box" placeholder="好きなもの・苦手なもの・趣味など"></textarea>
+      <label class="mem-lbl">📚 知識</label>
+      <textarea id="mem-knowledge" class="mem-box" placeholder="二人の出来事・約束・覚えておきたい事実"></textarea>
+      <label class="mem-lbl">🗂 その他</label>
+      <textarea id="mem-other" class="mem-box" placeholder="その他、覚えておきたいこと"></textarea>
+      <button class="btn ghost" id="update-memory" style="margin-top:10px">今すぐ記憶を更新する</button>
     </div>
   </div>
 
@@ -478,7 +487,8 @@ let settings = {
   think:true, budget:3000, window:30, system:"", pinHash:"",
   memory:"", autoMemory:true, uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
   proactive:false, proMin:3,
-  temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto"
+  temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto",
+  mem:{profile:"", likes:"", knowledge:"", other:""}
 };
 let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
 let pending = []; // 送信前の添付 {kind,media_type?,data?,name,text?}
@@ -490,6 +500,14 @@ let currentId = "";    // 開いているスレッドのid
 try{
   const s = store.get("ritsu-settings"); if(s) settings = Object.assign(settings, JSON.parse(s));
 }catch(e){}
+// 記憶のカテゴリ化(旧データの引き継ぎ)
+if(!settings.mem || typeof settings.mem!=="object") settings.mem = {profile:"",likes:"",knowledge:"",other:""};
+["profile","likes","knowledge","other"].forEach(k=>{ if(typeof settings.mem[k]!=="string") settings.mem[k]=""; });
+if(typeof settings.memory==="string" && settings.memory.trim() &&
+   !settings.mem.profile && !settings.mem.likes && !settings.mem.knowledge && !settings.mem.other){
+  settings.mem.other = settings.memory.trim(); settings.memory = "";
+  store.set("ritsu-settings", JSON.stringify(settings));
+}
 
 /* ---------- threads (チャットの保管・切替) ---------- */
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -836,14 +854,34 @@ function HEADERS(){ return {
   "anthropic-version":"2023-06-01",
   "anthropic-dangerous-direct-browser-access":"true"
 }; }
+const MEMCATS = [["profile","プロフィール"],["likes","好み"],["knowledge","知識"],["other","その他"]];
+function memText(){
+  const m = settings.mem||{}; const parts=[];
+  MEMCATS.forEach(([k,label])=>{ if(m[k] && m[k].trim()) parts.push("【"+label+"】\n"+m[k].trim()); });
+  return parts.join("\n\n");
+}
+function memParse(text){
+  const out = {profile:"",likes:"",knowledge:"",other:""};
+  const map = {"プロフィール":"profile","好み":"likes","知識":"knowledge","その他":"other"};
+  const re = /【(プロフィール|好み|知識|その他)】/g;
+  const hits=[]; let mm;
+  while((mm=re.exec(text))!==null){ hits.push({key:map[mm[1]], end:re.lastIndex, start:mm.index}); }
+  if(!hits.length){ out.other = (text||"").trim(); return out; }
+  for(let i=0;i<hits.length;i++){
+    const seg = text.slice(hits[i].end, i+1<hits.length ? hits[i+1].start : text.length).trim();
+    if(seg) out[hits[i].key] = out[hits[i].key] ? out[hits[i].key]+"\n"+seg : seg;
+  }
+  return out;
+}
 function buildSystem(){
   let s = settings.system || "";
   const prof = [];
   if(settings.uname) prof.push("名前: " + settings.uname);
   if(settings.uinfo && settings.uinfo.trim()) prof.push(settings.uinfo.trim());
   if(prof.length) s += (s ? "\n\n" : "") + "# 話している相手について\n" + prof.join("\n");
-  if(settings.memory && settings.memory.trim()){
-    s += (s ? "\n\n" : "") + "# これまでの記憶\n" + settings.memory.trim();
+  const mt = memText();
+  if(mt){
+    s += (s ? "\n\n" : "") + "# これまでの記憶\n" + mt;
   }
   if(settings.selfMemory){
     s += (s ? "\n\n" : "") + "# 記憶の残し方\n相手について長く覚えておきたい大切なこと(約束・好み・出来事・気持ちの変化など)が出てきたら、返信のどこかに <remember>覚えておく内容</remember> という形でそっと書いてください。この部分は相手には表示されず、あなたの記憶メモに自動で保存されます。乱用せず、本当に大切なときだけ簡潔に。";
@@ -855,7 +893,7 @@ function extractMemories(text){
   let remembered = false;
   const cleaned = text.replace(/<remember>([\s\S]*?)<\/remember>/g, (_, note)=>{
     note = note.trim();
-    if(note){ settings.memory = (settings.memory ? settings.memory.trim()+"\n" : "") + "・" + note; remembered = true; }
+    if(note){ settings.mem.other = (settings.mem.other ? settings.mem.other.trim()+"\n" : "") + "・" + note; remembered = true; }
     return "";
   }).replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
   if(remembered) store.set("ritsu-settings", JSON.stringify(settings));
@@ -870,8 +908,8 @@ async function maybeSummarize(force){
   summarizing = true;
   try{
     const convo = batch.map(m=>(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : ""))).join("\n");
-    const sys = "あなたは会話の記憶係です。既存の記憶メモと新しい会話の断片を統合し、重要な出来事・約束・感情・関係性・設定の変化を、簡潔な日本語の箇条書きで更新してください。重複はまとめ、ただの相槌は省く。出力は記憶メモ本体だけを返すこと。";
-    const usr = "【既存の記憶メモ】\n" + (settings.memory || "(まだ無い)") + "\n\n【新しい会話の断片】\n" + convo + "\n\n更新後の記憶メモ:";
+    const sys = "あなたは会話の記憶係です。既存の記憶メモ(カテゴリ分け)と新しい会話の断片を統合し、相手について長く覚えておきたい大切なことを4つのカテゴリに振り分けて、簡潔な日本語の箇条書き(・)で更新してください。重複はまとめ、ただの相槌は省く。\nカテゴリの目安: 【プロフィール】=名前・関係・人物設定、【好み】=好き嫌い・趣味、【知識】=二人の出来事・約束・覚えておくべき事実、【その他】=どれにも入らないこと。\n必ず次の形式だけで出力すること(中身が無いカテゴリは見出しごと省略してよい。前置きや説明は不要):\n【プロフィール】\n・…\n【好み】\n・…\n【知識】\n・…\n【その他】\n・…";
+    const usr = "【既存の記憶メモ】\n" + (memText() || "(まだ無い)") + "\n\n【新しい会話の断片】\n" + convo + "\n\n更新後の記憶メモ:";
     const mainModel = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
     const model = (settings.summaryModel && settings.summaryModel!=="same") ? settings.summaryModel : mainModel;
     const res = await fetch("https://api.anthropic.com/v1/messages",{
@@ -881,7 +919,11 @@ async function maybeSummarize(force){
     const data = await res.json();
     if(!data.error){
       const out = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
-      if(out){ settings.memory = out; store.set("ritsu-settings", JSON.stringify(settings)); }
+      if(out){
+        if(/【(プロフィール|好み|知識|その他)】/.test(out)){ settings.mem = memParse(out); }
+        else { settings.mem.other = (settings.mem.other ? settings.mem.other.trim()+"\n" : "") + out; }
+        store.set("ritsu-settings", JSON.stringify(settings));
+      }
       summarized = history.length - keep; if(summarized<0) summarized=0; saveMeta();
       chat.appendChild(el("div","sysnote","🧠 記憶を更新したよ")); scrollEnd();
     }
@@ -908,7 +950,10 @@ function openSettings(){
   $("set-selfmem").checked = settings.selfMemory;
   $("set-proactive").checked = settings.proactive;
   $("set-promin").value = settings.proMin;
-  $("set-memory").value = settings.memory;
+  $("mem-profile").value = settings.mem.profile;
+  $("mem-likes").value = settings.mem.likes;
+  $("mem-knowledge").value = settings.mem.knowledge;
+  $("mem-other").value = settings.mem.other;
   $("set-temp").value = settings.temp; $("temp-val").textContent = Number(settings.temp).toFixed(2);
   $("set-summodel").value = settings.summaryModel;
   $("set-lockmin").value = String(settings.lockMin);
@@ -957,7 +1002,12 @@ $("save-settings").addEventListener("click", ()=>{
   settings.selfMemory = $("set-selfmem").checked;
   settings.proactive = $("set-proactive").checked;
   settings.proMin = Math.max(1, Number($("set-promin").value) || 3);
-  settings.memory = $("set-memory").value;
+  settings.mem = {
+    profile: $("mem-profile").value,
+    likes: $("mem-likes").value,
+    knowledge: $("mem-knowledge").value,
+    other: $("mem-other").value
+  };
   settings.temp = Number($("set-temp").value);
   settings.summaryModel = $("set-summodel").value;
   settings.lockMin = Number($("set-lockmin").value);
@@ -982,11 +1032,19 @@ $("remove-pin").addEventListener("click", ()=>{
   }
 });
 $("update-memory").addEventListener("click", async ()=>{
-  settings.memory = $("set-memory").value;
+  settings.mem = {
+    profile: $("mem-profile").value,
+    likes: $("mem-likes").value,
+    knowledge: $("mem-knowledge").value,
+    other: $("mem-other").value
+  };
   store.set("ritsu-settings", JSON.stringify(settings));
   const btn = $("update-memory"); btn.textContent = "更新中…"; btn.disabled = true;
   await maybeSummarize(true);
-  $("set-memory").value = settings.memory;
+  $("mem-profile").value = settings.mem.profile;
+  $("mem-likes").value = settings.mem.likes;
+  $("mem-knowledge").value = settings.mem.knowledge;
+  $("mem-other").value = settings.mem.other;
   btn.textContent = "今すぐ記憶を更新する"; btn.disabled = false;
 });
 $("pick-uicon").addEventListener("click", ()=> $("uicon-file").click());
