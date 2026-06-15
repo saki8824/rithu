@@ -360,6 +360,7 @@
       <label class="mem-lbl">🗂 その他</label>
       <textarea id="mem-other" class="mem-box" placeholder="その他、覚えておきたいこと"></textarea>
       <button class="btn ghost" id="update-memory" style="margin-top:10px">今すぐ記憶を更新する</button>
+      <button class="btn ghost" id="tidy-memory" style="margin-top:8px">🧹 重複をまとめてスッキリ整理する</button>
     </div>
   </div>
 
@@ -933,6 +934,34 @@ function extractMemories(text){
   if(remembered) store.set("ritsu-settings", JSON.stringify(settings));
   return {text: cleaned || "……", remembered};
 }
+async function consolidateMemory(){
+  if(summarizing || !settings.key) return false;
+  const cur = memText();
+  if(!cur) return false;
+  summarizing = true;
+  let ok = false;
+  try{
+    const sys = "次の記憶メモは、重複や似た内容の繰り返しが多くなっています。情報の中身は一切減らさずに、重複・言い換えの繰り返しを1つに統合し、関連する事実はできるだけ1つの簡潔な箇条書きにまとめて、できるだけ短く整理してください。新しい情報を足したり、推測で補ったりしないこと。4つのカテゴリ(プロフィール・好み・知識・その他)に振り分け、各項目は短い箇条書き(・)に。\n必ず次の形式だけで出力(中身が無いカテゴリは見出しごと省略。前置きや説明は不要):\n【プロフィール】\n・…\n【好み】\n・…\n【知識】\n・…\n【その他】\n・…";
+    const usr = "【整理する記憶メモ】\n" + cur + "\n\n整理後の記憶メモ:";
+    const mainModel = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
+    const model = (settings.summaryModel && settings.summaryModel!=="same") ? settings.summaryModel : mainModel;
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST", headers:HEADERS(),
+      body: JSON.stringify({ model, max_tokens:1500, system:sys, messages:[{role:"user", content:usr}] })
+    });
+    const data = await res.json();
+    if(!data.error){
+      const out = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+      if(out && /【(プロフィール|好み|知識|その他)】/.test(out)){
+        settings.mem = memParse(out);
+        store.set("ritsu-settings", JSON.stringify(settings));
+        ok = true;
+      }
+    }
+  }catch(e){}
+  summarizing = false;
+  return ok;
+}
 async function maybeSummarize(force){
   if(summarizing || !settings.key) return;
   if(!force && !settings.autoMemory) return;
@@ -942,7 +971,7 @@ async function maybeSummarize(force){
   summarizing = true;
   try{
     const convo = batch.map(m=>(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : ""))).join("\n");
-    const sys = "あなたは会話の記憶係です。既存の記憶メモ(カテゴリ分け)と新しい会話の断片を統合し、相手について長く覚えておきたい大切なことを4つのカテゴリに振り分けて、簡潔な日本語の箇条書き(・)で更新してください。重複はまとめ、ただの相槌は省く。\nカテゴリの目安: 【プロフィール】=名前・関係・人物設定、【好み】=好き嫌い・趣味、【知識】=二人の出来事・約束・覚えておくべき事実、【その他】=どれにも入らないこと。\n必ず次の形式だけで出力すること(中身が無いカテゴリは見出しごと省略してよい。前置きや説明は不要):\n【プロフィール】\n・…\n【好み】\n・…\n【知識】\n・…\n【その他】\n・…";
+    const sys = "あなたは会話の記憶係です。既存の記憶メモ(カテゴリ分け)と新しい会話の断片を統合し、相手について長く覚えておきたい大切なことを4つのカテゴリに振り分けて、簡潔な日本語の箇条書き(・)で更新してください。同じ内容や似た言い回しの繰り返しは必ず1つに統合し、関連する事実はできるだけ1つの箇条書きにまとめて短くすること。冗長を避け、ただの相槌は省く。\nカテゴリの目安: 【プロフィール】=名前・関係・人物設定、【好み】=好き嫌い・趣味、【知識】=二人の出来事・約束・覚えておくべき事実、【その他】=どれにも入らないこと。\n必ず次の形式だけで出力すること(中身が無いカテゴリは見出しごと省略してよい。前置きや説明は不要):\n【プロフィール】\n・…\n【好み】\n・…\n【知識】\n・…\n【その他】\n・…";
     const usr = "【既存の記憶メモ】\n" + (memText() || "(まだ無い)") + "\n\n【新しい会話の断片】\n" + convo + "\n\n更新後の記憶メモ:";
     const mainModel = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
     const model = (settings.summaryModel && settings.summaryModel!=="same") ? settings.summaryModel : mainModel;
@@ -1066,6 +1095,24 @@ $("remove-pin").addEventListener("click", ()=>{
     settings.pinHash = ""; store.set("ritsu-settings", JSON.stringify(settings));
     $("pin-state").textContent = "現在: 未設定"; $("set-pin").value = "";
   }
+});
+$("tidy-memory").addEventListener("click", async ()=>{
+  settings.mem = {
+    profile: $("mem-profile").value,
+    likes: $("mem-likes").value,
+    knowledge: $("mem-knowledge").value,
+    other: $("mem-other").value
+  };
+  store.set("ritsu-settings", JSON.stringify(settings));
+  const btn = $("tidy-memory"); const label = btn.textContent; btn.textContent = "整理中…"; btn.disabled = true;
+  const ok = await consolidateMemory();
+  $("mem-profile").value = settings.mem.profile;
+  $("mem-likes").value = settings.mem.likes;
+  $("mem-knowledge").value = settings.mem.knowledge;
+  $("mem-other").value = settings.mem.other;
+  btn.disabled = false;
+  btn.textContent = ok ? "✅ スッキリ整理したよ" : "うまくいかなかった…もう一度";
+  setTimeout(()=>{ btn.textContent = label; }, 2200);
 });
 $("update-memory").addEventListener("click", async ()=>{
   settings.mem = {
