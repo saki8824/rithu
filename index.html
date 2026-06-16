@@ -525,6 +525,7 @@ let settings = {
 let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
 let pending = []; // 送信前の添付 {kind,media_type?,data?,name,text?}
 let summarized = 0;    // 先頭から要約済みのメッセージ数
+let anchor = 0;        // 履歴の送信開始点(キャッシュ安定用。たまにまとめて前進)
 let summarizing = false;
 let threads = [];      // [{id, title, named?, updatedAt}]  最近順
 let currentId = "";    // 開いているスレッドのid
@@ -551,12 +552,12 @@ function deriveTitle(h){
 }
 function saveThreads(){ store.set("ritsu-threads", JSON.stringify(threads)); }
 function loadCurrent(){
-  history=[]; summarized=0;
-  try{ const d = store.get("ritsu-thread-"+currentId); if(d){ const o=JSON.parse(d); history=o.history||[]; summarized=o.summarized||0; } }catch(e){}
+  history=[]; summarized=0; anchor=0;
+  try{ const d = store.get("ritsu-thread-"+currentId); if(d){ const o=JSON.parse(d); history=o.history||[]; summarized=o.summarized||0; anchor=o.anchor||0; } }catch(e){}
 }
 function persistThread(){
   for(let i=0;i<8;i++){
-    try{ localStorage.setItem("ritsu-thread-"+currentId, JSON.stringify({history, summarized})); break; }
+    try{ localStorage.setItem("ritsu-thread-"+currentId, JSON.stringify({history, summarized, anchor})); break; }
     catch(e){
       const m = history.find(x=>x.atts && x.atts.some(a=>a.data));
       if(!m) break;                          // もう削れる添付がない
@@ -589,9 +590,9 @@ function newThread(){
   persistThread();
   const id = uid();
   threads.unshift({id, title:"新しいチャット", updatedAt:Date.now()});
-  store.set("ritsu-thread-"+id, JSON.stringify({history:[], summarized:0}));
+  store.set("ritsu-thread-"+id, JSON.stringify({history:[], summarized:0, anchor:0}));
   currentId = id; saveThreads(); store.set("ritsu-current", currentId);
-  history=[]; summarized=0; renderAll(); renderThreadList();
+  history=[]; summarized=0; anchor=0; renderAll(); renderThreadList();
   closeThreads();
 }
 function switchThread(id){
@@ -924,8 +925,16 @@ $("file").addEventListener("change", async e=>{
 });
 
 function windowSlice(){
-  let arr = history.slice(-Math.max(1, Number(settings.window)||30));
-  while(arr.length && arr[0].role!=="user") arr = arr.slice(1); // 先頭は必ずユーザー発言から
+  const win = Math.max(1, Number(settings.window)||15);
+  const maxLen = win*2;                  // ここまで伸びたら、まとめて前進(=再アンカー)
+  if(history.length - anchor > maxLen){
+    anchor = history.length - win;       // 直近win件を残して再アンカー
+  }
+  if(anchor < 0) anchor = 0;
+  let start = anchor;
+  let arr = history.slice(start);
+  while(arr.length>1 && arr[0].role!=="user"){ arr = arr.slice(1); start++; } // 先頭は必ずユーザー発言から
+  anchor = start;                        // ユーザー発言始まりに揃えて固定(以後ズレない=キャッシュが効く)
   return arr;
 }
 function toContent(m){
@@ -1261,7 +1270,7 @@ $("clear-aicon").addEventListener("click", ()=>{
 });
 $("clear-chat").addEventListener("click", ()=>{
   if(confirm("今のチャットの中身を空にする?この操作は戻せないよ(他のチャットや律くんの記憶は残るよ)")){
-    history=[]; summarized=0; persistThread(); renderAll();
+    history=[]; summarized=0; anchor=0; persistThread(); renderAll();
     $("settings").classList.remove("open");
   }
 });
