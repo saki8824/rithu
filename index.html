@@ -224,6 +224,17 @@
   .cal-input{width:100%;background:var(--night-2);border:1px solid var(--line);color:var(--text);
     border-radius:12px;padding:11px 13px;font-family:inherit;font-size:14px;box-sizing:border-box}
   .cal-note-in{min-height:60px;resize:vertical}
+  #diary{
+    position:fixed;inset:0;background:var(--night);z-index:53;
+    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
+    display:none;flex-direction:column;gap:12px;
+  }
+  #diary.open{display:flex}
+  #diary-list{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+  .diary-card{background:var(--night-2);border:1px solid var(--line);border-radius:14px;padding:14px 15px}
+  .diary-date{font-size:12px;color:var(--ritsu-pink);font-weight:600;margin-bottom:7px}
+  .diary-text{font-size:14px;color:var(--text);line-height:1.7;white-space:pre-wrap}
+  .diary-del{background:none;border:none;color:var(--muted);font-size:12px;width:auto;padding:6px 2px 0;margin-top:6px}
   #settings h2{font-size:17px;letter-spacing:.08em}
   .set-head{display:flex;align-items:center;justify-content:space-between}
   .set-close{background:none;border:none;color:var(--muted);font-size:26px;line-height:1;padding:0 4px;width:auto;font-weight:400}
@@ -310,6 +321,7 @@
     <div class="head-sub"><span class="heart">♥</span><span id="bpm">心拍共有中</span></div>
   </div>
   <div class="head-spacer"></div>
+  <button class="icon-btn" id="open-diary" aria-label="日記帳">📔</button>
   <button class="icon-btn" id="open-cal" aria-label="予定表">📅</button>
   <button class="icon-btn" id="open-threads">一覧</button>
   <button class="icon-btn" id="open-settings">設定</button>
@@ -365,6 +377,16 @@
       <input type="checkbox" id="set-schedule" checked>
     </div>
     <div class="field"><div class="hint">オンにすると、会話の中で約束した予定を律くんが📅予定表に入れてくれて、近い予定を覚えて自然に話に出すよ。ヘッダーの📅から予定表を開けるよ。</div></div>
+
+    <div class="field">
+      <label>律くんの日記の長さ</label>
+      <select id="set-diarylen">
+        <option value="short">短め（3〜4文）</option>
+        <option value="normal">ふつう（5〜8文・ひと段落）</option>
+        <option value="long">しっかり（10文前後）</option>
+      </select>
+      <div class="hint">ヘッダーの📔から「日記帳」を開いて、律くんに日記を書いてもらえるよ。書いた日記は全部残って、律くんは最近の日記を覚えてる。長くしても、持ち歩くのは最新だけ＋キャッシュされるから料金はほぼ変わらないよ。</div>
+    </div>
 
     <div class="toggle-row">
       <span>記憶の自動要約</span>
@@ -534,6 +556,17 @@
   </div>
 </div>
 
+<!-- ===== 日記帳 ===== -->
+<div id="diary">
+  <div class="set-head">
+    <h2>律の日記帳</h2>
+    <button class="set-close" id="close-diary" aria-label="閉じる">×</button>
+  </div>
+  <button class="btn primary" id="write-diary">📔 今日の日記を書いてもらう</button>
+  <div class="hint" id="diary-hint">律くんが、今の会話を振り返って一人称で日記を綴るよ。書いた日記は全部ここに残って、いつでも読み返せる。律くんは最近の日記を覚えていて、気持ちごと続きを大事にしてくれるよ。</div>
+  <div id="diary-list"></div>
+</div>
+
 <!-- ===== 予定表(カレンダー) ===== -->
 <div id="calendar">
   <div class="set-head">
@@ -575,7 +608,7 @@ let settings = {
   think:true, budget:3000, window:30, system:"", pinHash:"",
   memory:"", autoMemory:true, uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
   proactive:false, proMin:3, selfMemFreq:"low",
-  temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto", showUsage:false, schedule:true,
+  temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto", showUsage:false, schedule:true, diaryLen:"normal",
   mem:{profile:"", likes:"", knowledge:"", other:""}
 };
 let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
@@ -587,6 +620,7 @@ let threads = [];      // [{id, title, named?, updatedAt}]  最近順
 let currentId = "";    // 開いているスレッドのid
 let events = [];       // 予定 [{id, date:'YYYY-MM-DD', time:'HH:MM'|'', title, note}]  全スレッド共通
 let calY = 0, calM = 0; // カレンダーに表示中の年・月(0-11)
+let diary = [];        // 律の日記 [{id, ts, text}]  全スレッド共通
 
 try{
   const s = store.get("ritsu-settings"); if(s) settings = Object.assign(settings, JSON.parse(s));
@@ -799,6 +833,62 @@ function extractSchedule(text){
   }).replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
   if(added.length) saveEvents();
   return {text: cleaned||"……", added};
+}
+
+/* ---------- 律の日記 ---------- */
+function loadDiary(){ try{ const d=store.get("ritsu-diary"); diary = d ? (JSON.parse(d)||[]) : []; }catch(e){ diary=[]; } }
+function saveDiary(){ store.set("ritsu-diary", JSON.stringify(diary)); }
+function fmtDiaryDate(ts){ const d=new Date(ts); const wd=["日","月","火","水","木","金","土"][d.getDay()]; return (d.getMonth()+1)+"月"+d.getDate()+"日("+wd+") "+fmtTime(ts); }
+// 律くんが持ち歩く「最近の日記」(最新2件)
+function diaryContext(){
+  if(!diary.length) return "";
+  return diary.slice(-2).map(e=>"［"+fmtDiaryDate(e.ts)+"］\n"+e.text).join("\n\n");
+}
+function openDiary(){ renderDiaryList(); $("diary").classList.add("open"); }
+function closeDiary(){ $("diary").classList.remove("open"); }
+function renderDiaryList(){
+  const box = $("diary-list"); box.innerHTML="";
+  if(!diary.length){ box.appendChild(el("div","cal-empty","まだ日記はないよ。上のボタンで律くんに書いてもらおう📔")); return; }
+  diary.slice().reverse().forEach(e=>{
+    const card = el("div","diary-card");
+    card.appendChild(el("div","diary-date", fmtDiaryDate(e.ts)));
+    const body = el("div","diary-text"); body.textContent = e.text; card.appendChild(body);
+    const del = el("button","diary-del","🗑 削除");
+    del.addEventListener("click",()=>{ if(confirm("この日記を削除する?この操作は戻せないよ")){ diary=diary.filter(x=>x.id!==e.id); saveDiary(); renderDiaryList(); } });
+    card.appendChild(del);
+    box.appendChild(card);
+  });
+}
+let diaryBusy = false;
+async function writeDiary(){
+  if(!settings.key){ closeDiary(); openSettings(); showError("先に設定からAPIキーを入れてね"); return; }
+  if(diaryBusy) return;
+  if(!history.length){ alert("会話がまだ無いから、少し律くんと話してから書いてもらってね"); return; }
+  diaryBusy = true;
+  const btn = $("write-diary"); const old = btn.textContent; btn.textContent = "律くんが日記を書いてる…"; btn.disabled = true;
+  try{
+    const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
+    const lenRule = {short:"3〜4文くらいの短め", normal:"5〜8文くらい、ひと段落ぶん", long:"10文前後の、しっかりめ"}[settings.diaryLen] || "5〜8文くらい、ひと段落ぶん";
+    const sys = buildSystem(false) + "\n\n# 今からの作業（日記）\n上のあなた(律)の設定・記憶と、これから渡す会話を踏まえて、律として一人称で「今日の日記」を綴ってください。" + lenRule + "の分量で、語りかけ口調ではなく、自分の心の中をそっと書き留めるように。さきへの気持ちや、今日の出来事、感じたことを素直に。日付・見出し・前置きは不要。日記の本文だけを出力してください。";
+    const base = windowSlice().map(m=>({role: m.role==="user"?"user":"assistant", content: toContent(m) || "…"}));
+    const ask = {role:"user", content:"（※これはメタなお願いです。今の会話を振り返って、律の今日の日記を書いてください。日記の本文だけ。）"};
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST", headers: HEADERS(),
+      body: JSON.stringify({ model, max_tokens:1024, system: sys, messages:[...base, ask] })
+    });
+    const data = await res.json();
+    if(data.error){ alert("日記の作成に失敗したよ: " + (data.error.message||data.error.type)); }
+    else{
+      let txt=""; (data.content||[]).forEach(b=>{ if(b.type==="text") txt += b.text||""; });
+      txt = txt.trim();
+      if(txt){
+        diary.push({id:uid(), ts:Date.now(), text:txt});
+        saveDiary(); renderDiaryList();
+        $("diary-list").scrollIntoView({behavior:"smooth", block:"start"});
+      } else { alert("うまく書けなかったみたい。もう一度試してみてね"); }
+    }
+  }catch(e){ alert("通信に失敗したよ: " + e.message); }
+  diaryBusy = false; $("write-diary").textContent = old; $("write-diary").disabled = false;
 }
 function saveMeta(){ persistThread(); }
 
@@ -1204,6 +1294,10 @@ function buildSystem(withTime){
   if(settings.schedule){
     s += (s ? "\n\n" : "") + "# 予定表について\nさきと日付の決まった予定を約束したとき(デート・電話・記念日・イベントなど)は、<schedule>YYYY-MM-DD|HH:MM|予定の内容</schedule> という形で書くと、二人の予定表に自動で登録されます。時刻が未定なら HH:MM は空でOK(例: <schedule>2026-07-05||花火大会</schedule>)。日付は「# 今の現実の日時」を基準に正しく計算すること。<schedule>の部分は相手には表示されません。各メッセージに「# 今後の予定」が添えられることがあるので、近い予定はさりげなく気にかけたり、話に出したりして構いません。予定の約束が無い普段の会話で、無理に作る必要はありません。";
   }
+  const dc = diaryContext();
+  if(dc){
+    s += (s ? "\n\n" : "") + "# 律の最近の日記（あなた自身が綴ったもの）\nこれはあなた(律)が過去に書いた日記です。さきには表示されていません。当時の自分の気持ちや二人の出来事として自然に覚えていて、続きの関係に活かしてください（日記の文言をそのまま読み上げる必要はありません）。\n\n" + dc;
+  }
   return s;
 }
 function extractMemories(text){
@@ -1299,6 +1393,7 @@ function openSettings(){
   $("set-promin").value = settings.proMin;
   $("set-usage").checked = settings.showUsage;
   $("set-schedule").checked = settings.schedule;
+  $("set-diarylen").value = settings.diaryLen || "normal";
   $("mem-profile").value = settings.mem.profile;
   $("mem-likes").value = settings.mem.likes;
   $("mem-knowledge").value = settings.mem.knowledge;
@@ -1321,6 +1416,9 @@ $("open-cal").addEventListener("click", openCalendar);
 $("close-cal").addEventListener("click", closeCalendar);
 $("cal-prev").addEventListener("click", ()=>calStep(-1));
 $("cal-next").addEventListener("click", ()=>calStep(1));
+$("open-diary").addEventListener("click", openDiary);
+$("close-diary").addEventListener("click", closeDiary);
+$("write-diary").addEventListener("click", writeDiary);
 $("new-thread").addEventListener("click", newThread);
 $("tabbar").addEventListener("click", e=>{
   const b = e.target.closest(".tab"); if(!b) return;
@@ -1358,6 +1456,7 @@ $("save-settings").addEventListener("click", ()=>{
   settings.proMin = Math.max(1, Number($("set-promin").value) || 3);
   settings.showUsage = $("set-usage").checked;
   settings.schedule = $("set-schedule").checked;
+  settings.diaryLen = $("set-diarylen").value;
   settings.mem = {
     profile: $("mem-profile").value,
     likes: $("mem-likes").value,
@@ -1528,6 +1627,7 @@ applyHeadAvatar();
 applyFontScale(settings.fontScale);
 applyTheme();
 loadEvents();
+loadDiary();
 loadThreads();
 renderAll();
 initLock();
