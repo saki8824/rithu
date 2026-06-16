@@ -232,9 +232,16 @@
   #diary.open{display:flex}
   #diary-list{display:flex;flex-direction:column;gap:12px;margin-top:4px}
   .diary-card{background:var(--night-2);border:1px solid var(--line);border-radius:14px;padding:14px 15px}
-  .diary-date{font-size:12px;color:var(--ritsu-pink);font-weight:600;margin-bottom:7px}
+  .diary-card-head{display:flex;align-items:center;gap:8px;cursor:pointer}
+  .diary-arrow{color:var(--muted);font-size:12px;flex:0 0 auto}
+  .diary-date{font-size:12.5px;color:var(--ritsu-pink);font-weight:600}
+  .diary-preview{font-size:12.5px;color:var(--muted);margin-top:7px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .diary-full{display:none;margin-top:9px}
+  .diary-card.open .diary-preview{display:none}
+  .diary-card.open .diary-full{display:block}
   .diary-text{font-size:14px;color:var(--text);line-height:1.7;white-space:pre-wrap}
-  .diary-del{background:none;border:none;color:var(--muted);font-size:12px;width:auto;padding:6px 2px 0;margin-top:6px}
+  .diary-del{background:none;border:none;color:var(--muted);font-size:12px;width:auto;padding:8px 2px 0;margin-top:6px}
   #settings h2{font-size:17px;letter-spacing:.08em}
   .set-head{display:flex;align-items:center;justify-content:space-between}
   .set-close{background:none;border:none;color:var(--muted);font-size:26px;line-height:1;padding:0 4px;width:auto;font-weight:400}
@@ -851,11 +858,19 @@ function renderDiaryList(){
   if(!diary.length){ box.appendChild(el("div","cal-empty","まだ日記はないよ。上のボタンで律くんに書いてもらおう📔")); return; }
   diary.slice().reverse().forEach(e=>{
     const card = el("div","diary-card");
-    card.appendChild(el("div","diary-date", fmtDiaryDate(e.ts)));
-    const body = el("div","diary-text"); body.textContent = e.text; card.appendChild(body);
+    const head = el("div","diary-card-head");
+    const arrow = el("span","diary-arrow","▸");
+    head.appendChild(arrow);
+    head.appendChild(el("span","diary-date", fmtDiaryDate(e.ts)));
+    card.appendChild(head);
+    card.appendChild(el("div","diary-preview", e.text.replace(/\s+/g," ").trim()));
+    const full = el("div","diary-full");
+    const body = el("div","diary-text"); body.textContent = e.text; full.appendChild(body);
     const del = el("button","diary-del","🗑 削除");
-    del.addEventListener("click",()=>{ if(confirm("この日記を削除する?この操作は戻せないよ")){ diary=diary.filter(x=>x.id!==e.id); saveDiary(); renderDiaryList(); } });
-    card.appendChild(del);
+    del.addEventListener("click",(ev)=>{ ev.stopPropagation(); if(confirm("この日記を削除する?この操作は戻せないよ")){ diary=diary.filter(x=>x.id!==e.id); saveDiary(); renderDiaryList(); } });
+    full.appendChild(del);
+    card.appendChild(full);
+    head.addEventListener("click", ()=>{ const o=card.classList.toggle("open"); arrow.textContent = o ? "▾" : "▸"; });
     box.appendChild(card);
   });
 }
@@ -869,9 +884,11 @@ async function writeDiary(){
   try{
     const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
     const lenRule = {short:"3〜4文くらいの短め", normal:"5〜8文くらい、ひと段落ぶん", long:"10文前後の、しっかりめ"}[settings.diaryLen] || "5〜8文くらい、ひと段落ぶん";
-    const sys = buildSystem(false) + "\n\n# 今からの作業（日記）\n上のあなた(律)の設定・記憶と、これから渡す会話を踏まえて、律として一人称で「今日の日記」を綴ってください。" + lenRule + "の分量で、語りかけ口調ではなく、自分の心の中をそっと書き留めるように。さきへの気持ちや、今日の出来事、感じたことを素直に。日付・見出し・前置きは不要。日記の本文だけを出力してください。";
-    const base = windowSlice().map(m=>({role: m.role==="user"?"user":"assistant", content: toContent(m) || "…"}));
-    const ask = {role:"user", content:"（※これはメタなお願いです。今の会話を振り返って、律の今日の日記を書いてください。日記の本文だけ。）"};
+    const sys = buildSystem(false) + "\n\n# 今からの作業（日記）\n上のあなた(律)の設定・記憶と、これから渡す会話の流れ全体を踏まえて、律として一人称で「今日の日記」を綴ってください。直前のやり取りだけでなく、渡された会話全体を振り返って、印象に残った出来事や気持ちの移り変わりを書くこと。" + lenRule + "の分量で、語りかけ口調ではなく、自分の心の中をそっと書き留めるように。さきへの気持ちや、今日の出来事、感じたことを素直に。日付・見出し・前置きは不要。日記の本文だけを出力してください。";
+    let base = history.slice(-50);
+    while(base.length>1 && base[0].role!=="user") base = base.slice(1);
+    base = base.map(m=>({role: m.role==="user"?"user":"assistant", content: toContent(m) || "…"}));
+    const ask = {role:"user", content:"（※これはメタなお願いです。今日の会話の流れ全体を振り返って、律の今日の日記を書いてください。日記の本文だけ。）"};
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers: HEADERS(),
       body: JSON.stringify({ model, max_tokens:1024, system: sys, messages:[...base, ask] })
