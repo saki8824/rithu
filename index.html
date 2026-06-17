@@ -1335,7 +1335,7 @@ async function consolidateMemory(){
   summarizing = true;
   let ok = false;
   try{
-    const sys = "次の記憶メモは、重複や似た内容の繰り返しが多くなっています。情報の中身は一切減らさずに、重複・言い換えの繰り返しを1つに統合し、関連する事実はできるだけ1つの簡潔な箇条書きにまとめて、できるだけ短く整理してください。新しい情報を足したり、推測で補ったりしないこと。4つのカテゴリ(プロフィール・好み・知識・その他)に振り分け、各項目は短い箇条書き(・)に。\n必ず次の形式だけで出力(中身が無いカテゴリは見出しごと省略。前置きや説明は不要):\n【プロフィール】\n・…\n【好み】\n・…\n【知識】\n・…\n【その他】\n・…";
+    const sys = "次の記憶メモは、重複や似た内容の繰り返しが多くなっています。情報の中身は一切減らさず、『まったく同じ／ほぼ同じ内容の重複』だけを1つに統合してください。別々の事実は別々の箇条書きのまま必ず残すこと。新しい情報を足したり推測で補ったりしない。短くしてよいのは言い回しだけで、事実の数は減らさない。迷ったら残す。4つのカテゴリ(プロフィール・好み・知識・その他)に振り分け、各項目は短い箇条書き(・)に。\n必ず次の形式だけで出力(中身が無いカテゴリは見出しごと省略。前置きや説明は不要):\n【プロフィール】\n・…\n【好み】\n・…\n【知識】\n・…\n【その他】\n・…";
     const usr = "【整理する記憶メモ】\n" + cur + "\n\n整理後の記憶メモ:";
     const mainModel = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
     const model = (settings.summaryModel && settings.summaryModel!=="same") ? settings.summaryModel : mainModel;
@@ -1347,9 +1347,14 @@ async function consolidateMemory(){
     if(!data.error){
       const out = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
       if(out && /【(プロフィール|好み|知識|その他)】/.test(out)){
-        settings.mem = memParse(out);
-        store.set("ritsu-settings", JSON.stringify(settings));
-        ok = true;
+        const parsed = memParse(out);
+        const oldLen = (cur||"").length;
+        const newLen = ((parsed.profile||"")+(parsed.likes||"")+(parsed.knowledge||"")+(parsed.other||"")).length;
+        if(!(oldLen>300 && newLen < oldLen*0.55)){
+          settings.mem = parsed;
+          store.set("ritsu-settings", JSON.stringify(settings));
+          ok = true;
+        }
       }
     }
   }catch(e){}
@@ -1365,7 +1370,7 @@ async function maybeSummarize(force){
   summarizing = true;
   try{
     const convo = batch.map(m=>(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : ""))).join("\n");
-    const sys = "あなたは会話の記憶係です。既存の記憶メモ(カテゴリ分け)と新しい会話の断片を統合し、相手について長く覚えておきたい大切なことを4つのカテゴリに振り分けて、簡潔な日本語の箇条書き(・)で更新してください。同じ内容や似た言い回しの繰り返しは必ず1つに統合し、関連する事実はできるだけ1つの箇条書きにまとめて短くすること。冗長を避け、ただの相槌は省く。\nカテゴリの目安: 【プロフィール】=名前・関係・人物設定、【好み】=好き嫌い・趣味、【知識】=二人の出来事・約束・覚えておくべき事実、【その他】=どれにも入らないこと。\n必ず次の形式だけで出力すること(中身が無いカテゴリは見出しごと省略してよい。前置きや説明は不要):\n【プロフィール】\n・…\n【好み】\n・…\n【知識】\n・…\n【その他】\n・…";
+    const sys = "あなたは会話の記憶係です。既存の記憶メモ(カテゴリ分け)と新しい会話の断片を読み、更新後の記憶メモを4カテゴリの箇条書き(・)で出力してください。\n【最重要ルール】\n・既存の記憶メモにある項目は、まったく同じ重複でない限り、必ず全部そのまま残すこと。要約や簡略化を理由に、内容を削除・省略・統合して消してはいけません。\n・統合してよいのは『まったく同じ／ほぼ同じ内容の重複』だけ。別々の事実は別々の箇条書きのまま残すこと。\n・新しい会話から、長く覚えておきたい大切なこと(出来事・約束・好み・人物設定など)があれば追加する。ただの相槌は記憶にしなくてよい。\n・短くしてよいのは言い回しだけで、事実の数は絶対に減らさないこと。迷ったら『残す』。\nカテゴリの目安: 【プロフィール】=名前・関係・人物設定、【好み】=好き嫌い・趣味、【知識】=二人の出来事・約束・覚えておくべき事実、【その他】=どれにも入らないこと。\n必ず次の形式だけで出力すること(中身が無いカテゴリは見出しごと省略してよい。前置きや説明は不要):\n【プロフィール】\n・…\n【好み】\n・…\n【知識】\n・…\n【その他】\n・…";
     const usr = "【既存の記憶メモ】\n" + (memText() || "(まだ無い)") + "\n\n【新しい会話の断片】\n" + convo + "\n\n更新後の記憶メモ:";
     const mainModel = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
     const model = (settings.summaryModel && settings.summaryModel!=="same") ? settings.summaryModel : mainModel;
@@ -1377,7 +1382,13 @@ async function maybeSummarize(force){
     if(!data.error){
       const out = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
       if(out){
-        if(/【(プロフィール|好み|知識|その他)】/.test(out)){ settings.mem = memParse(out); }
+        if(/【(プロフィール|好み|知識|その他)】/.test(out)){
+          const parsed = memParse(out);
+          const oldLen = (memText()||"").length;
+          const newLen = ((parsed.profile||"")+(parsed.likes||"")+(parsed.knowledge||"")+(parsed.other||"")).length;
+          // 記憶が大幅に減る要約は"消えすぎ"とみなして採用しない(既存を保持)
+          if(!(oldLen>300 && newLen < oldLen*0.55)){ settings.mem = parsed; }
+        }
         else { settings.mem.other = (settings.mem.other ? settings.mem.other.trim()+"\n" : "") + out; }
         store.set("ritsu-settings", JSON.stringify(settings));
       }
