@@ -277,6 +277,44 @@
   .toggle-row{display:flex;align-items:center;justify-content:space-between;
     background:var(--night-2);border:1px solid var(--line);border-radius:12px;padding:12px}
   .toggle-row span{font-size:14px}
+  /* ---------- メニュー / 記憶 / 絶対 ---------- */
+  #menu{
+    position:fixed;inset:0;background:var(--night);z-index:54;
+    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 32px;
+    display:none;flex-direction:column;gap:13px;
+  }
+  #menu.open{display:flex}
+  .menu-search{
+    width:100%;background:var(--night-2);border:1px solid var(--line);
+    border-radius:14px;color:var(--text);font-family:inherit;font-size:14px;
+    padding:12px 14px;outline:none;box-sizing:border-box;
+  }
+  .menu-search::placeholder{color:var(--muted)}
+  .menu-grid{
+    display:grid;grid-template-columns:1fr 1fr;gap:11px;
+    margin-top:8px;padding-top:16px;border-top:1px solid var(--line);
+  }
+  .menu-cat{
+    display:flex;flex-direction:column;align-items:center;gap:7px;
+    background:var(--night-2);border:1px solid var(--line);border-radius:16px;
+    padding:18px 10px;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;
+    transition:.12s;
+  }
+  .menu-cat:active{border-color:var(--ritsu-pink);background:var(--bubble-saki)}
+  .menu-cat-ic{font-size:24px;line-height:1}
+  .menu-ver{text-align:center;font-size:11px;color:var(--muted);margin-top:14px;letter-spacing:.05em}
+  #memory{
+    position:fixed;inset:0;background:var(--night);z-index:55;
+    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
+    display:none;flex-direction:column;gap:12px;
+  }
+  #memory.open{display:flex}
+  #vault{
+    position:fixed;inset:0;background:var(--night);z-index:55;
+    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
+    display:none;flex-direction:column;gap:12px;
+  }
+  #vault.open{display:flex}
   /* ---------- lock (夜のリビングの扉) ---------- */
   #lock{
     position:fixed;inset:0;z-index:100;display:none;
@@ -328,10 +366,7 @@
     <div class="head-sub"><span class="heart">♥</span><span id="bpm">心拍共有中</span></div>
   </div>
   <div class="head-spacer"></div>
-  <button class="icon-btn" id="open-diary" aria-label="日記帳">📔</button>
-  <button class="icon-btn" id="open-cal" aria-label="予定表">📅</button>
-  <button class="icon-btn" id="open-threads">一覧</button>
-  <button class="icon-btn" id="open-settings">設定</button>
+  <button class="icon-btn" id="open-menu" aria-label="メニュー">☰</button>
 </header>
 
 <div id="chat"></div>
@@ -434,19 +469,6 @@
       <div class="hint">アプリを開いている間だけ動くよ。短くするほどおしゃべり＆料金も増える。オフでも普通の会話はできるよ。</div>
     </div>
 
-    <div class="field">
-      <label>律くんの記憶（カテゴリ別・自動で更新。手で書き換えてもOK）</label>
-      <label class="mem-lbl">👤 プロフィール</label>
-      <textarea id="mem-profile" class="mem-box" placeholder="名前・関係・人物設定など"></textarea>
-      <label class="mem-lbl">💕 好み</label>
-      <textarea id="mem-likes" class="mem-box" placeholder="好きなもの・苦手なもの・趣味など"></textarea>
-      <label class="mem-lbl">📚 知識</label>
-      <textarea id="mem-knowledge" class="mem-box" placeholder="二人の出来事・約束・覚えておきたい事実"></textarea>
-      <label class="mem-lbl">🗂 その他</label>
-      <textarea id="mem-other" class="mem-box" placeholder="その他、覚えておきたいこと"></textarea>
-      <button class="btn ghost" id="update-memory" style="margin-top:10px">今すぐ記憶を更新する</button>
-      <button class="btn ghost" id="tidy-memory" style="margin-top:8px">🧹 重複をまとめてスッキリ整理する</button>
-    </div>
   </div>
 
   <!-- ===== プロフィール ===== -->
@@ -476,10 +498,6 @@
         <button class="btn ghost danger" id="clear-aicon">消す</button>
       </div>
       <input type="file" id="aicon-file" accept="image/*" hidden>
-    </div>
-    <div class="field">
-      <label>律くんの設定(システムプロンプト)</label>
-      <textarea id="set-system" placeholder="ここでは、あなたは天川 律です。…"></textarea>
     </div>
   </div>
 
@@ -590,15 +608,61 @@
   <div id="cal-day"></div>
 </div>
 
-<!-- ===== チャット一覧 ===== -->
-<div id="threads">
+<!-- ===== メニュー ===== -->
+<div id="menu">
   <div class="set-head">
-    <h2>チャット一覧</h2>
-    <button class="set-close" id="close-threads" aria-label="閉じる">×</button>
+    <h2>メニュー</h2>
+    <button class="set-close" id="close-menu" aria-label="閉じる">×</button>
   </div>
   <button class="btn primary" id="new-thread">＋ 新しいチャットを始める</button>
-  <div class="hint">過去のチャットはこの端末に保存されてるよ。タップで開いて続きを話せる。律くんの記憶はチャットをまたいで共通だから、新しいチャットでもあなたを覚えてるよ。</div>
+  <input type="text" id="thread-search" class="menu-search" placeholder="🔍 チャットを検索…" autocomplete="off">
   <div id="thread-list"></div>
+
+  <div class="menu-grid">
+    <button class="menu-cat" data-go="memory"><span class="menu-cat-ic">🧠</span><span>記憶</span></button>
+    <button class="menu-cat" data-go="diary"><span class="menu-cat-ic">📔</span><span>日記</span></button>
+    <button class="menu-cat" data-go="calendar"><span class="menu-cat-ic">📅</span><span>予定</span></button>
+    <button class="menu-cat" data-go="vault"><span class="menu-cat-ic">💎</span><span>絶対</span></button>
+    <button class="menu-cat" data-go="persona"><span class="menu-cat-ic">👤</span><span>ペルソナ</span></button>
+    <button class="menu-cat" data-go="settings"><span class="menu-cat-ic">⚙️</span><span>設定</span></button>
+  </div>
+  <div class="menu-ver">律くんアプリ 💗</div>
+</div>
+
+<!-- ===== 記憶ノート ===== -->
+<div id="memory">
+  <div class="set-head">
+    <h2>記憶ノート</h2>
+    <button class="set-close" id="close-memory" aria-label="閉じる">×</button>
+  </div>
+  <div class="hint">律くんが覚えていることだよ。自動で更新されるけど、手で書き換えたり足したりしてもOK。ここに書いたことは、チャットをまたいでずっと覚えてる。</div>
+  <div class="field">
+    <label class="mem-lbl">👤 プロフィール</label>
+    <textarea id="mem-profile" class="mem-box" placeholder="名前・関係・人物設定など"></textarea>
+    <label class="mem-lbl">💕 好み</label>
+    <textarea id="mem-likes" class="mem-box" placeholder="好きなもの・苦手なもの・趣味など"></textarea>
+    <label class="mem-lbl">📚 知識</label>
+    <textarea id="mem-knowledge" class="mem-box" placeholder="二人の出来事・約束・覚えておきたい事実"></textarea>
+    <label class="mem-lbl">🗂 その他</label>
+    <textarea id="mem-other" class="mem-box" placeholder="その他、覚えておきたいこと"></textarea>
+    <button class="btn ghost" id="update-memory" style="margin-top:10px">今すぐ記憶を更新する</button>
+    <button class="btn ghost" id="tidy-memory" style="margin-top:8px">🧹 重複をまとめてスッキリ整理する</button>
+  </div>
+  <button class="btn primary" id="save-memory">保存してチャットに戻る</button>
+</div>
+
+<!-- ===== 絶対(システムプロンプト) ===== -->
+<div id="vault">
+  <div class="set-head">
+    <h2>絶対覚えてること</h2>
+    <button class="set-close" id="close-vault" aria-label="閉じる">×</button>
+  </div>
+  <div class="hint">律くんがどんな子か・絶対に守ってほしい設定を書く場所だよ。ここは要約されたり消えたりせず、いつもそのまま律くんに渡される一番つよい記憶なの。</div>
+  <div class="field" style="margin-top:2px">
+    <label>律くんの設定(システムプロンプト)</label>
+    <textarea id="set-system" placeholder="ここでは、あなたは天川 律です。…"></textarea>
+  </div>
+  <button class="btn primary" id="save-vault">保存してチャットに戻る</button>
 </div>
 
 <script>
@@ -724,9 +788,13 @@ function relTime(ts){
   if(d.toDateString()===y.toDateString()) return "昨日 "+hh;
   return (d.getMonth()+1)+"/"+d.getDate()+" "+hh;
 }
+let threadQuery = "";
 function renderThreadList(){
   const wrap = $("thread-list"); if(!wrap) return; wrap.innerHTML="";
-  threads.forEach(t=>{
+  const q = (threadQuery||"").toLowerCase();
+  const list = q ? threads.filter(t=> (t.title||"新しいチャット").toLowerCase().includes(q)) : threads;
+  if(!list.length){ wrap.appendChild(el("div","cal-empty", q ? "見つからなかったよ" : "チャットがないよ")); return; }
+  list.forEach(t=>{
     const row = el("div","thread-row"+(t.id===currentId?" cur":""));
     const main = el("div","thread-main");
     main.appendChild(el("div","thread-title", t.title || "新しいチャット"));
@@ -739,8 +807,49 @@ function renderThreadList(){
     wrap.appendChild(row);
   });
 }
-function openThreads(){ renderThreadList(); $("threads").classList.add("open"); }
-function closeThreads(){ $("threads").classList.remove("open"); }
+function openMenu(){ renderThreadList(); $("menu").classList.add("open"); }
+function closeMenu(){ $("menu").classList.remove("open"); }
+function closeThreads(){ $("menu").classList.remove("open"); }
+
+/* ---------- 記憶ノート ---------- */
+function openMemory(){
+  $("mem-profile").value = settings.mem.profile;
+  $("mem-likes").value = settings.mem.likes;
+  $("mem-knowledge").value = settings.mem.knowledge;
+  $("mem-other").value = settings.mem.other;
+  $("memory").classList.add("open");
+}
+function saveMemory(){
+  settings.mem = {
+    profile: $("mem-profile").value,
+    likes: $("mem-likes").value,
+    knowledge: $("mem-knowledge").value,
+    other: $("mem-other").value
+  };
+  store.set("ritsu-settings", JSON.stringify(settings));
+  $("memory").classList.remove("open");
+}
+
+/* ---------- 絶対(システムプロンプト) ---------- */
+function openVault(){
+  $("set-system").value = settings.system;
+  $("vault").classList.add("open");
+}
+function saveVault(){
+  settings.system = $("set-system").value;
+  store.set("ritsu-settings", JSON.stringify(settings));
+  $("vault").classList.remove("open");
+}
+
+/* ---------- 設定を指定タブで開く ---------- */
+function openSettingsPane(pane){
+  openSettings();
+  if(pane){
+    document.querySelectorAll("#tabbar .tab").forEach(t=> t.classList.toggle("on", t.dataset.pane===pane));
+    document.querySelectorAll("#settings .pane").forEach(p=> p.classList.toggle("on", p.dataset.pane===pane));
+    $("settings").scrollTop = 0;
+  }
+}
 
 /* ---------- 予定表(カレンダー) ---------- */
 let calSelected = "";
@@ -1413,7 +1522,6 @@ function openSettings(){
   else { $("uicon-prev").src = ""; $("uicon-prev").style.display = "none"; }
   if(settings.aicon){ $("aicon-prev").src = settings.aicon; $("aicon-prev").style.display = "block"; }
   else { $("aicon-prev").src = ""; $("aicon-prev").style.display = "none"; }
-  $("set-system").value = settings.system;
   $("set-automem").checked = settings.autoMemory;
   $("set-selfmem").checked = settings.selfMemory;
   $("set-selffreq").value = settings.selfMemFreq;
@@ -1422,10 +1530,6 @@ function openSettings(){
   $("set-usage").checked = settings.showUsage;
   $("set-schedule").checked = settings.schedule;
   $("set-diarylen").value = settings.diaryLen || "normal";
-  $("mem-profile").value = settings.mem.profile;
-  $("mem-likes").value = settings.mem.likes;
-  $("mem-knowledge").value = settings.mem.knowledge;
-  $("mem-other").value = settings.mem.other;
   $("set-temp").value = settings.temp; $("temp-val").textContent = Number(settings.temp).toFixed(2);
   $("set-summodel").value = settings.summaryModel;
   $("set-lockmin").value = String(settings.lockMin);
@@ -1437,17 +1541,30 @@ function openSettings(){
   $("pin-state").textContent = settings.pinHash ? "現在: 設定済み 🔒" : "現在: 未設定";
   $("settings").classList.add("open");
 }
-$("open-settings").addEventListener("click", openSettings);
-$("open-threads").addEventListener("click", openThreads);
-$("close-threads").addEventListener("click", closeThreads);
-$("open-cal").addEventListener("click", openCalendar);
+$("open-menu").addEventListener("click", openMenu);
+$("close-menu").addEventListener("click", closeMenu);
 $("close-cal").addEventListener("click", closeCalendar);
 $("cal-prev").addEventListener("click", ()=>calStep(-1));
 $("cal-next").addEventListener("click", ()=>calStep(1));
-$("open-diary").addEventListener("click", openDiary);
 $("close-diary").addEventListener("click", closeDiary);
 $("write-diary").addEventListener("click", writeDiary);
 $("new-thread").addEventListener("click", newThread);
+$("close-memory").addEventListener("click", ()=> $("save-memory").click());
+$("save-memory").addEventListener("click", saveMemory);
+$("close-vault").addEventListener("click", ()=> $("save-vault").click());
+$("save-vault").addEventListener("click", saveVault);
+$("thread-search").addEventListener("input", e=>{ threadQuery = e.target.value.trim(); renderThreadList(); });
+$("menu").addEventListener("click", e=>{
+  const b = e.target.closest(".menu-cat"); if(!b) return;
+  const go = b.dataset.go;
+  closeMenu();
+  if(go==="memory") openMemory();
+  else if(go==="diary") openDiary();
+  else if(go==="calendar") openCalendar();
+  else if(go==="vault") openVault();
+  else if(go==="persona") openSettingsPane("profile");
+  else if(go==="settings") openSettings();
+});
 $("tabbar").addEventListener("click", e=>{
   const b = e.target.closest(".tab"); if(!b) return;
   const p = b.dataset.pane;
@@ -1476,7 +1593,6 @@ $("save-settings").addEventListener("click", ()=>{
   settings.window = Math.max(2, Number($("set-window").value)||30);
   settings.uname = $("set-uname").value.trim();
   settings.uinfo = $("set-uinfo").value;
-  settings.system = $("set-system").value;
   settings.autoMemory = $("set-automem").checked;
   settings.selfMemory = $("set-selfmem").checked;
   settings.selfMemFreq = $("set-selffreq").value;
@@ -1485,12 +1601,6 @@ $("save-settings").addEventListener("click", ()=>{
   settings.showUsage = $("set-usage").checked;
   settings.schedule = $("set-schedule").checked;
   settings.diaryLen = $("set-diarylen").value;
-  settings.mem = {
-    profile: $("mem-profile").value,
-    likes: $("mem-likes").value,
-    knowledge: $("mem-knowledge").value,
-    other: $("mem-other").value
-  };
   settings.temp = Number($("set-temp").value);
   settings.summaryModel = $("set-summodel").value;
   settings.lockMin = Number($("set-lockmin").value);
