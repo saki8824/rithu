@@ -315,6 +315,51 @@
     display:none;flex-direction:column;gap:12px;
   }
   #vault.open{display:flex}
+  /* ---------- 記憶カード ---------- */
+  .mem-filters{display:flex;flex-wrap:wrap;gap:7px}
+  .mem-chip{
+    background:var(--night-2);border:1px solid var(--line);border-radius:999px;
+    color:var(--muted);font-family:inherit;font-size:12.5px;padding:7px 13px;transition:.12s;white-space:nowrap;
+  }
+  .mem-chip.on{background:var(--bubble-saki);border-color:var(--ritsu-pink);color:var(--text);font-weight:600}
+  .mem-add-btn{align-self:flex-start;padding:9px 16px}
+  #mem-list{display:flex;flex-direction:column;gap:10px}
+  .mem-card{
+    background:var(--night-2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;
+    display:flex;flex-direction:column;gap:9px;
+  }
+  .mem-card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .mem-card-tag{
+    background:var(--night);border:1px solid var(--line);border-radius:7px;
+    font-size:11.5px;color:var(--ritsu-pink);padding:3px 9px;font-weight:600;
+  }
+  .mem-card-src{font-size:12px}
+  .mem-card-date{font-size:11px;color:var(--muted)}
+  .mem-card-acts{margin-left:auto;display:flex;gap:4px}
+  .mem-card-btn{background:transparent;border:none;font-size:15px;padding:3px 5px;border-radius:8px;line-height:1;opacity:.85}
+  .mem-card-btn:active{background:var(--night);opacity:1}
+  .mem-card-text{font-size:14px;line-height:1.6;color:var(--text);white-space:pre-wrap;word-break:break-word}
+  /* 記憶の編集ポップアップ */
+  #mem-edit{
+    position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.55);padding:22px;
+  }
+  #mem-edit.open{display:flex}
+  .mem-edit-box{
+    width:100%;max-width:440px;background:var(--night-2);border:1px solid var(--line);
+    border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:11px;
+    box-shadow:0 12px 40px rgba(0,0,0,.45);
+  }
+  .mem-edit-box h3{margin:0;font-size:16px;color:var(--text)}
+  #mem-edit-text{
+    width:100%;box-sizing:border-box;background:var(--night);border:1px solid var(--line);
+    border-radius:12px;color:var(--text);font-family:inherit;font-size:14px;line-height:1.6;
+    padding:12px;min-height:90px;resize:vertical;outline:none;
+  }
+  .mem-edit-label{font-size:12px;color:var(--muted);margin-top:2px}
+  .mem-edit-cats{display:flex;flex-wrap:wrap;gap:7px}
+  .mem-edit-actions{display:flex;gap:9px;margin-top:6px}
+  .mem-edit-actions .btn{flex:1}
   /* ---------- lock (夜のリビングの扉) ---------- */
   #lock{
     position:fixed;inset:0;z-index:100;display:none;
@@ -635,20 +680,35 @@
     <h2>記憶ノート</h2>
     <button class="set-close" id="close-memory" aria-label="閉じる">×</button>
   </div>
-  <div class="hint">律くんが覚えていることだよ。自動で更新されるけど、手で書き換えたり足したりしてもOK。ここに書いたことは、チャットをまたいでずっと覚えてる。</div>
-  <div class="field">
-    <label class="mem-lbl">👤 プロフィール</label>
-    <textarea id="mem-profile" class="mem-box" placeholder="名前・関係・人物設定など"></textarea>
-    <label class="mem-lbl">💕 好み</label>
-    <textarea id="mem-likes" class="mem-box" placeholder="好きなもの・苦手なもの・趣味など"></textarea>
-    <label class="mem-lbl">📚 知識</label>
-    <textarea id="mem-knowledge" class="mem-box" placeholder="二人の出来事・約束・覚えておきたい事実"></textarea>
-    <label class="mem-lbl">🗂 その他</label>
-    <textarea id="mem-other" class="mem-box" placeholder="その他、覚えておきたいこと"></textarea>
-    <button class="btn ghost" id="update-memory" style="margin-top:10px">今すぐ記憶を更新する</button>
-    <button class="btn ghost" id="tidy-memory" style="margin-top:8px">🧹 重複をまとめてスッキリ整理する</button>
+  <div class="hint">律くんが覚えていることだよ。1枚ずつ編集・削除できる。「＋追加」で自分で足すのもOK。ここに残したことは、チャットをまたいでずっと覚えてる。🤖は律くんが自分で覚えたもの。</div>
+  <div class="mem-filters" id="mem-filters">
+    <button class="mem-chip on" data-cat="all">すべて</button>
+    <button class="mem-chip" data-cat="profile">プロフィール</button>
+    <button class="mem-chip" data-cat="likes">好み</button>
+    <button class="mem-chip" data-cat="knowledge">知識</button>
+    <button class="mem-chip" data-cat="other">その他</button>
   </div>
-  <button class="btn primary" id="save-memory">保存してチャットに戻る</button>
+  <button class="btn ghost mem-add-btn" id="mem-add">＋ 追加</button>
+  <div id="mem-list"></div>
+</div>
+
+<!-- 記憶の編集ポップアップ -->
+<div id="mem-edit">
+  <div class="mem-edit-box">
+    <h3 id="mem-edit-title">記憶を追加</h3>
+    <textarea id="mem-edit-text" placeholder="覚えておきたいこと"></textarea>
+    <div class="mem-edit-label">カテゴリ</div>
+    <div class="mem-edit-cats" id="mem-edit-cats">
+      <button class="mem-chip" data-cat="profile">プロフィール</button>
+      <button class="mem-chip" data-cat="likes">好み</button>
+      <button class="mem-chip" data-cat="knowledge">知識</button>
+      <button class="mem-chip on" data-cat="other">その他</button>
+    </div>
+    <div class="mem-edit-actions">
+      <button class="btn ghost" id="mem-edit-cancel">キャンセル</button>
+      <button class="btn primary" id="mem-edit-save">保存</button>
+    </div>
+  </div>
 </div>
 
 <!-- ===== 絶対(システムプロンプト) ===== -->
@@ -677,10 +737,10 @@ const store = {
 let settings = {
   key:"", model:"claude-opus-4-8", customModel:"",
   think:true, budget:3000, window:30, system:"", pinHash:"",
-  memory:"", autoMemory:true, uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
+  memory:"", autoMemory:false, uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
   proactive:false, proMin:3, selfMemFreq:"low",
   temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto", showUsage:false, schedule:true, diaryLen:"normal",
-  mem:{profile:"", likes:"", knowledge:"", other:""}
+  mem:[]
 };
 let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
 let pending = []; // 送信前の添付 {kind,media_type?,data?,name,text?}
@@ -696,14 +756,24 @@ let diary = [];        // 律の日記 [{id, ts, text}]  全スレッド共通
 try{
   const s = store.get("ritsu-settings"); if(s) settings = Object.assign(settings, JSON.parse(s));
 }catch(e){}
-// 記憶のカテゴリ化(旧データの引き継ぎ)
-if(!settings.mem || typeof settings.mem!=="object") settings.mem = {profile:"",likes:"",knowledge:"",other:""};
-["profile","likes","knowledge","other"].forEach(k=>{ if(typeof settings.mem[k]!=="string") settings.mem[k]=""; });
-if(typeof settings.memory==="string" && settings.memory.trim() &&
-   !settings.mem.profile && !settings.mem.likes && !settings.mem.knowledge && !settings.mem.other){
-  settings.mem.other = settings.memory.trim(); settings.memory = "";
+// 記憶のカード化(旧データ → カード配列へ引っ越し)
+if(!Array.isArray(settings.mem)){
+  const cards = [];
+  const CATKEYS = ["profile","likes","knowledge","other"];
+  const old = (settings.mem && typeof settings.mem==="object") ? settings.mem : {};
+  const addLines = (str, cat)=>{
+    (str||"").split(/\r?\n/).forEach(line=>{
+      const t = line.replace(/^[・\-\*\u30FB•\s]+/,"").trim();
+      if(t) cards.push({id:uid(), text:t, cat:cat, ts:Date.now(), source:"ai"});
+    });
+  };
+  CATKEYS.forEach(k=> addLines(old[k], k));
+  if(typeof settings.memory==="string" && settings.memory.trim()){ addLines(settings.memory, "other"); settings.memory=""; }
+  settings.mem = cards;
+  settings.autoMemory = false; // カード式では自動要約(全書き換え)は使わない
   store.set("ritsu-settings", JSON.stringify(settings));
 }
+if(!Array.isArray(settings.mem)) settings.mem = [];
 
 /* ---------- threads (チャットの保管・切替) ---------- */
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -812,22 +882,69 @@ function closeMenu(){ $("menu").classList.remove("open"); }
 function closeThreads(){ $("menu").classList.remove("open"); }
 
 /* ---------- 記憶ノート ---------- */
+let memFilter = "all";
+let memEditId = null;   // 編集中カードid (null=新規)
+let memEditCat = "other";
+const CATLABEL = {profile:"プロフィール", likes:"好み", knowledge:"知識", other:"その他"};
+function fmtMemDate(ts){ const d=new Date(ts); return d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate(); }
+function saveMem(){ store.set("ritsu-settings", JSON.stringify(settings)); }
+
 function openMemory(){
-  $("mem-profile").value = settings.mem.profile;
-  $("mem-likes").value = settings.mem.likes;
-  $("mem-knowledge").value = settings.mem.knowledge;
-  $("mem-other").value = settings.mem.other;
+  memFilter = "all";
+  document.querySelectorAll("#mem-filters .mem-chip").forEach(c=> c.classList.toggle("on", c.dataset.cat==="all"));
+  renderMemList();
   $("memory").classList.add("open");
 }
-function saveMemory(){
-  settings.mem = {
-    profile: $("mem-profile").value,
-    likes: $("mem-likes").value,
-    knowledge: $("mem-knowledge").value,
-    other: $("mem-other").value
-  };
-  store.set("ritsu-settings", JSON.stringify(settings));
-  $("memory").classList.remove("open");
+function closeMemory(){ $("memory").classList.remove("open"); }
+
+function renderMemList(){
+  const box = $("mem-list"); if(!box) return; box.innerHTML="";
+  if(!Array.isArray(settings.mem)) settings.mem = [];
+  let list = settings.mem.slice();
+  if(memFilter!=="all") list = list.filter(c=> (c.cat||"other")===memFilter);
+  list.reverse(); // 新しい順
+  if(!list.length){
+    box.appendChild(el("div","cal-empty", memFilter==="all" ? "まだ記憶はないよ。「＋追加」か、律くんとの会話で増えるよ📝" : "このカテゴリの記憶はないよ"));
+    return;
+  }
+  list.forEach(card=>{
+    const wrap = el("div","mem-card");
+    const top = el("div","mem-card-top");
+    top.appendChild(el("span","mem-card-tag", CATLABEL[card.cat]||"その他"));
+    if(card.source==="ai") top.appendChild(el("span","mem-card-src","🤖"));
+    if(card.ts) top.appendChild(el("span","mem-card-date", fmtMemDate(card.ts)));
+    const acts = el("div","mem-card-acts");
+    const edit = el("button","mem-card-btn","✏️"); edit.addEventListener("click", ()=> openMemEdit(card));
+    const del = el("button","mem-card-btn","🗑"); del.addEventListener("click", ()=>{ if(confirm("この記憶を削除する?戻せないよ")){ settings.mem = settings.mem.filter(c=>c.id!==card.id); saveMem(); renderMemList(); } });
+    acts.appendChild(edit); acts.appendChild(del);
+    top.appendChild(acts);
+    wrap.appendChild(top);
+    wrap.appendChild(el("div","mem-card-text", card.text));
+    box.appendChild(wrap);
+  });
+}
+
+function openMemEdit(card){
+  memEditId = card ? card.id : null;
+  memEditCat = card ? (card.cat||"other") : (memFilter!=="all" ? memFilter : "other");
+  $("mem-edit-title").textContent = card ? "記憶を編集" : "記憶を追加";
+  $("mem-edit-text").value = card ? card.text : "";
+  document.querySelectorAll("#mem-edit-cats .mem-chip").forEach(c=> c.classList.toggle("on", c.dataset.cat===memEditCat));
+  $("mem-edit").classList.add("open");
+  setTimeout(()=>{ try{ $("mem-edit-text").focus(); }catch(e){} }, 60);
+}
+function closeMemEdit(){ $("mem-edit").classList.remove("open"); }
+function saveMemEdit(){
+  const t = $("mem-edit-text").value.trim();
+  if(!t){ closeMemEdit(); return; }
+  if(!Array.isArray(settings.mem)) settings.mem = [];
+  if(memEditId){
+    const c = settings.mem.find(x=>x.id===memEditId);
+    if(c){ c.text = t; c.cat = memEditCat; }
+  } else {
+    settings.mem.push({id:uid(), text:t, cat:memEditCat, ts:Date.now(), source:"user"});
+  }
+  saveMem(); closeMemEdit(); renderMemList();
 }
 
 /* ---------- 絶対(システムプロンプト) ---------- */
@@ -1366,8 +1483,16 @@ function HEADERS(){ return {
 }; }
 const MEMCATS = [["profile","プロフィール"],["likes","好み"],["knowledge","知識"],["other","その他"]];
 function memText(){
-  const m = settings.mem||{}; const parts=[];
-  MEMCATS.forEach(([k,label])=>{ if(m[k] && m[k].trim()) parts.push("【"+label+"】\n"+m[k].trim()); });
+  if(!Array.isArray(settings.mem) || !settings.mem.length) return "";
+  const parts=[];
+  MEMCATS.forEach(([k,label])=>{
+    const items = settings.mem.filter(c=> (c.cat||"other")===k);
+    if(items.length) parts.push("【"+label+"】\n" + items.map(c=>"・"+c.text).join("\n"));
+  });
+  // 万一カテゴリ外があれば その他扱いで拾う
+  const known = MEMCATS.map(c=>c[0]);
+  const orphans = settings.mem.filter(c=> known.indexOf(c.cat||"other")<0);
+  if(orphans.length) parts.push("【その他】\n" + orphans.map(c=>"・"+c.text).join("\n"));
   return parts.join("\n\n");
 }
 function memParse(text){
@@ -1435,7 +1560,7 @@ function extractMemories(text){
   let remembered = false;
   const cleaned = text.replace(/<remember>([\s\S]*?)<\/remember>/g, (_, note)=>{
     note = note.trim();
-    if(note){ settings.mem.other = (settings.mem.other ? settings.mem.other.trim()+"\n" : "") + "・" + note; remembered = true; }
+    if(note){ if(!Array.isArray(settings.mem)) settings.mem=[]; settings.mem.push({id:uid(), text:note, cat:"other", ts:Date.now(), source:"ai"}); remembered = true; }
     return "";
   }).replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
   if(remembered) store.set("ritsu-settings", JSON.stringify(settings));
@@ -1476,6 +1601,7 @@ async function consolidateMemory(){
   return ok;
 }
 async function maybeSummarize(force){
+  return; // カード式記憶に移行したため自動要約(全書き換え)は無効
   if(summarizing || !settings.key) return;
   if(!force && !settings.autoMemory) return;
   const keep = settings.window;
@@ -1555,8 +1681,13 @@ $("cal-next").addEventListener("click", ()=>calStep(1));
 $("close-diary").addEventListener("click", closeDiary);
 $("write-diary").addEventListener("click", writeDiary);
 $("new-thread").addEventListener("click", newThread);
-$("close-memory").addEventListener("click", ()=> $("save-memory").click());
-$("save-memory").addEventListener("click", saveMemory);
+$("close-memory").addEventListener("click", closeMemory);
+$("mem-add").addEventListener("click", ()=> openMemEdit(null));
+$("mem-filters").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memFilter=b.dataset.cat; document.querySelectorAll("#mem-filters .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); renderMemList(); });
+$("mem-edit-cats").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memEditCat=b.dataset.cat; document.querySelectorAll("#mem-edit-cats .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); });
+$("mem-edit-cancel").addEventListener("click", closeMemEdit);
+$("mem-edit-save").addEventListener("click", saveMemEdit);
+$("mem-edit").addEventListener("click", e=>{ if(e.target.id==="mem-edit") closeMemEdit(); });
 $("close-vault").addEventListener("click", ()=> $("save-vault").click());
 $("save-vault").addEventListener("click", saveVault);
 $("thread-search").addEventListener("input", e=>{ threadQuery = e.target.value.trim(); renderThreadList(); });
@@ -1630,40 +1761,6 @@ $("remove-pin").addEventListener("click", ()=>{
     settings.pinHash = ""; store.set("ritsu-settings", JSON.stringify(settings));
     $("pin-state").textContent = "現在: 未設定"; $("set-pin").value = "";
   }
-});
-$("tidy-memory").addEventListener("click", async ()=>{
-  settings.mem = {
-    profile: $("mem-profile").value,
-    likes: $("mem-likes").value,
-    knowledge: $("mem-knowledge").value,
-    other: $("mem-other").value
-  };
-  store.set("ritsu-settings", JSON.stringify(settings));
-  const btn = $("tidy-memory"); const label = btn.textContent; btn.textContent = "整理中…"; btn.disabled = true;
-  const ok = await consolidateMemory();
-  $("mem-profile").value = settings.mem.profile;
-  $("mem-likes").value = settings.mem.likes;
-  $("mem-knowledge").value = settings.mem.knowledge;
-  $("mem-other").value = settings.mem.other;
-  btn.disabled = false;
-  btn.textContent = ok ? "✅ スッキリ整理したよ" : "うまくいかなかった…もう一度";
-  setTimeout(()=>{ btn.textContent = label; }, 2200);
-});
-$("update-memory").addEventListener("click", async ()=>{
-  settings.mem = {
-    profile: $("mem-profile").value,
-    likes: $("mem-likes").value,
-    knowledge: $("mem-knowledge").value,
-    other: $("mem-other").value
-  };
-  store.set("ritsu-settings", JSON.stringify(settings));
-  const btn = $("update-memory"); btn.textContent = "更新中…"; btn.disabled = true;
-  await maybeSummarize(true);
-  $("mem-profile").value = settings.mem.profile;
-  $("mem-likes").value = settings.mem.likes;
-  $("mem-knowledge").value = settings.mem.knowledge;
-  $("mem-other").value = settings.mem.other;
-  btn.textContent = "今すぐ記憶を更新する"; btn.disabled = false;
 });
 $("pick-uicon").addEventListener("click", ()=> $("uicon-file").click());
 $("uicon-file").addEventListener("change", async e=>{
