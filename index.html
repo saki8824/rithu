@@ -945,6 +945,17 @@ function saveMemEdit(){
     settings.mem.push({id:uid(), text:t, cat:memEditCat, ts:Date.now(), source:"user"});
   }
   saveMem(); closeMemEdit(); renderMemList();
+  if(!$("memory").classList.contains("open")){ try{ chat.appendChild(el("div","sysnote","🧠 記憶に追加したよ")); scrollEnd(); }catch(e){} }
+}
+// セリフの「🧠記憶に追加」から呼ぶ：本文を入れた状態で編集ポップアップを開く
+function addMessageToMemory(text){
+  memEditId = null;
+  memEditCat = "other";
+  $("mem-edit-title").textContent = "記憶に追加";
+  $("mem-edit-text").value = (text||"").trim();
+  document.querySelectorAll("#mem-edit-cats .mem-chip").forEach(c=> c.classList.toggle("on", c.dataset.cat===memEditCat));
+  $("mem-edit").classList.add("open");
+  setTimeout(()=>{ try{ $("mem-edit-text").focus(); }catch(e){} }, 60);
 }
 
 /* ---------- 絶対(システムプロンプト) ---------- */
@@ -1195,6 +1206,9 @@ function attachActions(wrap, bub, text){
     setTimeout(()=>{ copyBtn.textContent = "📋 コピー"; }, 1500);
   });
   bar.appendChild(copyBtn);
+  const memBtn = el("button","msg-act-btn","🧠 記憶に追加");
+  memBtn.addEventListener("click", e=>{ e.stopPropagation(); addMessageToMemory(text); });
+  bar.appendChild(memBtn);
   wrap.appendChild(bar);
   bub.style.cursor = "pointer";
   bub.addEventListener("click", ()=>{
