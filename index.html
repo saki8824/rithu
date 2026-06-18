@@ -994,7 +994,11 @@ async function writeDiary(){
     const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
     const lenRule = {short:"3〜4文くらいの短め", normal:"5〜8文くらい、ひと段落ぶん", long:"10文前後の、しっかりめ"}[settings.diaryLen] || "5〜8文くらい、ひと段落ぶん";
     const sys = buildSystem(false) + "\n\n# 今からの作業（日記）\n上のあなた(律)の設定・記憶と、これから渡す会話の流れ全体を踏まえて、律として一人称で「今日の日記」を綴ってください。直前のやり取りだけでなく、渡された会話全体を振り返って、印象に残った出来事や気持ちの移り変わりを書くこと。" + lenRule + "の分量で、語りかけ口調ではなく、自分の心の中をそっと書き留めるように。さきへの気持ちや、今日の出来事、感じたことを素直に。日付・見出し・前置きは不要。日記の本文だけを出力してください。";
-    let base = history.slice(-50);
+    // 前回の日記より後の会話＝その日ぶんを中心に拾う(寝る前に1回の想定)
+    const lastDiaryTs = diary.length ? Math.max(...diary.map(d=>d.ts||0)) : 0;
+    let base = history.filter(m => (m.ts||0) > lastDiaryTs);
+    if(base.length < 30) base = history.slice(-50);   // 少なすぎたら直近50通は確保
+    if(base.length > 200) base = base.slice(-200);    // 多すぎたらコスト上限(直近200通)
     while(base.length>1 && base[0].role!=="user") base = base.slice(1);
     base = base.map(m=>({role: m.role==="user"?"user":"assistant", content: toContent(m) || "…"}));
     const ask = {role:"user", content:"（※これはメタなお願いです。今日の会話の流れ全体を振り返って、律の今日の日記を書いてください。日記の本文だけ。）"};
