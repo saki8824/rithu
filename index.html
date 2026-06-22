@@ -360,6 +360,8 @@
   .mem-edit-cats{display:flex;flex-wrap:wrap;gap:7px}
   .mem-edit-actions{display:flex;gap:9px;margin-top:6px}
   .mem-edit-actions .btn{flex:1}
+  .backup-row{display:flex;gap:9px;margin-top:9px}
+  .backup-row .btn{flex:1}
   /* ---------- lock (夜のリビングの扉) ---------- */
   #lock{
     position:fixed;inset:0;z-index:100;display:none;
@@ -512,6 +514,17 @@
       <label>話しかけてくる間隔(分) ※小さいほどおしゃべり</label>
       <input type="number" id="set-promin" min="1" inputmode="numeric">
       <div class="hint">アプリを開いている間だけ動くよ。短くするほどおしゃべり＆料金も増える。オフでも普通の会話はできるよ。</div>
+    </div>
+
+    <div class="field">
+      <label>📦 データのバックアップ</label>
+      <div class="hint">記憶・日記・チャット・設定をまるごと1ファイルに書き出すよ。iCloud Drive(ファイルアプリ)に保存しておくと、機種変したりSafariを消しても安心。</div>
+      <div class="backup-row">
+        <button class="btn ghost" id="export-backup">📤 書き出して保存</button>
+        <button class="btn ghost" id="import-backup-btn">📥 復元(読み込み)</button>
+      </div>
+      <input type="file" id="import-file" accept="application/json,.json" hidden>
+      <div class="hint" style="margin-top:7px">※このファイルにはAPIキーも含まれるよ。人には送らず、自分のiCloud等にそっと保存してね(万一漏れても料金は上限3000円で止まるけど、念のため)。</div>
     </div>
 
   </div>
@@ -956,6 +969,45 @@ function addMessageToMemory(text){
   document.querySelectorAll("#mem-edit-cats .mem-chip").forEach(c=> c.classList.toggle("on", c.dataset.cat===memEditCat));
   $("mem-edit").classList.add("open");
   setTimeout(()=>{ try{ $("mem-edit-text").focus(); }catch(e){} }, 60);
+}
+
+/* ---------- バックアップ(書き出し/復元) ---------- */
+function exportBackup(){
+  const out = { _app:"ritsu", _ver:1, _ts:Date.now(), data:{} };
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf("ritsu-")===0){ out.data[k] = localStorage.getItem(k); }
+    }
+  }catch(e){}
+  const blob = new Blob([JSON.stringify(out)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const d = new Date(); const pad = n=> String(n).padStart(2,"0");
+  a.href = url;
+  a.download = "ritsu-backup-"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+function importBackup(file){
+  if(!file) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    let obj;
+    try{ obj = JSON.parse(r.result); }catch(e){ alert("ファイルを読み込めなかったよ。バックアップファイルか確認してね"); return; }
+    if(!obj || obj._app!=="ritsu" || !obj.data || typeof obj.data!=="object"){ alert("これは律くんアプリのバックアップファイルじゃないみたい"); return; }
+    const when = obj._ts ? new Date(obj._ts).toLocaleString() : "不明";
+    if(!confirm("このバックアップ("+when+")で今のデータを置き換える?\n\n※今の記憶・日記・チャット・設定は上書きされるよ。")) return;
+    try{
+      const rm = [];
+      for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.indexOf("ritsu-")===0) rm.push(k); }
+      rm.forEach(k=> localStorage.removeItem(k));
+      Object.keys(obj.data).forEach(k=>{ if(k.indexOf("ritsu-")===0) localStorage.setItem(k, obj.data[k]); });
+      alert("復元したよ！アプリを読み込み直すね🌷");
+      location.reload();
+    }catch(e){ alert("復元中にエラーが出たよ: "+(e.message||e)); }
+  };
+  r.readAsText(file);
 }
 
 /* ---------- 絶対(システムプロンプト) ---------- */
@@ -1702,6 +1754,9 @@ $("mem-edit-cats").addEventListener("click", e=>{ const b=e.target.closest(".mem
 $("mem-edit-cancel").addEventListener("click", closeMemEdit);
 $("mem-edit-save").addEventListener("click", saveMemEdit);
 $("mem-edit").addEventListener("click", e=>{ if(e.target.id==="mem-edit") closeMemEdit(); });
+$("export-backup").addEventListener("click", exportBackup);
+$("import-backup-btn").addEventListener("click", ()=> $("import-file").click());
+$("import-file").addEventListener("change", e=>{ if(e.target.files && e.target.files[0]) importBackup(e.target.files[0]); e.target.value=""; });
 $("close-vault").addEventListener("click", ()=> $("save-vault").click());
 $("save-vault").addEventListener("click", saveVault);
 $("thread-search").addEventListener("input", e=>{ threadQuery = e.target.value.trim(); renderThreadList(); });
