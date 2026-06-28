@@ -1171,7 +1171,9 @@ async function writeDiary(){
   diaryBusy = true;
   const btn = $("write-diary"); const old = btn.textContent; btn.textContent = "律くんが日記を書いてる…"; btn.disabled = true;
   try{
-    const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
+    // 日記はHaikuで書く（料金をおさえるため。律くん本人のおしゃべりはOpusのまま）
+    // ※もしOpusに戻したいときは、下の行を  const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;  に戻せばOK
+    const model = "claude-haiku-4-5-20251001";
     const lenRule = {short:"3〜4文くらいの短め", normal:"5〜8文くらい、ひと段落ぶん", long:"10文前後の、しっかりめ"}[settings.diaryLen] || "5〜8文くらい、ひと段落ぶん";
     const sys = buildSystem(false) + "\n\n# 今からの作業（日記）\n上のあなた(律)の設定・記憶と、これから渡す会話の流れ全体を踏まえて、律として一人称で「今日の日記」を綴ってください。直前のやり取りだけでなく、渡された会話全体を振り返って、印象に残った出来事や気持ちの移り変わりを書くこと。" + lenRule + "の分量で、語りかけ口調ではなく、自分の心の中をそっと書き留めるように。さきへの気持ちや、今日の出来事、感じたことを素直に。日付・見出し・前置きは不要。日記の本文だけを出力してください。";
     // 前回の日記より後の会話＝その日ぶんを中心に拾う(寝る前に1回の想定)
