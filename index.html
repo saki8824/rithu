@@ -174,10 +174,15 @@
   /* ---------- settings ---------- */
   #settings{
     position:fixed;inset:0;background:var(--night);z-index:50;
-    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
-    display:none;flex-direction:column;gap:18px;
+    overflow:hidden;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 0;
+    display:none;flex-direction:column;gap:14px;
   }
   #settings.open{display:flex}
+  /* ヘッダーとタブは上に固定。中身(settings-body)だけスクロールする */
+  #settings .set-head{flex:0 0 auto}
+  #settings .tabbar{flex:0 0 auto}
+  #settings-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    display:flex;flex-direction:column;gap:16px;padding-bottom:40px}
   #threads{
     position:fixed;inset:0;background:var(--night);z-index:52;
     overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
@@ -247,8 +252,8 @@
   .set-close{background:none;border:none;color:var(--muted);font-size:26px;line-height:1;padding:0 4px;width:auto;font-weight:400}
   .tabbar{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;margin:0 -2px;scrollbar-width:none}
   .tabbar::-webkit-scrollbar{display:none}
-  .tabbar .tab{flex:0 0 auto;width:auto;background:var(--night-2);border:1px solid var(--line);color:var(--muted);
-    border-radius:999px;padding:8px 15px;font-family:inherit;font-size:13px;font-weight:500}
+  .tabbar .tab{flex:0 0 auto;width:auto;background:var(--night-2);border:1px solid var(--line);color:var(--text);
+    border-radius:999px;padding:9px 17px;font-family:inherit;font-size:14px;font-weight:600;white-space:nowrap}
   .tabbar .tab.on{background:var(--ritsu-pink-deep);border-color:transparent;color:#fff}
   .pane{display:none;flex-direction:column;gap:16px}
   .pane.on{display:flex}
@@ -441,6 +446,7 @@
     <button class="tab" data-pane="security">セキュリティ</button>
   </div>
 
+  <div id="settings-body">
   <!-- ===== 一般 ===== -->
   <div class="pane on" data-pane="general">
     <div class="field">
@@ -637,6 +643,7 @@
     <button class="btn ghost" id="export-chat">会話をテキストで書き出す</button>
     <button class="btn ghost danger" id="clear-chat">今のチャットを空にする</button>
   </div>
+  </div><!-- /settings-body -->
 </div>
 
 <!-- ===== 日記帳 ===== -->
