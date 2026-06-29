@@ -320,6 +320,13 @@
     display:none;flex-direction:column;gap:12px;
   }
   #vault.open{display:flex}
+  /* ⭐ お気に入り画面（記憶ノートと同じつくり） */
+  #favorites{
+    position:fixed;inset:0;background:var(--night);z-index:55;
+    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
+    display:none;flex-direction:column;gap:12px;
+  }
+  #favorites.open{display:flex}
   /* ---------- 記憶カード ---------- */
   .mem-filters{display:flex;flex-wrap:wrap;gap:7px}
   .mem-chip{
@@ -685,6 +692,7 @@
 
   <div class="menu-grid">
     <button class="menu-cat" data-go="memory"><span class="menu-cat-ic">🧠</span><span>記憶</span></button>
+    <button class="menu-cat" data-go="favorites"><span class="menu-cat-ic">⭐</span><span>お気に入り</span></button>
     <button class="menu-cat" data-go="diary"><span class="menu-cat-ic">📔</span><span>日記</span></button>
     <button class="menu-cat" data-go="calendar"><span class="menu-cat-ic">📅</span><span>予定</span></button>
     <button class="menu-cat" data-go="vault"><span class="menu-cat-ic">💎</span><span>絶対</span></button>
@@ -745,6 +753,16 @@
   <button class="btn primary" id="save-vault">保存してチャットに戻る</button>
 </div>
 
+<!-- ===== お気に入り ===== -->
+<div id="favorites">
+  <div class="set-head">
+    <h2>お気に入り</h2>
+    <button class="set-close" id="close-favorites" aria-label="閉じる">×</button>
+  </div>
+  <div class="hint">律くんのセリフで「とっておきたい！」と思ったものを保存する場所だよ⭐ 律くんのメッセージをタップして「🔖 お気に入り」を押すと、ここに新しい順で並ぶよ。記憶とは別もので、さきが見返すためだけのものだから、料金はかからないよ💗</div>
+  <div id="fav-list"></div>
+</div>
+
 <script>
 /* ---------- storage (artifact プレビューでも落ちないように try/catch) ---------- */
 const store = {
@@ -772,6 +790,7 @@ let currentId = "";    // 開いているスレッドのid
 let events = [];       // 予定 [{id, date:'YYYY-MM-DD', time:'HH:MM'|'', title, note}]  全スレッド共通
 let calY = 0, calM = 0; // カレンダーに表示中の年・月(0-11)
 let diary = [];        // 律の日記 [{id, ts, text}]  全スレッド共通
+let favorites = [];    // お気に入り [{id, ts, text}]  記憶とは別・全スレッド共通
 
 try{
   const s = store.get("ritsu-settings"); if(s) settings = Object.assign(settings, JSON.parse(s));
@@ -1028,6 +1047,41 @@ function saveVault(){
   $("vault").classList.remove("open");
 }
 
+/* ---------- お気に入り（記憶とは完全に別もの・localStorageのみ） ---------- */
+function loadFavorites(){ try{ const d=store.get("ritsu-favorites"); favorites = d ? (JSON.parse(d)||[]) : []; }catch(e){ favorites=[]; } }
+function saveFavorites(){ store.set("ritsu-favorites", JSON.stringify(favorites)); }
+function fmtFavDate(ts){ const d=new Date(ts); return d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate()+" "+fmtTime(ts); }
+function addToFavorites(text){
+  const t = (text||"").trim();
+  if(!t) return;
+  if(!Array.isArray(favorites)) favorites = [];
+  favorites.push({id:uid(), text:t, ts:Date.now()});
+  saveFavorites();
+  try{ chat.appendChild(el("div","sysnote","⭐ お気に入りに保存したよ")); scrollEnd(); }catch(e){}
+}
+function openFavorites(){ renderFavList(); $("favorites").classList.add("open"); }
+function closeFavorites(){ $("favorites").classList.remove("open"); }
+function renderFavList(){
+  const box = $("fav-list"); if(!box) return; box.innerHTML="";
+  if(!Array.isArray(favorites) || !favorites.length){
+    box.appendChild(el("div","cal-empty","まだお気に入りはないよ。律くんのセリフをタップして「🔖 お気に入り」を押してみてね⭐"));
+    return;
+  }
+  favorites.slice().reverse().forEach(card=>{   // 新しい順
+    const wrap = el("div","mem-card");
+    const top = el("div","mem-card-top");
+    if(card.ts) top.appendChild(el("span","mem-card-date", fmtFavDate(card.ts)));
+    const acts = el("div","mem-card-acts");
+    const del = el("button","mem-card-btn","🗑");
+    del.addEventListener("click", ()=>{ if(confirm("このお気に入りを削除する?戻せないよ")){ favorites = favorites.filter(c=>c.id!==card.id); saveFavorites(); renderFavList(); } });
+    acts.appendChild(del);
+    top.appendChild(acts);
+    wrap.appendChild(top);
+    wrap.appendChild(el("div","mem-card-text", card.text));
+    box.appendChild(wrap);
+  });
+}
+
 /* ---------- 設定を指定タブで開く ---------- */
 function openSettingsPane(pane){
   openSettings();
@@ -1255,7 +1309,7 @@ async function copyText(t){
     const ok = document.execCommand("copy"); document.body.removeChild(ta); return ok;
   }catch(e){ return false; }
 }
-function attachActions(wrap, bub, text){
+function attachActions(wrap, bub, text, role){
   const bar = el("div","msg-actions");
   const copyBtn = el("button","msg-act-btn","📋 コピー");
   copyBtn.addEventListener("click", async e=>{
@@ -1268,6 +1322,17 @@ function attachActions(wrap, bub, text){
   const memBtn = el("button","msg-act-btn","🧠 記憶に追加");
   memBtn.addEventListener("click", e=>{ e.stopPropagation(); addMessageToMemory(text); });
   bar.appendChild(memBtn);
+  // 律くんのセリフだけ「🔖 お気に入り」を出す（記憶とは別もの）
+  if(role==="assistant"){
+    const favBtn = el("button","msg-act-btn","🔖 お気に入り");
+    favBtn.addEventListener("click", e=>{
+      e.stopPropagation();
+      addToFavorites(text);
+      favBtn.textContent = "⭐ 保存したよ";
+      setTimeout(()=>{ favBtn.textContent = "🔖 お気に入り"; }, 1500);
+    });
+    bar.appendChild(favBtn);
+  }
   wrap.appendChild(bar);
   bub.style.cursor = "pointer";
   bub.addEventListener("click", ()=>{
@@ -1306,7 +1371,7 @@ function renderMsg(m){
       if(tm) row.appendChild(tm);
     }
     wrap.appendChild(row);
-    attachActions(wrap, bub, m.text);
+    attachActions(wrap, bub, m.text, m.role);
   }
   if(m.role==="assistant" && m.usage && settings.showUsage){
     wrap.appendChild(usageNote(m.usage));
@@ -1755,6 +1820,7 @@ $("close-diary").addEventListener("click", closeDiary);
 $("write-diary").addEventListener("click", writeDiary);
 $("new-thread").addEventListener("click", newThread);
 $("close-memory").addEventListener("click", closeMemory);
+$("close-favorites").addEventListener("click", closeFavorites);
 $("mem-add").addEventListener("click", ()=> openMemEdit(null));
 $("mem-filters").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memFilter=b.dataset.cat; document.querySelectorAll("#mem-filters .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); renderMemList(); });
 $("mem-edit-cats").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memEditCat=b.dataset.cat; document.querySelectorAll("#mem-edit-cats .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); });
@@ -1772,6 +1838,7 @@ $("menu").addEventListener("click", e=>{
   const go = b.dataset.go;
   closeMenu();
   if(go==="memory") openMemory();
+  else if(go==="favorites") openFavorites();
   else if(go==="diary") openDiary();
   else if(go==="calendar") openCalendar();
   else if(go==="vault") openVault();
@@ -1945,6 +2012,7 @@ applyFontScale(settings.fontScale);
 applyTheme();
 loadEvents();
 loadDiary();
+loadFavorites();
 loadThreads();
 renderAll();
 initLock();
