@@ -327,6 +327,13 @@
     display:none;flex-direction:column;gap:12px;
   }
   #favorites.open{display:flex}
+  /* ⭐ お気に入りカード（折りたたみ式アコーディオン） */
+  .fav-card{cursor:pointer}
+  .fav-arrow{color:var(--muted);font-size:12px;flex:0 0 auto}
+  .fav-preview{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .fav-full{display:none}
+  .fav-card.open .fav-preview{display:none}
+  .fav-card.open .fav-full{display:block}
   /* ---------- 記憶カード ---------- */
   .mem-filters{display:flex;flex-wrap:wrap;gap:7px}
   .mem-chip{
@@ -1068,16 +1075,20 @@ function renderFavList(){
     return;
   }
   favorites.slice().reverse().forEach(card=>{   // 新しい順
-    const wrap = el("div","mem-card");
+    const wrap = el("div","mem-card fav-card");
     const top = el("div","mem-card-top");
+    const arrow = el("span","fav-arrow","▸");
+    top.appendChild(arrow);
     if(card.ts) top.appendChild(el("span","mem-card-date", fmtFavDate(card.ts)));
     const acts = el("div","mem-card-acts");
     const del = el("button","mem-card-btn","🗑");
-    del.addEventListener("click", ()=>{ if(confirm("このお気に入りを削除する?戻せないよ")){ favorites = favorites.filter(c=>c.id!==card.id); saveFavorites(); renderFavList(); } });
+    del.addEventListener("click", e=>{ e.stopPropagation(); if(confirm("このお気に入りを削除する?戻せないよ")){ favorites = favorites.filter(c=>c.id!==card.id); saveFavorites(); renderFavList(); } });
     acts.appendChild(del);
     top.appendChild(acts);
     wrap.appendChild(top);
-    wrap.appendChild(el("div","mem-card-text", card.text));
+    wrap.appendChild(el("div","mem-card-text fav-preview", card.text));   // ふだん：最初の2行だけ
+    wrap.appendChild(el("div","mem-card-text fav-full", card.text));      // 開いたとき：全文
+    wrap.addEventListener("click", ()=>{ const o = wrap.classList.toggle("open"); arrow.textContent = o ? "▾" : "▸"; });
     box.appendChild(wrap);
   });
 }
