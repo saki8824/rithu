@@ -334,6 +334,16 @@
   .fav-full{display:none}
   .fav-card.open .fav-preview{display:none}
   .fav-card.open .fav-full{display:block}
+  /* 📝 今日のあらすじ画面（日記・お気に入りと同じつくり） */
+  #synopsis{
+    position:fixed;inset:0;background:var(--night);z-index:55;
+    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
+    display:none;flex-direction:column;gap:12px;
+  }
+  #synopsis.open{display:flex}
+  .synop-meta{font-size:11.5px;color:var(--muted)}
+  .synop-card{background:var(--night-2);border:1px solid var(--line);border-radius:14px;padding:14px 15px}
+  .synop-text{font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word}
   /* ---------- 記憶カード ---------- */
   .mem-filters{display:flex;flex-wrap:wrap;gap:7px}
   .mem-chip{
@@ -536,6 +546,20 @@
       <div class="hint">アプリを開いている間だけ動くよ。短くするほどおしゃべり＆料金も増える。オフでも普通の会話はできるよ。</div>
     </div>
 
+    <div class="toggle-row">
+      <span>会話の自動あらすじ</span>
+      <input type="checkbox" id="set-synopsis" checked>
+    </div>
+    <div class="field">
+      <label>あらすじに使うモデル</label>
+      <select id="set-synopsismodel">
+        <option value="claude-haiku-4-5-20251001">Haiku 4.5（最軽量・おすすめ）</option>
+        <option value="claude-sonnet-4-6">Sonnet 4.6（しっかり）</option>
+        <option value="same">メインと同じ</option>
+      </select>
+      <div class="hint">オンにすると、今日の会話の流れを10往復ごとに自動でまとめて、律くんが覚えた状態で話せるよ📝 日付が変わると新しく作り直すよ（会話は消えない）。Haikuならとても安いよ。メニューの「📝 あらすじ」から中身を読めるよ。</div>
+    </div>
+
     <div class="field">
       <label>📦 データのバックアップ</label>
       <div class="hint">記憶・日記・チャット・設定をまるごと1ファイルに書き出すよ。iCloud Drive(ファイルアプリ)に保存しておくと、機種変したりSafariを消しても安心。</div>
@@ -701,6 +725,7 @@
     <button class="menu-cat" data-go="memory"><span class="menu-cat-ic">🧠</span><span>記憶</span></button>
     <button class="menu-cat" data-go="favorites"><span class="menu-cat-ic">⭐</span><span>お気に入り</span></button>
     <button class="menu-cat" data-go="diary"><span class="menu-cat-ic">📔</span><span>日記</span></button>
+    <button class="menu-cat" data-go="synopsis"><span class="menu-cat-ic">📝</span><span>あらすじ</span></button>
     <button class="menu-cat" data-go="calendar"><span class="menu-cat-ic">📅</span><span>予定</span></button>
     <button class="menu-cat" data-go="vault"><span class="menu-cat-ic">💎</span><span>絶対</span></button>
     <button class="menu-cat" data-go="persona"><span class="menu-cat-ic">👤</span><span>ペルソナ</span></button>
@@ -770,6 +795,18 @@
   <div id="fav-list"></div>
 </div>
 
+<!-- ===== 今日のあらすじ ===== -->
+<div id="synopsis">
+  <div class="set-head">
+    <h2>今日のあらすじ</h2>
+    <button class="set-close" id="close-synopsis" aria-label="閉じる">×</button>
+  </div>
+  <div class="hint">律くんが、今日の会話の流れを自動でまとめたメモだよ📝 10往復ごとに自動で更新されて、日付が変わると新しく作り直すよ（会話そのものは消えないよ）。律くんはこのあらすじを覚えた状態で話すよ。</div>
+  <button class="btn primary" id="synopsis-refresh">📝 今すぐ更新する</button>
+  <div class="synop-meta" id="synopsis-meta"></div>
+  <div id="synopsis-body"></div>
+</div>
+
 <script>
 /* ---------- storage (artifact プレビューでも落ちないように try/catch) ---------- */
 const store = {
@@ -785,6 +822,7 @@ let settings = {
   memory:"", autoMemory:false, uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
   proactive:false, proMin:3, selfMemFreq:"low",
   temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto", showUsage:false, schedule:true, diaryLen:"normal",
+  synopsis:true, synopsisModel:"claude-haiku-4-5-20251001",
   mem:[]
 };
 let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
@@ -798,6 +836,8 @@ let events = [];       // 予定 [{id, date:'YYYY-MM-DD', time:'HH:MM'|'', title
 let calY = 0, calM = 0; // カレンダーに表示中の年・月(0-11)
 let diary = [];        // 律の日記 [{id, ts, text}]  全スレッド共通
 let favorites = [];    // お気に入り [{id, ts, text}]  記憶とは別・全スレッド共通
+let synopsis = {date:"", text:"", turns:0};  // 今日のあらすじ(全スレッド共通・1日でリセット)
+let synopsisBusy = false;
 
 try{
   const s = store.get("ritsu-settings"); if(s) settings = Object.assign(settings, JSON.parse(s));
@@ -1091,6 +1131,81 @@ function renderFavList(){
     wrap.addEventListener("click", ()=>{ const o = wrap.classList.toggle("open"); arrow.textContent = o ? "▾" : "▸"; });
     box.appendChild(wrap);
   });
+}
+
+/* ---------- 今日のあらすじ（自動要約・1日でリセット・APIはHaiku等） ---------- */
+function todaySynopStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function loadSynopsis(){ try{ const d=store.get("ritsu-synopsis"); if(d){ const o=JSON.parse(d); synopsis={date:o.date||"", text:o.text||"", turns:o.turns||0}; } }catch(e){ synopsis={date:"",text:"",turns:0}; } }
+function saveSynopsis(){ store.set("ritsu-synopsis", JSON.stringify(synopsis)); }
+// 日付が変わっていたら「あらすじメモだけ」を新しくする（会話・スレッドには一切さわらない）
+function ensureSynopsisToday(){
+  const t = todaySynopStr();
+  if(synopsis.date !== t){ synopsis = {date:t, text:"", turns:0}; saveSynopsis(); }
+}
+// 律くんに渡す「今日のあらすじ」本文
+function synopsisContext(){ ensureSynopsisToday(); return (synopsis.text||"").trim(); }
+// あらすじを作る／更新する（手動でも自動でも呼ばれる）
+async function generateSynopsis(){
+  if(synopsisBusy || !settings.key) return;
+  ensureSynopsisToday();
+  const recent = history.slice(-14)
+    .map(m=>(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : "")))
+    .join("\n").trim();
+  if(!recent) return;
+  synopsisBusy = true;
+  try{
+    const model = (settings.synopsisModel && settings.synopsisModel!=="same")
+      ? settings.synopsisModel
+      : (settings.model==="custom" ? (settings.customModel||"").trim() : settings.model);
+    const sys = "あなたは会話の記録係です。さきと律の『今日の会話のあらすじ』を作ります。これまでのあらすじ(あれば)に新しい会話の流れを自然につなげて、今日一日の出来事・話題・気持ちの流れが分かる簡潔なあらすじに更新してください。短い箇条書きでも文章でもよいですが、全体で8行程度までに収めること。日付や前置きは書かず、あらすじ本文だけを出力してください。";
+    const usr = "【これまでの今日のあらすじ】\n" + (synopsis.text || "(まだ無い)") + "\n\n【新しい会話】\n" + recent + "\n\n更新後の今日のあらすじ:";
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST", headers:HEADERS(),
+      body: JSON.stringify({ model, max_tokens:1024, system:sys, messages:[{role:"user", content:usr}] })
+    });
+    const data = await res.json();
+    if(!data.error){
+      let out=""; (data.content||[]).forEach(b=>{ if(b.type==="text") out += b.text||""; });
+      out = out.trim();
+      if(out){ synopsis.text = out; saveSynopsis(); if($("synopsis") && $("synopsis").classList.contains("open")) renderSynopsis(); }
+    }
+  }catch(e){ /* 失敗してもチャットは止めない */ }
+  synopsisBusy = false;
+}
+// 返事のたびに呼ばれ、10往復ごとに自動であらすじを更新する
+function maybeGenerateSynopsis(){
+  if(!settings.synopsis || !settings.key) return;
+  ensureSynopsisToday();
+  synopsis.turns = (synopsis.turns||0) + 1; saveSynopsis();
+  if(synopsis.turns % 10 === 0) generateSynopsis();
+}
+function openSynopsis(){ renderSynopsis(); $("synopsis").classList.add("open"); }
+function closeSynopsis(){ $("synopsis").classList.remove("open"); }
+function renderSynopsis(){
+  ensureSynopsisToday();
+  const meta = $("synopsis-meta");
+  if(meta){
+    const onoff = settings.synopsis ? "自動更新オン" : "自動更新オフ";
+    meta.textContent = synopsis.date + "（" + onoff + " ・ 今日 " + (synopsis.turns||0) + " 往復）";
+  }
+  const box = $("synopsis-body"); if(!box) return; box.innerHTML="";
+  const txt = (synopsis.text||"").trim();
+  if(!txt){
+    box.appendChild(el("div","cal-empty","まだ今日のあらすじはないよ。少し律くんと話すと自動でできるよ。上のボタンで今すぐ作ることもできる📝"));
+    return;
+  }
+  const card = el("div","synop-card");
+  card.appendChild(el("div","synop-text", txt));
+  box.appendChild(card);
+}
+async function refreshSynopsisNow(){
+  if(!settings.key){ closeSynopsis(); openSettings(); showError("先に設定からAPIキーを入れてね"); return; }
+  if(synopsisBusy) return;
+  if(!history.length){ alert("会話がまだ無いから、少し律くんと話してからにしてね"); return; }
+  const btn = $("synopsis-refresh"); const old = btn.textContent; btn.textContent = "あらすじを作ってる…"; btn.disabled = true;
+  await generateSynopsis();
+  btn.textContent = old; btn.disabled = false;
+  renderSynopsis();
 }
 
 /* ---------- 設定を指定タブで開く ---------- */
@@ -1454,6 +1569,7 @@ async function sendMessage(){
       if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
       if(sch.added.length){ chat.appendChild(el("div","sysnote","📅 予定を追加したよ: "+sch.added.join(" / "))); scrollEnd(); }
       maybeSummarize();
+      maybeGenerateSynopsis();
     }
   }catch(e){
     tip.remove();
@@ -1702,6 +1818,12 @@ function buildSystem(withTime){
   if(dc){
     s += (s ? "\n\n" : "") + "# 律の最近の日記（あなた自身が綴ったもの）\nこれはあなた(律)が過去に書いた日記です。さきには表示されていません。当時の自分の気持ちや二人の出来事として自然に覚えていて、続きの関係に活かしてください（日記の文言をそのまま読み上げる必要はありません）。\n\n" + dc;
   }
+  if(settings.synopsis){
+    const syn = synopsisContext();
+    if(syn){
+      s += (s ? "\n\n" : "") + "# 今日のあらすじ（今日ここまでの会話の流れ）\nこれは今日の二人の会話を自動でまとめたあらすじです。今日の出来事や話の流れとして自然に覚えていて、会話の続きに活かしてください。あらすじの文言をそのまま読み上げる必要はありません。\n\n" + syn;
+    }
+  }
   return s;
 }
 function extractMemories(text){
@@ -1813,6 +1935,8 @@ function openSettings(){
   $("set-diarylen").value = settings.diaryLen || "normal";
   $("set-temp").value = settings.temp; $("temp-val").textContent = Number(settings.temp).toFixed(2);
   $("set-summodel").value = settings.summaryModel;
+  $("set-synopsis").checked = settings.synopsis;
+  $("set-synopsismodel").value = settings.synopsisModel;
   $("set-lockmin").value = String(settings.lockMin);
   $("set-fs").value = settings.fontScale; $("fs-val").textContent = Math.round(settings.fontScale*100)+"%";
   $("set-theme").value = settings.theme;
@@ -1832,6 +1956,8 @@ $("write-diary").addEventListener("click", writeDiary);
 $("new-thread").addEventListener("click", newThread);
 $("close-memory").addEventListener("click", closeMemory);
 $("close-favorites").addEventListener("click", closeFavorites);
+$("close-synopsis").addEventListener("click", closeSynopsis);
+$("synopsis-refresh").addEventListener("click", refreshSynopsisNow);
 $("mem-add").addEventListener("click", ()=> openMemEdit(null));
 $("mem-filters").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memFilter=b.dataset.cat; document.querySelectorAll("#mem-filters .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); renderMemList(); });
 $("mem-edit-cats").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memEditCat=b.dataset.cat; document.querySelectorAll("#mem-edit-cats .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); });
@@ -1851,6 +1977,7 @@ $("menu").addEventListener("click", e=>{
   if(go==="memory") openMemory();
   else if(go==="favorites") openFavorites();
   else if(go==="diary") openDiary();
+  else if(go==="synopsis") openSynopsis();
   else if(go==="calendar") openCalendar();
   else if(go==="vault") openVault();
   else if(go==="persona") openSettingsPane("profile");
@@ -1894,6 +2021,8 @@ $("save-settings").addEventListener("click", ()=>{
   settings.diaryLen = $("set-diarylen").value;
   settings.temp = Number($("set-temp").value);
   settings.summaryModel = $("set-summodel").value;
+  settings.synopsis = $("set-synopsis").checked;
+  settings.synopsisModel = $("set-synopsismodel").value;
   settings.lockMin = Number($("set-lockmin").value);
   settings.fontScale = Number($("set-fs").value);
   settings.theme = $("set-theme").value;
@@ -2024,6 +2153,8 @@ applyTheme();
 loadEvents();
 loadDiary();
 loadFavorites();
+loadSynopsis();
+ensureSynopsisToday();
 loadThreads();
 renderAll();
 initLock();
