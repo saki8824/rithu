@@ -289,25 +289,48 @@
     display:none;flex-direction:column;gap:13px;
   }
   #menu.open{display:flex}
+  /* 新しいチャット(目立つ・丸み強め・ふんわり影) */
+  #new-thread{border-radius:20px;box-shadow:0 6px 18px rgba(217,123,151,.22)}
   .menu-search{
     width:100%;background:var(--night-2);border:1px solid var(--line);
-    border-radius:14px;color:var(--text);font-family:inherit;font-size:14px;
-    padding:12px 14px;outline:none;box-sizing:border-box;
+    border-radius:16px;color:var(--text);font-family:inherit;font-size:14px;
+    padding:13px 15px;outline:none;box-sizing:border-box;
   }
   .menu-search::placeholder{color:var(--muted)}
+  /* やさしい仕切り＋小さな見出し */
+  .menu-sec{
+    display:flex;align-items:center;gap:12px;margin-top:6px;
+    color:var(--muted);font-size:11.5px;font-weight:600;letter-spacing:.12em;
+  }
+  .menu-sec::before,.menu-sec::after{content:"";flex:1;height:1px;background:var(--line)}
   .menu-grid{
-    display:grid;grid-template-columns:1fr 1fr;gap:11px;
-    margin-top:8px;padding-top:16px;border-top:1px solid var(--line);
+    display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:2px;
   }
   .menu-cat{
-    display:flex;flex-direction:column;align-items:center;gap:7px;
-    background:var(--night-2);border:1px solid var(--line);border-radius:16px;
-    padding:18px 10px;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;
-    transition:.12s;
+    display:flex;flex-direction:column;align-items:center;gap:10px;
+    background:var(--night-2);border:1px solid var(--line);border-radius:20px;
+    padding:20px 12px;color:var(--text);font-family:inherit;font-size:13.5px;font-weight:600;
+    transition:transform .14s, box-shadow .14s, border-color .14s;
+    box-shadow:0 3px 12px rgba(0,0,0,.06);
   }
-  .menu-cat:active{border-color:var(--ritsu-pink);background:var(--bubble-saki)}
-  .menu-cat-ic{font-size:24px;line-height:1}
-  .menu-ver{text-align:center;font-size:11px;color:var(--muted);margin-top:14px;letter-spacing:.05em}
+  .menu-cat:active{transform:translateY(1px);border-color:var(--ritsu-pink);box-shadow:0 1px 5px rgba(0,0,0,.08)}
+  /* 線画アイコンの丸い下地(パステル・半透明=昼夜どちらもなじむ) */
+  .menu-ic{
+    width:50px;height:50px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--ic-bg,rgba(241,157,180,.16));color:var(--ic-fg,var(--ritsu-pink));
+  }
+  .menu-ic svg{width:26px;height:26px;display:block}
+  .menu-cat-label{line-height:1}
+  /* 7色パステル(半透明の下地＋やさしいアイコン色) */
+  .ic-memory  {--ic-bg:rgba(168,148,224,.18);--ic-fg:#a48fe0}
+  .ic-fav     {--ic-bg:rgba(241,150,176,.18);--ic-fg:#e58aa6}
+  .ic-diary   {--ic-bg:rgba(244,176,138,.20);--ic-fg:#e29a63}
+  .ic-synopsis{--ic-bg:rgba(116,196,168,.18);--ic-fg:#54b193}
+  .ic-calendar{--ic-bg:rgba(143,183,232,.18);--ic-fg:#6f9fda}
+  .ic-vault   {--ic-bg:rgba(232,128,150,.18);--ic-fg:#dd7c98}
+  .ic-settings{--ic-bg:rgba(150,170,196,.20);--ic-fg:#8ea2bd}
+  .menu-ver{text-align:center;font-size:11px;color:var(--muted);margin-top:16px;letter-spacing:.05em}
   #memory{
     position:fixed;inset:0;background:var(--night);z-index:55;
     overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
@@ -707,14 +730,36 @@
   <input type="text" id="thread-search" class="menu-search" placeholder="🔍 チャットを検索…" autocomplete="off">
   <div id="thread-list"></div>
 
+  <div class="menu-sec">メニュー</div>
   <div class="menu-grid">
-    <button class="menu-cat" data-go="memory"><span class="menu-cat-ic">🧠</span><span>記憶</span></button>
-    <button class="menu-cat" data-go="favorites"><span class="menu-cat-ic">⭐</span><span>お気に入り</span></button>
-    <button class="menu-cat" data-go="diary"><span class="menu-cat-ic">📔</span><span>日記</span></button>
-    <button class="menu-cat" data-go="synopsis"><span class="menu-cat-ic">📝</span><span>あらすじ</span></button>
-    <button class="menu-cat" data-go="calendar"><span class="menu-cat-ic">📅</span><span>予定</span></button>
-    <button class="menu-cat" data-go="vault"><span class="menu-cat-ic">💎</span><span>絶対</span></button>
-    <button class="menu-cat" data-go="settings"><span class="menu-cat-ic">⚙️</span><span>設定</span></button>
+    <button class="menu-cat" data-go="memory">
+      <span class="menu-ic ic-memory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3.5c.6 3.4 1.6 4.4 5 5-3.4.6-4.4 1.6-5 5-.6-3.4-1.6-4.4-5-5 3.4-.6 4.4-1.6 5-5Z"/><path d="M6.5 14c.3 1.7.8 2.2 2.5 2.5-1.7.3-2.2.8-2.5 2.5-.3-1.7-.8-2.2-2.5-2.5 1.7-.3 2.2-.8 2.5-2.5Z"/></svg></span>
+      <span class="menu-cat-label">記憶</span>
+    </button>
+    <button class="menu-cat" data-go="favorites">
+      <span class="menu-ic ic-fav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5h10a1 1 0 0 1 1 1v14.5l-6-4-6 4V5.5a1 1 0 0 1 1-1Z"/></svg></span>
+      <span class="menu-cat-label">お気に入り</span>
+    </button>
+    <button class="menu-cat" data-go="diary">
+      <span class="menu-ic ic-diary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.6C10.4 5.4 8.3 4.9 4 5.2v12.8c4.3-.3 6.4.2 8 1.4 1.6-1.2 3.7-1.7 8-1.4V5.2c-4.3-.3-6.4.2-8 1.4Z"/><path d="M12 6.6v12.8"/></svg></span>
+      <span class="menu-cat-label">日記</span>
+    </button>
+    <button class="menu-cat" data-go="synopsis">
+      <span class="menu-ic ic-synopsis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.5h5l4 4v11.5a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z"/><path d="M13 3.5V7a1 1 0 0 0 1 1h3"/><path d="M9.5 12.5h5M9.5 15.5h5"/></svg></span>
+      <span class="menu-cat-label">あらすじ</span>
+    </button>
+    <button class="menu-cat" data-go="calendar">
+      <span class="menu-ic ic-calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14" rx="2.6"/><path d="M4 9.5h16M8 3.6v3.4M16 3.6v3.4"/><circle cx="12" cy="14" r="1.15" fill="currentColor" stroke="none"/></svg></span>
+      <span class="menu-cat-label">予定</span>
+    </button>
+    <button class="menu-cat" data-go="vault">
+      <span class="menu-ic ic-vault"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.6C5.6 15.6 4 11.9 4 9.3 4 7 5.9 5.6 8 5.6c1.4 0 2.7.7 4 2.2 1.3-1.5 2.6-2.2 4-2.2 2.1 0 4 1.4 4 3.7 0 2.6-1.6 6.3-8 10.3Z"/></svg></span>
+      <span class="menu-cat-label">絶対</span>
+    </button>
+    <button class="menu-cat" data-go="settings">
+      <span class="menu-ic ic-settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 3.6v2.3M12 18.1v2.3M20.4 12h-2.3M5.9 12H3.6M18 6l-1.6 1.6M7.6 16.4 6 18M18 18l-1.6-1.6M7.6 7.6 6 6"/></svg></span>
+      <span class="menu-cat-label">設定</span>
+    </button>
   </div>
   <div class="menu-ver">律くんアプリ 💗</div>
 </div>
