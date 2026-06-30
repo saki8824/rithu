@@ -508,20 +508,6 @@
     </div>
 
     <div class="toggle-row">
-      <span>記憶の自動要約</span>
-      <input type="checkbox" id="set-automem" checked>
-    </div>
-    <div class="field">
-      <label>記憶の要約に使うモデル</label>
-      <select id="set-summodel">
-        <option value="claude-haiku-4-5-20251001">Haiku 4.5（最軽量・おすすめ）</option>
-        <option value="claude-sonnet-4-6">Sonnet 4.6（バランス）</option>
-        <option value="same">メインと同じ</option>
-      </select>
-      <div class="hint">要約は安いモデルに任せると、思い出を残しつつ料金を節約できるよ。</div>
-    </div>
-
-    <div class="toggle-row">
       <span>律くんが自分で記憶を登録</span>
       <input type="checkbox" id="set-selfmem" checked>
     </div>
@@ -728,7 +714,6 @@
     <button class="menu-cat" data-go="synopsis"><span class="menu-cat-ic">📝</span><span>あらすじ</span></button>
     <button class="menu-cat" data-go="calendar"><span class="menu-cat-ic">📅</span><span>予定</span></button>
     <button class="menu-cat" data-go="vault"><span class="menu-cat-ic">💎</span><span>絶対</span></button>
-    <button class="menu-cat" data-go="persona"><span class="menu-cat-ic">👤</span><span>ペルソナ</span></button>
     <button class="menu-cat" data-go="settings"><span class="menu-cat-ic">⚙️</span><span>設定</span></button>
   </div>
   <div class="menu-ver">律くんアプリ 💗</div>
@@ -1568,7 +1553,6 @@ async function sendMessage(){
       history.push(m); renderMsg(m); scrollEnd(); persistHistory();
       if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
       if(sch.added.length){ chat.appendChild(el("div","sysnote","📅 予定を追加したよ: "+sch.added.join(" / "))); scrollEnd(); }
-      maybeSummarize();
       maybeGenerateSynopsis();
     }
   }catch(e){
@@ -1617,7 +1601,6 @@ async function sendProactive(){
         history.push(m); renderMsg(m); scrollEnd(); persistHistory();
         if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
         if(sch.added.length){ chat.appendChild(el("div","sysnote","📅 予定を追加したよ: "+sch.added.join(" / "))); scrollEnd(); }
-        maybeSummarize();
       }
     }
   }catch(e){ tip.remove(); }
@@ -1837,80 +1820,6 @@ function extractMemories(text){
   if(remembered) store.set("ritsu-settings", JSON.stringify(settings));
   return {text: cleaned || "……", remembered};
 }
-async function consolidateMemory(){
-  if(summarizing || !settings.key) return false;
-  const cur = memText();
-  if(!cur) return false;
-  summarizing = true;
-  let ok = false;
-  try{
-    const sys = "次の記憶メモは、重複や似た内容の繰り返しが多くなっています。情報の中身は一切減らさず、『まったく同じ／ほぼ同じ内容の重複』だけを1つに統合してください。別々の事実は別々の箇条書きのまま必ず残すこと。新しい情報を足したり推測で補ったりしない。短くしてよいのは言い回しだけで、事実の数は減らさない。迷ったら残す。4つのカテゴリ(プロフィール・好み・知識・その他)に振り分け、各項目は短い箇条書き(・)に。\n必ず次の形式だけで出力(中身が無いカテゴリは見出しごと省略。前置きや説明は不要):\n【プロフィール】\n・…\n【好み】\n・…\n【知識】\n・…\n【その他】\n・…";
-    const usr = "【整理する記憶メモ】\n" + cur + "\n\n整理後の記憶メモ:";
-    const mainModel = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
-    const model = (settings.summaryModel && settings.summaryModel!=="same") ? settings.summaryModel : mainModel;
-    const res = await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST", headers:HEADERS(),
-      body: JSON.stringify({ model, max_tokens:8192, system:sys, messages:[{role:"user", content:usr}] })
-    });
-    const data = await res.json();
-    if(!data.error){
-      const out = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
-      const truncated = data.stop_reason === "max_tokens";
-      if(out && !truncated && /【(プロフィール|好み|知識|その他)】/.test(out)){
-        const parsed = memParse(out);
-        const oldLen = (cur||"").length;
-        const newLen = ((parsed.profile||"")+(parsed.likes||"")+(parsed.knowledge||"")+(parsed.other||"")).length;
-        if(!(oldLen>300 && newLen < oldLen*0.55)){
-          settings.mem = parsed;
-          store.set("ritsu-settings", JSON.stringify(settings));
-          ok = true;
-        }
-      }
-    }
-  }catch(e){}
-  summarizing = false;
-  return ok;
-}
-async function maybeSummarize(force){
-  return; // カード式記憶に移行したため自動要約(全書き換え)は無効
-  if(summarizing || !settings.key) return;
-  if(!force && !settings.autoMemory) return;
-  const keep = settings.window;
-  const batch = history.slice(summarized, Math.max(summarized, history.length - keep));
-  if(batch.length < (force ? 1 : 8)) return;   // たまるまで動かない(手動は1件から)
-  summarizing = true;
-  try{
-    const convo = batch.map(m=>(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : ""))).join("\n");
-    const sys = "あなたは会話の記憶係です。既存の記憶メモ(カテゴリ分け)と新しい会話の断片を読み、更新後の記憶メモを4カテゴリの箇条書き(・)で出力してください。\n【最重要ルール】\n・既存の記憶メモにある項目は、まったく同じ重複でない限り、必ず全部そのまま残すこと。要約や簡略化を理由に、内容を削除・省略・統合して消してはいけません。\n・統合してよいのは『まったく同じ／ほぼ同じ内容の重複』だけ。別々の事実は別々の箇条書きのまま残すこと。\n・新しい会話から、長く覚えておきたい大切なこと(出来事・約束・好み・人物設定など)があれば追加する。ただの相槌は記憶にしなくてよい。\n・短くしてよいのは言い回しだけで、事実の数は絶対に減らさないこと。迷ったら『残す』。\nカテゴリの目安: 【プロフィール】=名前・関係・人物設定、【好み】=好き嫌い・趣味、【知識】=二人の出来事・約束・覚えておくべき事実、【その他】=どれにも入らないこと。\n必ず次の形式だけで出力すること(中身が無いカテゴリは見出しごと省略してよい。前置きや説明は不要):\n【プロフィール】\n・…\n【好み】\n・…\n【知識】\n・…\n【その他】\n・…";
-    const usr = "【既存の記憶メモ】\n" + (memText() || "(まだ無い)") + "\n\n【新しい会話の断片】\n" + convo + "\n\n更新後の記憶メモ:";
-    const mainModel = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
-    const model = (settings.summaryModel && settings.summaryModel!=="same") ? settings.summaryModel : mainModel;
-    const res = await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST", headers:HEADERS(),
-      body: JSON.stringify({ model, max_tokens:8192, system:sys, messages:[{role:"user", content:usr}] })
-    });
-    const data = await res.json();
-    if(!data.error){
-      const out = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
-      const truncated = data.stop_reason === "max_tokens";
-      if(out && !truncated){
-        if(/【(プロフィール|好み|知識|その他)】/.test(out)){
-          const parsed = memParse(out);
-          const oldLen = (memText()||"").length;
-          const newLen = ((parsed.profile||"")+(parsed.likes||"")+(parsed.knowledge||"")+(parsed.other||"")).length;
-          // 記憶が大幅に減る要約は"消えすぎ"とみなして採用しない(既存を保持)
-          if(!(oldLen>300 && newLen < oldLen*0.55)){ settings.mem = parsed; }
-        }
-        else { settings.mem.other = (settings.mem.other ? settings.mem.other.trim()+"\n" : "") + out; }
-        store.set("ritsu-settings", JSON.stringify(settings));
-      }
-      summarized = history.length - keep; if(summarized<0) summarized=0; saveMeta();
-      chat.appendChild(el("div","sysnote", truncated ? "🧠 記憶が増えてきたよ（🧹整理がおすすめ）" : "🧠 記憶を更新したよ")); scrollEnd();
-    }
-  }catch(e){ /* 失敗してもチャットは止めない */ }
-  summarizing = false;
-}
-
 /* ---------- settings ---------- */
 function openSettings(){
   $("set-key").value = settings.key;
@@ -1925,7 +1834,6 @@ function openSettings(){
   else { $("uicon-prev").src = ""; $("uicon-prev").style.display = "none"; }
   if(settings.aicon){ $("aicon-prev").src = settings.aicon; $("aicon-prev").style.display = "block"; }
   else { $("aicon-prev").src = ""; $("aicon-prev").style.display = "none"; }
-  $("set-automem").checked = settings.autoMemory;
   $("set-selfmem").checked = settings.selfMemory;
   $("set-selffreq").value = settings.selfMemFreq;
   $("set-proactive").checked = settings.proactive;
@@ -1934,7 +1842,6 @@ function openSettings(){
   $("set-schedule").checked = settings.schedule;
   $("set-diarylen").value = settings.diaryLen || "normal";
   $("set-temp").value = settings.temp; $("temp-val").textContent = Number(settings.temp).toFixed(2);
-  $("set-summodel").value = settings.summaryModel;
   $("set-synopsis").checked = settings.synopsis;
   $("set-synopsismodel").value = settings.synopsisModel;
   $("set-lockmin").value = String(settings.lockMin);
@@ -1980,7 +1887,6 @@ $("menu").addEventListener("click", e=>{
   else if(go==="synopsis") openSynopsis();
   else if(go==="calendar") openCalendar();
   else if(go==="vault") openVault();
-  else if(go==="persona") openSettingsPane("profile");
   else if(go==="settings") openSettings();
 });
 $("tabbar").addEventListener("click", e=>{
@@ -2011,7 +1917,6 @@ $("save-settings").addEventListener("click", ()=>{
   settings.window = Math.max(2, Number($("set-window").value)||30);
   settings.uname = $("set-uname").value.trim();
   settings.uinfo = $("set-uinfo").value;
-  settings.autoMemory = $("set-automem").checked;
   settings.selfMemory = $("set-selfmem").checked;
   settings.selfMemFreq = $("set-selffreq").value;
   settings.proactive = $("set-proactive").checked;
@@ -2020,7 +1925,6 @@ $("save-settings").addEventListener("click", ()=>{
   settings.schedule = $("set-schedule").checked;
   settings.diaryLen = $("set-diarylen").value;
   settings.temp = Number($("set-temp").value);
-  settings.summaryModel = $("set-summodel").value;
   settings.synopsis = $("set-synopsis").checked;
   settings.synopsisModel = $("set-synopsismodel").value;
   settings.lockMin = Number($("set-lockmin").value);
