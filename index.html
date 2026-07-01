@@ -330,6 +330,7 @@
   .ic-calendar{--ic-bg:rgba(143,183,232,.18);--ic-fg:#6f9fda}
   .ic-vault   {--ic-bg:rgba(232,128,150,.18);--ic-fg:#dd7c98}
   .ic-settings{--ic-bg:rgba(150,170,196,.20);--ic-fg:#8ea2bd}
+  .ic-archive {--ic-bg:rgba(201,162,122,.20);--ic-fg:#c79b6f}
   .menu-ver{text-align:center;font-size:11px;color:var(--muted);margin-top:16px;letter-spacing:.05em}
   #memory{
     position:fixed;inset:0;background:var(--night);z-index:55;
@@ -367,6 +368,19 @@
   .synop-meta{font-size:11.5px;color:var(--muted)}
   .synop-card{background:var(--night-2);border:1px solid var(--line);border-radius:14px;padding:14px 15px}
   .synop-text{font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word}
+  /* 📦 アーカイブ画面（お気に入り・あらすじと同じつくり） */
+  #archive{
+    position:fixed;inset:0;background:var(--night);z-index:55;
+    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
+    display:none;flex-direction:column;gap:12px;
+  }
+  #archive.open{display:flex}
+  .thread-restore{
+    background:var(--bubble-saki);border:1px solid var(--line);color:var(--text);
+    border-radius:999px;font-family:inherit;font-size:12.5px;font-weight:600;
+    padding:6px 14px;width:auto;flex:0 0 auto;
+  }
+  .thread-restore:active{border-color:var(--ritsu-pink)}
   /* ---------- 記憶カード ---------- */
   .mem-filters{display:flex;flex-wrap:wrap;gap:7px}
   .mem-chip{
@@ -760,6 +774,10 @@
       <span class="menu-ic ic-settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 3.6v2.3M12 18.1v2.3M20.4 12h-2.3M5.9 12H3.6M18 6l-1.6 1.6M7.6 16.4 6 18M18 18l-1.6-1.6M7.6 7.6 6 6"/></svg></span>
       <span class="menu-cat-label">設定</span>
     </button>
+    <button class="menu-cat" data-go="archive">
+      <span class="menu-ic ic-archive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5 6 4h12l2 3.5"/><rect x="4" y="7.5" width="16" height="12" rx="2"/><path d="M9.5 12h5"/></svg></span>
+      <span class="menu-cat-label">アーカイブ</span>
+    </button>
   </div>
   <div class="menu-ver">律くんアプリ 💗</div>
 </div>
@@ -835,6 +853,16 @@
   <button class="btn primary" id="synopsis-refresh">📝 今すぐ更新する</button>
   <div class="synop-meta" id="synopsis-meta"></div>
   <div id="synopsis-body"></div>
+</div>
+
+<!-- ===== アーカイブ ===== -->
+<div id="archive">
+  <div class="set-head">
+    <h2>アーカイブ</h2>
+    <button class="set-close" id="close-archive" aria-label="閉じる">×</button>
+  </div>
+  <div class="hint">棚にしまったチャットだよ📦 「復元」で通常の一覧にもどせる。🗑を押したときだけ完全に消えるよ（勝手には消えないよ）。会話の中身はしまっても消えないから安心してね。</div>
+  <div id="archive-list"></div>
 </div>
 
 <script>
@@ -961,7 +989,7 @@ function deleteThread(id){
   if(!threads.length){
     const nid=uid(); threads=[{id:nid,title:"新しいチャット",updatedAt:Date.now()}];
     store.set("ritsu-thread-"+nid, JSON.stringify({history:[],summarized:0})); currentId=nid;
-  } else if(id===currentId){ currentId = threads[0].id; }
+  } else if(id===currentId){ const n = threads.find(x=>!x.archived) || threads[0]; currentId = n.id; }
   store.set("ritsu-current", currentId); saveThreads();
   loadCurrent(); renderAll(); renderThreadList();
 }
@@ -978,7 +1006,8 @@ let threadQuery = "";
 function renderThreadList(){
   const wrap = $("thread-list"); if(!wrap) return; wrap.innerHTML="";
   const q = (threadQuery||"").toLowerCase();
-  const list = q ? threads.filter(t=> (t.title||"新しいチャット").toLowerCase().includes(q)) : threads;
+  let list = threads.filter(t=> !t.archived);                 // しまっていないチャットだけ
+  if(q) list = list.filter(t=> (t.title||"新しいチャット").toLowerCase().includes(q));
   if(!list.length){ wrap.appendChild(el("div","cal-empty", q ? "見つからなかったよ" : "チャットがないよ")); return; }
   list.forEach(t=>{
     const row = el("div","thread-row"+(t.id===currentId?" cur":""));
@@ -988,14 +1017,62 @@ function renderThreadList(){
     main.addEventListener("click", ()=> switchThread(t.id));
     row.appendChild(main);
     const rn = el("button","thread-act","✏️"); rn.addEventListener("click", e=>{ e.stopPropagation(); renameThread(t.id); });
+    const ar = el("button","thread-act","📦"); ar.addEventListener("click", e=>{ e.stopPropagation(); archiveThread(t.id); });
     const dl = el("button","thread-act","🗑"); dl.addEventListener("click", e=>{ e.stopPropagation(); if(confirm("このチャットを消す? 戻せないよ")) deleteThread(t.id); });
-    row.appendChild(rn); row.appendChild(dl);
+    row.appendChild(rn); row.appendChild(ar); row.appendChild(dl);
     wrap.appendChild(row);
   });
 }
 function openMenu(){ renderThreadList(); $("menu").classList.add("open"); }
 function closeMenu(){ $("menu").classList.remove("open"); }
 function closeThreads(){ $("menu").classList.remove("open"); }
+
+/* ---------- アーカイブ（棚にしまう・表示を分けるだけ・中身は消さない） ---------- */
+function archiveThread(id){
+  const t = threads.find(x=>x.id===id); if(!t) return;
+  t.archived = true;                                  // 旗を立てるだけ（会話データは触らない）
+  if(id===currentId){
+    persistThread();                                  // 今の会話を保存してから離れる
+    const next = threads.find(x=>!x.archived);
+    if(next){ currentId = next.id; }
+    else {                                            // 全部しまったら新しい空チャットを用意
+      const nid = uid();
+      threads.unshift({id:nid, title:"新しいチャット", updatedAt:Date.now()});
+      store.set("ritsu-thread-"+nid, JSON.stringify({history:[], summarized:0, anchor:0}));
+      currentId = nid;
+    }
+    store.set("ritsu-current", currentId);
+    saveThreads();
+    loadCurrent(); renderAll();
+  } else {
+    saveThreads();
+  }
+  renderThreadList();
+}
+function unarchiveThread(id){                          // 復元（旗をおろすだけ）
+  const t = threads.find(x=>x.id===id); if(!t) return;
+  t.archived = false;
+  saveThreads();
+  renderArchiveList(); renderThreadList();
+}
+function openArchive(){ renderArchiveList(); $("archive").classList.add("open"); }
+function closeArchive(){ $("archive").classList.remove("open"); }
+function renderArchiveList(){
+  const wrap = $("archive-list"); if(!wrap) return; wrap.innerHTML="";
+  const list = threads.filter(t=> t.archived).slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  if(!list.length){ wrap.appendChild(el("div","cal-empty","アーカイブはまだ空だよ📦 スレッド一覧の📦でしまえるよ")); return; }
+  list.forEach(t=>{
+    const row = el("div","thread-row");
+    const main = el("div","thread-main");
+    main.appendChild(el("div","thread-title", t.title || "新しいチャット"));
+    main.appendChild(el("div","thread-sub", relTime(t.updatedAt)));
+    row.appendChild(main);
+    const rs = el("button","thread-restore","復元"); rs.addEventListener("click", e=>{ e.stopPropagation(); unarchiveThread(t.id); });
+    const dl = el("button","thread-act","🗑"); dl.addEventListener("click", e=>{ e.stopPropagation(); if(confirm("このチャットを完全に消す? 戻せないよ")){ deleteThread(t.id); renderArchiveList(); } });
+    row.appendChild(rs); row.appendChild(dl);
+    wrap.appendChild(row);
+  });
+}
 
 /* ---------- 記憶ノート ---------- */
 let memFilter = "all";
@@ -1910,6 +1987,7 @@ $("close-memory").addEventListener("click", closeMemory);
 $("close-favorites").addEventListener("click", closeFavorites);
 $("close-synopsis").addEventListener("click", closeSynopsis);
 $("synopsis-refresh").addEventListener("click", refreshSynopsisNow);
+$("close-archive").addEventListener("click", closeArchive);
 $("mem-add").addEventListener("click", ()=> openMemEdit(null));
 $("mem-filters").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memFilter=b.dataset.cat; document.querySelectorAll("#mem-filters .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); renderMemList(); });
 $("mem-edit-cats").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memEditCat=b.dataset.cat; document.querySelectorAll("#mem-edit-cats .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); });
@@ -1933,6 +2011,7 @@ $("menu").addEventListener("click", e=>{
   else if(go==="calendar") openCalendar();
   else if(go==="vault") openVault();
   else if(go==="settings") openSettings();
+  else if(go==="archive") openArchive();
 });
 $("tabbar").addEventListener("click", e=>{
   const b = e.target.closest(".tab"); if(!b) return;
