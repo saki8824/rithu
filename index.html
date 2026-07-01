@@ -438,6 +438,46 @@
   .mem-edit-actions .btn{flex:1}
   .backup-row{display:flex;gap:9px;margin-top:9px}
   .backup-row .btn{flex:1}
+  /* ---------- ホーム画面(ダッシュボード) ---------- */
+  #home{
+    position:fixed;inset:0;z-index:90;display:none;
+    flex-direction:column;overflow:hidden;
+    padding:calc(env(safe-area-inset-top,0px) + 26px) 22px calc(env(safe-area-inset-bottom,0px) + 24px);
+  }
+  #home.open{display:flex}
+  #home-bg{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,#242838,#1b1d27)}
+  html.day #home-bg{background:linear-gradient(180deg,#fff2ea,#faf2ec)}
+  #home-illus{position:absolute;left:0;right:0;bottom:0;width:100%;height:56%;opacity:.5}
+  .il-line{fill:none;stroke:var(--line);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .il-soft{fill:var(--bubble-saki);opacity:.55}
+  .il-sofa{fill:var(--ritsu-pink);opacity:.30}
+  .il-win{fill:var(--night-2)}
+  html.day .il-win{fill:#fffdfb}
+  .il-plant{fill:var(--saki-blue);opacity:.5}
+  .home-sun{display:none}
+  html.day .home-sun{display:block}
+  .home-moon{display:block}
+  html.day .home-moon{display:none}
+  #home-inner{position:relative;z-index:1;display:flex;flex-direction:column;gap:15px;height:100%}
+  .home-hi{font-size:23px;font-weight:700;letter-spacing:.04em;color:var(--text)}
+  .home-line{font-size:14.5px;line-height:1.7;color:var(--muted);min-height:22px}
+  .home-cards{display:flex;flex-direction:column;gap:11px;margin-top:2px}
+  .home-card{
+    display:flex;align-items:center;gap:11px;
+    background:var(--night-2);border:1px solid var(--line);border-radius:18px;
+    padding:14px 16px;box-shadow:0 4px 14px rgba(0,0,0,.06);
+  }
+  .home-card-ic{font-size:20px;flex:0 0 auto}
+  .home-card-main{min-width:0}
+  .home-card-ttl{font-size:14px;font-weight:600;color:var(--text)}
+  .home-card-sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .home-spacer{flex:1 1 auto;min-height:10px}
+  #home-talk{
+    border:none;border-radius:22px;padding:16px;font-family:inherit;
+    font-size:16px;font-weight:700;color:#fff;background:var(--ritsu-pink-deep);
+    box-shadow:0 8px 22px rgba(217,123,151,.30);
+  }
+  #home-talk:active{transform:translateY(1px)}
   /* ---------- lock (夜のリビングの扉) ---------- */
   #lock{
     position:fixed;inset:0;z-index:100;display:none;
@@ -479,6 +519,44 @@
     <button>4</button><button>5</button><button>6</button>
     <button>7</button><button>8</button><button>9</button>
     <button class="blank"></button><button>0</button><button class="del" data-del="1">&#9003;</button>
+  </div>
+</div>
+
+<!-- ===== ホーム画面(ダッシュボード) ===== -->
+<div id="home">
+  <div id="home-bg">
+    <svg id="home-illus" viewBox="0 0 400 300" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+      <line class="il-line" x1="0" y1="205" x2="400" y2="205"/>
+      <rect class="il-win" x="48" y="28" width="132" height="120" rx="12"/>
+      <rect class="il-line" x="48" y="28" width="132" height="120" rx="12"/>
+      <line class="il-line" x1="114" y1="28" x2="114" y2="148"/>
+      <line class="il-line" x1="48" y1="88" x2="180" y2="88"/>
+      <circle class="home-sun" cx="150" cy="62" r="15" fill="#f5c07f"/>
+      <circle class="home-moon" cx="152" cy="60" r="13" fill="#eef0f7"/>
+      <circle class="home-moon" cx="146" cy="56" r="11" fill="#232633"/>
+      <circle class="home-moon" cx="82" cy="52" r="1.6" fill="#eef0f7"/>
+      <circle class="home-moon" cx="98" cy="112" r="1.4" fill="#eef0f7"/>
+      <path class="il-soft" d="M40 24h20c-6 40-6 84 0 124H40z"/>
+      <path class="il-soft" d="M188 24h-20c6 40 6 84 0 124h20z"/>
+      <path class="il-plant" d="M332 150c-14-8-20-26-14-42 10 8 16 24 14 42z"/>
+      <path class="il-plant" d="M332 150c14-8 20-26 14-42-10 8-16 24-14 42z"/>
+      <path class="il-line" d="M324 150h18l-3 30h-12z"/>
+      <ellipse class="il-soft" cx="205" cy="262" rx="150" ry="26"/>
+      <rect class="il-sofa" x="96" y="196" width="218" height="70" rx="22"/>
+      <rect class="il-line" x="96" y="196" width="218" height="70" rx="22"/>
+      <line class="il-line" x1="205" y1="206" x2="205" y2="250"/>
+      <rect class="il-line" x="86" y="214" width="24" height="48" rx="12"/>
+      <rect class="il-line" x="300" y="214" width="24" height="48" rx="12"/>
+    </svg>
+  </div>
+  <div id="home-inner">
+    <div>
+      <div class="home-hi" id="home-hi">おかえり、さき</div>
+      <div class="home-line" id="home-line"></div>
+    </div>
+    <div class="home-cards" id="home-cards"></div>
+    <div class="home-spacer"></div>
+    <button id="home-talk">律くんと話す 💬</button>
   </div>
 </div>
 
@@ -592,6 +670,24 @@
         <option value="same">メインと同じ</option>
       </select>
       <div class="hint">オンにすると、今日の会話の流れを10往復ごとに自動でまとめて、律くんが覚えた状態で話せるよ📝 日付が変わると新しく作り直すよ（会話は消えない）。Haikuならとても安いよ。メニューの「📝 あらすじ」から中身を読めるよ。</div>
+    </div>
+
+    <div class="toggle-row">
+      <span>ホーム画面を使う</span>
+      <input type="checkbox" id="set-home" checked>
+    </div>
+    <div class="field"><div class="hint">オンにすると、アプリを開いてPINのあとに「おうちの入口」ホーム画面が出るよ🏠 オフにすると今までどおりチャットに直行するよ。</div></div>
+
+    <div class="toggle-row">
+      <span>ホームで律くんの一言</span>
+      <input type="checkbox" id="set-homegreet" checked>
+    </div>
+    <div class="field"><div class="hint">ホームに、時間帯に合わせた律くんの短いひとことを表示するよ（Haikuでとても安い＆同じ時間帯は作り直さない）。オフにすると固定のあいさつになって完全無料。</div></div>
+
+    <div class="field">
+      <label>記念日（ふたりの大切な日）</label>
+      <input type="date" id="set-anniv">
+      <div class="hint">記念日の10日前になると、ホームに「あと◯日」が出るよ🎀 毎年くり返し。空っぽなら表示しないよ。</div>
     </div>
 
     <div class="field">
@@ -892,8 +988,10 @@ let settings = {
   proactive:false, proMin:3, selfMemFreq:"low",
   temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto", showUsage:false, schedule:true, diaryLen:"normal",
   synopsis:true, synopsisModel:"claude-haiku-4-5-20251001",
+  home:true, homeGreeting:true, anniv:"",
   mem:[]
 };
+let homeGreet = {date:"", band:"", text:""};   // ホームの一言キャッシュ(その日・時間帯ごとに1回だけ作る)
 let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
 let pending = []; // 送信前の添付 {kind,media_type?,data?,name,text?}
 let summarized = 0;    // 先頭から要約済みのメッセージ数
@@ -1100,6 +1198,89 @@ function openArchivedThread(id){
 function isCurrentArchived(){ const t = threads.find(x=>x.id===currentId); return !!(t && t.archived); }
 // アーカイブ閲覧中は入力ボックスを隠して案内バーを出す（body に ro クラスを付け外し）
 function applyReadOnly(){ document.body.classList.toggle("ro", isCurrentArchived()); }
+
+/* ---------- ホーム画面(ダッシュボード) ---------- */
+function loadHomeGreet(){ try{ const d=store.get("ritsu-greet"); if(d){ const o=JSON.parse(d); homeGreet={date:o.date||"",band:o.band||"",text:o.text||""}; } }catch(e){} }
+function saveHomeGreet(){ store.set("ritsu-greet", JSON.stringify(homeGreet)); }
+function homeBand(){
+  const h = new Date().getHours();
+  if(h>=5 && h<11) return "朝";
+  if(h>=11 && h<17) return "昼";
+  if(h>=17 && h<23) return "夜";
+  return "深夜";
+}
+function staticGreet(band){
+  return ({
+    "朝":"おはよう。よく眠れた？",
+    "昼":"おつかれさま。ひと息つこ。",
+    "夜":"おかえり。ゆっくりしよう。",
+    "深夜":"まだ起きてたんだ。無理してない？"
+  })[band] || "おかえり。";
+}
+// 記念日まであと何日（なければ null）。表示は10日以内のときだけ
+function annivDaysUntil(){
+  if(!settings.anniv) return null;
+  const p = String(settings.anniv).split("-").map(Number);
+  if(p.length<3 || !p[1] || !p[2]) return null;
+  const now = new Date(); now.setHours(0,0,0,0);
+  let next = new Date(now.getFullYear(), p[1]-1, p[2]);
+  if(next < now) next = new Date(now.getFullYear()+1, p[1]-1, p[2]);
+  return Math.round((next - now)/86400000);
+}
+function renderHome(){
+  $("home-hi").textContent = "おかえり、" + (settings.uname || "さき");
+  const band = homeBand();
+  const lineEl = $("home-line");
+  if(!settings.homeGreeting || !settings.key){
+    lineEl.textContent = staticGreet(band);
+  } else if(homeGreet.date===todaySynopStr() && homeGreet.band===band && homeGreet.text){
+    lineEl.textContent = homeGreet.text;                 // キャッシュ利用（＝無料）
+  } else {
+    lineEl.textContent = staticGreet(band);              // まず仮表示
+    generateGreeting(band);                              // 裏で作って差し替え
+  }
+  const box = $("home-cards"); box.innerHTML="";
+  const d = annivDaysUntil();
+  if(d!==null && d<=10){
+    const card = el("div","home-card");
+    card.appendChild(el("div","home-card-ic","🎀"));
+    const m = el("div","home-card-main");
+    m.appendChild(el("div","home-card-ttl", d===0 ? "今日は記念日だよ🎉" : "記念日まで あと "+d+"日"));
+    m.appendChild(el("div","home-card-sub","ふたりの大切な日"));
+    card.appendChild(m); box.appendChild(card);
+  }
+  const evs = eventsOn(ymd(new Date()));
+  if(evs.length){
+    const card = el("div","home-card");
+    card.appendChild(el("div","home-card-ic","📅"));
+    const m = el("div","home-card-main");
+    m.appendChild(el("div","home-card-ttl","今日の予定"));
+    m.appendChild(el("div","home-card-sub", evs.map(e=>(e.time?e.time+" ":"")+e.title).join(" ・ ")));
+    card.appendChild(m); box.appendChild(card);
+  }
+}
+async function generateGreeting(band){                    // ホームの一言（Haikuで安く）
+  if(!settings.key || !settings.homeGreeting) return;
+  try{
+    const name = settings.uname || "さき";
+    const sys = "あなたは天川律。恋人の"+name+"がアプリを開いて、ホーム画面であなたに会いに来ました。今の時間帯は「"+band+"」です。律として、"+name+"へ『おかえり』の気持ちで短いひとこと(1文・20〜35文字程度)を返してください。時間帯に自然に合わせて、やさしく甘すぎず。あいさつ本文だけを出力（かぎ括弧・説明は不要）。";
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST", headers:HEADERS(),
+      body: JSON.stringify({ model:"claude-haiku-4-5-20251001", max_tokens:120, system:sys, messages:[{role:"user", content:"（ホームを開きました。今日のひとことを。）"}] })
+    });
+    const data = await res.json();
+    if(!data.error){
+      let out=""; (data.content||[]).forEach(b=>{ if(b.type==="text") out += b.text||""; });
+      out = out.replace(/\s+/g," ").trim();
+      if(out){
+        homeGreet = {date: todaySynopStr(), band, text: out}; saveHomeGreet();
+        if($("home").classList.contains("open")) $("home-line").textContent = out;
+      }
+    }
+  }catch(e){ /* 失敗しても仮表示のままでOK */ }
+}
+function openHome(){ renderHome(); $("home").classList.add("open"); }
+function closeHome(){ $("home").classList.remove("open"); }
 
 /* ---------- 記憶ノート ---------- */
 let memFilter = "all";
@@ -1995,6 +2176,9 @@ function openSettings(){
   $("set-temp").value = settings.temp; $("temp-val").textContent = Number(settings.temp).toFixed(2);
   $("set-synopsis").checked = settings.synopsis;
   $("set-synopsismodel").value = settings.synopsisModel;
+  $("set-home").checked = settings.home;
+  $("set-homegreet").checked = settings.homeGreeting;
+  $("set-anniv").value = settings.anniv || "";
   $("set-lockmin").value = String(settings.lockMin);
   $("set-fs").value = settings.fontScale; $("fs-val").textContent = Math.round(settings.fontScale*100)+"%";
   $("set-theme").value = settings.theme;
@@ -2017,6 +2201,7 @@ $("close-favorites").addEventListener("click", closeFavorites);
 $("close-synopsis").addEventListener("click", closeSynopsis);
 $("synopsis-refresh").addEventListener("click", refreshSynopsisNow);
 $("close-archive").addEventListener("click", closeArchive);
+$("home-talk").addEventListener("click", closeHome);
 $("mem-add").addEventListener("click", ()=> openMemEdit(null));
 $("mem-filters").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memFilter=b.dataset.cat; document.querySelectorAll("#mem-filters .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); renderMemList(); });
 $("mem-edit-cats").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memEditCat=b.dataset.cat; document.querySelectorAll("#mem-edit-cats .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); });
@@ -2080,6 +2265,9 @@ $("save-settings").addEventListener("click", ()=>{
   settings.temp = Number($("set-temp").value);
   settings.synopsis = $("set-synopsis").checked;
   settings.synopsisModel = $("set-synopsismodel").value;
+  settings.home = $("set-home").checked;
+  settings.homeGreeting = $("set-homegreet").checked;
+  settings.anniv = $("set-anniv").value;
   settings.lockMin = Number($("set-lockmin").value);
   settings.fontScale = Number($("set-fs").value);
   settings.theme = $("set-theme").value;
@@ -2188,7 +2376,7 @@ document.addEventListener("visibilitychange", ()=>{
     scheduleProactive();
   }
 });
-function afterUnlock(){ if(!settings.key) openSettings(); armIdle(); }
+function afterUnlock(){ if(!settings.key) openSettings(); else if(settings.home) openHome(); armIdle(); }
 function initLock(){ if(settings.pinHash) showLock(); else afterUnlock(); }
 
 /* ---------- init ---------- */
@@ -2212,6 +2400,7 @@ loadDiary();
 loadFavorites();
 loadSynopsis();
 ensureSynopsisToday();
+loadHomeGreet();
 loadThreads();
 renderAll();
 initLock();
