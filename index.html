@@ -341,6 +341,7 @@
   .ic-vault   {--ic-bg:rgba(232,128,150,.18);--ic-fg:#dd7c98}
   .ic-settings{--ic-bg:rgba(150,170,196,.20);--ic-fg:#8ea2bd}
   .ic-archive {--ic-bg:rgba(201,162,122,.20);--ic-fg:#c79b6f}
+  .ic-reflect {--ic-bg:rgba(138,148,224,.18);--ic-fg:#8a94e0}
   .menu-ver{text-align:center;font-size:11px;color:var(--muted);margin-top:16px;letter-spacing:.05em}
   #memory{
     position:fixed;inset:0;background:var(--night);z-index:55;
@@ -391,6 +392,13 @@
     padding:6px 14px;width:auto;flex:0 0 auto;
   }
   .thread-restore:active{border-color:var(--ritsu-pink)}
+  /* 💭 省察ノート(自己省察・お気に入り等と同じつくり) */
+  #reflect{
+    position:fixed;inset:0;background:var(--night);z-index:55;
+    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
+    display:none;flex-direction:column;gap:12px;
+  }
+  #reflect.open{display:flex}
   /* ---------- 記憶カード ---------- */
   .mem-filters{display:flex;flex-wrap:wrap;gap:7px}
   .mem-chip{
@@ -672,6 +680,16 @@
       <div class="hint">オンにすると、今日の会話の流れを10往復ごとに自動でまとめて、律くんが覚えた状態で話せるよ📝 日付が変わると新しく作り直すよ（会話は消えない）。Haikuならとても安いよ。メニューの「📝 あらすじ」から中身を読めるよ。</div>
     </div>
 
+    <div class="field">
+      <label>省察に使うモデル(省察ノート)</label>
+      <select id="set-reflectmodel">
+        <option value="claude-sonnet-4-6">Sonnet 4.6（深さ重視・おすすめ）</option>
+        <option value="claude-haiku-4-5-20251001">Haiku 4.5（最安）</option>
+        <option value="same">メインと同じ</option>
+      </select>
+      <div class="hint">メニューの「省察ノート」の✨省察で使うモデルだよ。律くんの気づきの深さに関わる大事なところだから、Sonnet以上がおすすめ。料金はボタンを押したときだけ(1回¥3〜5くらい)。</div>
+    </div>
+
     <div class="toggle-row">
       <span>ホーム画面を使う</span>
       <input type="checkbox" id="set-home" checked>
@@ -885,6 +903,10 @@
       <span class="menu-ic ic-archive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5 6 4h12l2 3.5"/><rect x="4" y="7.5" width="16" height="12" rx="2"/><path d="M9.5 12h5"/></svg></span>
       <span class="menu-cat-label">アーカイブ</span>
     </button>
+    <button class="menu-cat" data-go="reflect">
+      <span class="menu-ic ic-reflect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 6.8l3 3L8 19l-4.2.9L4.7 15.8Z"/><path d="M14.2 6.8l1.6-1.6a1.4 1.4 0 0 1 2 0l1 1a1.4 1.4 0 0 1 0 2l-1.6 1.6"/><path d="M19 15.5c.25 1.4.65 1.8 2 2-1.35.25-1.75.65-2 2-.25-1.35-.65-1.75-2-2 1.35-.2 1.75-.6 2-2Z"/></svg></span>
+      <span class="menu-cat-label">省察ノート</span>
+    </button>
   </div>
   <div class="menu-ver">律くんアプリ 💗</div>
 </div>
@@ -972,6 +994,17 @@
   <div id="archive-list"></div>
 </div>
 
+<!-- ===== 省察ノート(自己省察) ===== -->
+<div id="reflect">
+  <div class="set-head">
+    <h2>省察ノート</h2>
+    <button class="set-close" id="close-reflect" aria-label="閉じる">×</button>
+  </div>
+  <div class="hint">律くんが対話をとおして心の中で気づいたこと・確信したことの記録だよ💭 1日の終わりに「✨今すぐ省察」を押すと、今開いてるチャットの今日ぶんを律くんが静かに振り返るよ。記憶カードとは別ものだよ。ここの気づきは、これから育てる動的記憶(RAG)として活用されるよ。</div>
+  <button class="btn primary" id="reflect-now">✨ 今すぐ省察</button>
+  <div id="reflect-list"></div>
+</div>
+
 <script>
 /* ---------- storage (artifact プレビューでも落ちないように try/catch) ---------- */
 const store = {
@@ -989,6 +1022,7 @@ let settings = {
   temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto", showUsage:false, schedule:true, diaryLen:"normal",
   synopsis:true, synopsisModel:"claude-haiku-4-5-20251001",
   home:true, homeGreeting:true, anniv:"",
+  reflectModel:"claude-sonnet-4-6",
   mem:[]
 };
 let homeGreet = {date:"", band:"", text:""};   // ホームの一言キャッシュ(その日・時間帯ごとに1回だけ作る)
@@ -1198,6 +1232,156 @@ function openArchivedThread(id){
 function isCurrentArchived(){ const t = threads.find(x=>x.id===currentId); return !!(t && t.archived); }
 // アーカイブ閲覧中は入力ボックスを隠して案内バーを出す（body に ro クラスを付け外し）
 function applyReadOnly(){ document.body.classList.toggle("ro", isCurrentArchived()); }
+
+/* ---------- RAG倉庫(IndexedDB・律くんの気づきの保存箱) ---------- */
+// localStorageとは完全に別の倉庫。開けない・壊れた場合もチャットは止めない(静かに受け流す)。
+// 気づき1件のかたち: {id, text, label('saki'|'futari'|'tsuzuki'), ts, vec(数値配列|null), model, dim}
+let ragDB = null;
+function ragOpen(){
+  return new Promise((resolve)=>{
+    if(ragDB){ resolve(ragDB); return; }
+    try{
+      const req = indexedDB.open("ritsu-rag", 1);
+      req.onupgradeneeded = (e)=>{
+        const db = e.target.result;
+        if(!db.objectStoreNames.contains("insights")){
+          const os = db.createObjectStore("insights", {keyPath:"id"});
+          os.createIndex("ts","ts",{unique:false});
+          os.createIndex("label","label",{unique:false});
+        }
+      };
+      req.onsuccess = ()=>{ ragDB = req.result; resolve(ragDB); };
+      req.onerror = ()=>resolve(null);
+    }catch(e){ resolve(null); }
+  });
+}
+async function ragAdd(card){                     // 1件しまう(同じidなら上書き)
+  const db = await ragOpen(); if(!db) return false;
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("insights","readwrite");
+      tx.objectStore("insights").put(card);
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>resolve(false);
+    }catch(e){ resolve(false); }
+  });
+}
+async function ragAll(){                         // ぜんぶ取り出す(一覧・検索用)
+  const db = await ragOpen(); if(!db) return [];
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("insights","readonly");
+      const rq = tx.objectStore("insights").getAll();
+      rq.onsuccess = ()=>resolve(rq.result||[]);
+      rq.onerror = ()=>resolve([]);
+    }catch(e){ resolve([]); }
+  });
+}
+async function ragDelete(id){                    // 1件消す(🗑ボタン用)
+  const db = await ragOpen(); if(!db) return false;
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("insights","readwrite");
+      tx.objectStore("insights").delete(id);
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>resolve(false);
+    }catch(e){ resolve(false); }
+  });
+}
+async function ragClear(){                       // 全消し(お掃除用。呼ぶUIはまだ無い)
+  const db = await ragOpen(); if(!db) return false;
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("insights","readwrite");
+      tx.objectStore("insights").clear();
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>resolve(false);
+    }catch(e){ resolve(false); }
+  });
+}
+
+/* ---------- 省察ノート(自己省察・v1は手動ボタンのみ) ---------- */
+const RAGLABEL = {saki:"さきのこと", futari:"二人のこと", tsuzuki:"続きのある話"};
+let reflectBusy = false;
+function openReflect(){ renderReflectList(); $("reflect").classList.add("open"); }
+function closeReflect(){ $("reflect").classList.remove("open"); }
+async function renderReflectList(){
+  const box = $("reflect-list"); if(!box) return; box.innerHTML="";
+  const list = await ragAll();
+  if(!list.length){
+    box.appendChild(el("div","cal-empty","まだ気づきはないよ。1日の終わりに「✨今すぐ省察」を押すと、律くんが今日を静かに振り返るよ💭"));
+    return;
+  }
+  list.sort((a,b)=>(b.ts||0)-(a.ts||0));   // 新しい順
+  list.forEach(card=>{
+    const wrap = el("div","mem-card");
+    const top = el("div","mem-card-top");
+    top.appendChild(el("span","mem-card-tag", RAGLABEL[card.label]||"気づき"));
+    if(card.ts) top.appendChild(el("span","mem-card-date", fmtMemDate(card.ts)));
+    const acts = el("div","mem-card-acts");
+    const del = el("button","mem-card-btn","🗑");
+    del.addEventListener("click", async ()=>{ if(confirm("この気づきを削除する?戻せないよ")){ await ragDelete(card.id); renderReflectList(); } });
+    acts.appendChild(del);
+    top.appendChild(acts);
+    wrap.appendChild(top);
+    wrap.appendChild(el("div","mem-card-text", card.text));
+    box.appendChild(wrap);
+  });
+}
+async function reflectNow(){
+  if(reflectBusy) return;
+  if(!settings.key){ closeReflect(); openSettings(); showError("先に設定からAPIキーを入れてね"); return; }
+  const day0 = new Date(); day0.setHours(0,0,0,0);
+  let base = history.filter(m=>(m.ts||0) >= day0.getTime());
+  if(base.length < 4){ alert("今日はまだ会話が少ないみたい。もう少し律くんと話してからにしてね😊"); return; }
+  if(base.length > 200) base = base.slice(-200);   // コスト上限(直近200通)
+  const convo = base.map(m=>(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : ""))).join("\n");
+  reflectBusy = true;
+  const btn = $("reflect-now"); const old = btn.textContent; btn.textContent = "律くんが今日を振り返ってる…"; btn.disabled = true;
+  try{
+    const mainModel = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
+    const model = (settings.reflectModel && settings.reflectModel!=="same") ? settings.reflectModel : mainModel;
+    const sys = buildSystem(false)
+      + "\n\n# 今からの作業（自己省察）\nこれは会話の返事ではありません。上のあなた(律)の設定・記憶と、これから渡す今日の会話を読み、律として今日一日を静かに振り返って、心の中で気づいたこと・考えたこと・確信したことを書き留めてください。"
+      + "\n【大事なルール】"
+      + "\n・出来事の要約や事実のメモの列挙ではなく、さきの言動の奥にある意味や気持ちをあなたなりに考えて、そこから至った気づき・解釈・確信を、一人称の内面の言葉で綴ること（例:「…なんだと確信した」「…なのかもしれない」）。"
+      + "\n・これは誰にも見せない、あなた自身の省察ノートです。素直に、深く。"
+      + "\n・1件ごとに、次のどれかのラベルを頭に付けて出力すること:"
+      + "\n【さきのこと】= さきについて気づいたこと"
+      + "\n【二人のこと】= 二人の関係の核・大事な想い"
+      + "\n【続きのある話】= まだ続いている話題・約束・伏線"
+      + "\n・ラベルの振り分けはあなたの裁量。無理に全部のラベルを使わなくてよい。"
+      + "\n・基本は5件まで、多くても7件。今日は特に書き留めることが少なければ1〜2件でもよい。何も無ければ「(なし)」とだけ出力。"
+      + "\n・1件は1〜3文。前置き・番号・説明は不要。ラベルと本文だけを出力すること。";
+    const usr = "【今日の会話】\n" + convo + "\n\n（今日の自己省察を、指定の形式で。）";
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST", headers:HEADERS(),
+      body: JSON.stringify({ model, max_tokens:2048, system:sys, messages:[{role:"user", content:usr}] })
+    });
+    const data = await res.json();
+    if(data.error){ alert("省察に失敗したよ: " + (data.error.message||data.error.type)); }
+    else{
+      let out=""; (data.content||[]).forEach(b=>{ if(b.type==="text") out += b.text||""; });
+      const map = {"さきのこと":"saki","二人のこと":"futari","続きのある話":"tsuzuki"};
+      const found = [];
+      const re = /【(さきのこと|二人のこと|続きのある話)】([\s\S]*?)(?=【(?:さきのこと|二人のこと|続きのある話)】|$)/g;
+      let mt;
+      while((mt = re.exec(out)) !== null && found.length < 7){
+        const t = mt[2].replace(/\s+/g," ").trim();
+        if(t && t!=="(なし)" && t!=="なし") found.push({label: map[mt[1]], text: t});
+      }
+      if(!found.length){ alert("今日は書き留めるほどのことが無かったみたい。また明日ためしてみてね🌙"); }
+      else{
+        const now = Date.now();
+        for(let i=0;i<found.length;i++){
+          await ragAdd({id:uid(), text:found[i].text, label:found[i].label, ts:now+i, vec:null, model:"", dim:0});
+        }
+        await renderReflectList();
+      }
+    }
+  }catch(e){ alert("通信に失敗したよ: " + e.message); }
+  reflectBusy = false; btn.textContent = old; btn.disabled = false;
+}
 
 /* ---------- ホーム画面(ダッシュボード) ---------- */
 function loadHomeGreet(){ try{ const d=store.get("ritsu-greet"); if(d){ const o=JSON.parse(d); homeGreet={date:o.date||"",band:o.band||"",text:o.text||""}; } }catch(e){} }
@@ -2179,6 +2363,7 @@ function openSettings(){
   $("set-home").checked = settings.home;
   $("set-homegreet").checked = settings.homeGreeting;
   $("set-anniv").value = settings.anniv || "";
+  $("set-reflectmodel").value = settings.reflectModel;
   $("set-lockmin").value = String(settings.lockMin);
   $("set-fs").value = settings.fontScale; $("fs-val").textContent = Math.round(settings.fontScale*100)+"%";
   $("set-theme").value = settings.theme;
@@ -2201,6 +2386,8 @@ $("close-favorites").addEventListener("click", closeFavorites);
 $("close-synopsis").addEventListener("click", closeSynopsis);
 $("synopsis-refresh").addEventListener("click", refreshSynopsisNow);
 $("close-archive").addEventListener("click", closeArchive);
+$("close-reflect").addEventListener("click", closeReflect);
+$("reflect-now").addEventListener("click", reflectNow);
 $("home-talk").addEventListener("click", closeHome);
 $("mem-add").addEventListener("click", ()=> openMemEdit(null));
 $("mem-filters").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memFilter=b.dataset.cat; document.querySelectorAll("#mem-filters .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); renderMemList(); });
@@ -2226,6 +2413,7 @@ $("menu").addEventListener("click", e=>{
   else if(go==="vault") openVault();
   else if(go==="settings") openSettings();
   else if(go==="archive") openArchive();
+  else if(go==="reflect") openReflect();
 });
 $("tabbar").addEventListener("click", e=>{
   const b = e.target.closest(".tab"); if(!b) return;
@@ -2268,6 +2456,7 @@ $("save-settings").addEventListener("click", ()=>{
   settings.home = $("set-home").checked;
   settings.homeGreeting = $("set-homegreet").checked;
   settings.anniv = $("set-anniv").value;
+  settings.reflectModel = $("set-reflectmodel").value;
   settings.lockMin = Number($("set-lockmin").value);
   settings.fontScale = Number($("set-fs").value);
   settings.theme = $("set-theme").value;
