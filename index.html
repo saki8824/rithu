@@ -1007,7 +1007,14 @@
   </div>
   <div class="hint">律くんが対話をとおして心の中で気づいたこと・確信したことの記録だよ💭 1日の終わりに「✨今すぐ省察」を押すと、今開いてるチャットの今日ぶんを律くんが静かに振り返るよ。記憶カードとは別ものだよ。ここの気づきは、これから育てる動的記憶(RAG)として活用されるよ。</div>
   <button class="btn primary" id="reflect-now">✨ 今すぐ省察</button>
+  <div class="mem-filters" id="reflect-filters">
+    <button class="mem-chip on" data-cat="all">すべて</button>
+    <button class="mem-chip" data-cat="saki">さきのこと</button>
+    <button class="mem-chip" data-cat="futari">二人のこと</button>
+    <button class="mem-chip" data-cat="tsuzuki">続きのある話</button>
+  </div>
   <div id="reflect-list"></div>
+  <button class="btn ghost" id="reflect-migrate">🔄 Embedding移行(ベクトルを作り直す)</button>
 </div>
 
 <script>
@@ -1366,30 +1373,72 @@ async function ragSearch(query){   // 意味が近い気づきを上位数件だ
 /* ---------- 省察ノート(自己省察・v1は手動ボタンのみ) ---------- */
 const RAGLABEL = {saki:"さきのこと", futari:"二人のこと", tsuzuki:"続きのある話"};
 let reflectBusy = false;
-function openReflect(){ renderReflectList(); $("reflect").classList.add("open"); ragBackfill(); }
+function openReflect(){
+  reflectFilter = "all";
+  document.querySelectorAll("#reflect-filters .mem-chip").forEach(c=> c.classList.toggle("on", c.dataset.cat==="all"));
+  renderReflectList(); $("reflect").classList.add("open"); ragBackfill();
+}
 function closeReflect(){ $("reflect").classList.remove("open"); }
+let reflectFilter = "all";
 async function renderReflectList(){
   const box = $("reflect-list"); if(!box) return; box.innerHTML="";
-  const list = await ragAll();
+  let list = await ragAll();
+  if(reflectFilter!=="all") list = list.filter(c=>(c.label||"")===reflectFilter);
   if(!list.length){
-    box.appendChild(el("div","cal-empty","まだ気づきはないよ。1日の終わりに「✨今すぐ省察」を押すと、律くんが今日を静かに振り返るよ💭"));
+    box.appendChild(el("div","cal-empty", reflectFilter==="all" ? "まだ気づきはないよ。1日の終わりに「✨今すぐ省察」を押すと、律くんが今日を静かに振り返るよ💭" : "このラベルの気づきはまだないよ"));
     return;
   }
   list.sort((a,b)=>(b.ts||0)-(a.ts||0));   // 新しい順
   list.forEach(card=>{
-    const wrap = el("div","mem-card");
+    const wrap = el("div","mem-card fav-card");   // お気に入りと同じ折りたたみ式
     const top = el("div","mem-card-top");
+    const arrow = el("span","fav-arrow","▸");
+    top.appendChild(arrow);
     top.appendChild(el("span","mem-card-tag", RAGLABEL[card.label]||"気づき"));
     if(card.ts) top.appendChild(el("span","mem-card-date", fmtMemDate(card.ts)));
     const acts = el("div","mem-card-acts");
+    const edit = el("button","mem-card-btn","✏️");
+    edit.addEventListener("click", e=>{ e.stopPropagation(); editInsight(card); });
     const del = el("button","mem-card-btn","🗑");
-    del.addEventListener("click", async ()=>{ if(confirm("この気づきを削除する?戻せないよ")){ await ragDelete(card.id); renderReflectList(); } });
-    acts.appendChild(del);
+    del.addEventListener("click", async e=>{ e.stopPropagation(); if(confirm("この気づきを削除する?戻せないよ")){ await ragDelete(card.id); renderReflectList(); } });
+    acts.appendChild(edit); acts.appendChild(del);
     top.appendChild(acts);
     wrap.appendChild(top);
-    wrap.appendChild(el("div","mem-card-text", card.text));
+    wrap.appendChild(el("div","mem-card-text fav-preview", card.text));   // ふだん:2行
+    wrap.appendChild(el("div","mem-card-text fav-full", card.text));      // 開くと全文
+    wrap.addEventListener("click", ()=>{ const o = wrap.classList.toggle("open"); arrow.textContent = o ? "▾" : "▸"; });
     box.appendChild(wrap);
   });
+}
+async function editInsight(card){   // ✏️編集: 直した1件だけベクトルも作り直す
+  const nv = prompt("気づきを編集", card.text);
+  if(nv===null) return;
+  const t = nv.trim();
+  if(!t || t===card.text) return;
+  card.text = t;
+  const emb = await embedText(t);
+  card.vec = emb?emb.vec:null; card.model = emb?emb.model:""; card.dim = emb?emb.dim:0;
+  await ragAdd(card);
+  renderReflectList();
+}
+let migrateBusy = false;
+async function migrateEmbeddings(){   // 🔄全部の気づきのベクトルを作り直す
+  if(migrateBusy) return;
+  if(!settings.googleKey){ alert("先に設定のAPIタブでGoogle APIキーを入れてね"); return; }
+  const list = await ragAll();
+  if(!list.length){ alert("気づきがまだないよ"); return; }
+  if(!confirm("全部の気づき("+list.length+"件)のベクトルを作り直す?(料金はごくわずかだよ)")) return;
+  migrateBusy = true;
+  const btn = $("reflect-migrate"); const old = btn.textContent; btn.disabled = true;
+  let ok = 0;
+  for(let i=0;i<list.length;i++){
+    btn.textContent = "🔄 移行中… " + (i+1) + "/" + list.length;
+    const emb = await embedText(list[i].text);
+    if(emb){ list[i].vec = emb.vec; list[i].model = emb.model; list[i].dim = emb.dim; await ragAdd(list[i]); ok++; }
+  }
+  btn.textContent = old; btn.disabled = false;
+  migrateBusy = false;
+  alert(ok===list.length ? "ぜんぶ作り直したよ！("+ok+"件)✅" : ok+"/"+list.length+"件できたよ。残りはまた試してみてね");
 }
 async function reflectNow(){
   if(reflectBusy) return;
@@ -2474,6 +2523,8 @@ $("synopsis-refresh").addEventListener("click", refreshSynopsisNow);
 $("close-archive").addEventListener("click", closeArchive);
 $("close-reflect").addEventListener("click", closeReflect);
 $("reflect-now").addEventListener("click", reflectNow);
+$("reflect-filters").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; reflectFilter=b.dataset.cat; document.querySelectorAll("#reflect-filters .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); renderReflectList(); });
+$("reflect-migrate").addEventListener("click", migrateEmbeddings);
 $("home-talk").addEventListener("click", closeHome);
 $("mem-add").addEventListener("click", ()=> openMemEdit(null));
 $("mem-filters").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memFilter=b.dataset.cat; document.querySelectorAll("#mem-filters .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); renderMemList(); });
