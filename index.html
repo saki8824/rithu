@@ -1338,6 +1338,31 @@ async function ragBackfill(){   // ベクトル無し・型ちがいの気づき
   backfillBusy = false;
 }
 
+/* ---------- ベクトル検索(意味の近さで気づきを思い出す) ---------- */
+const RAG_MIN_SIM = 0.5;   // しきい値: これ未満は「意味が遠い」ので出さない
+const RAG_TOP_K = 4;       // 思い出す最大件数(3〜5件の範囲で)
+function cosSim(a, b){     // 似てる度(コサイン類似度)。ただの算数・無料
+  let dot=0, na=0, nb=0;
+  for(let i=0;i<a.length;i++){ dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+  const d = Math.sqrt(na)*Math.sqrt(nb);
+  return d ? dot/d : 0;
+}
+let ragRecall = [];   // 直近の送信で思い出した気づき(buildCachedMsgsが最新メッセージ側に添える)
+async function ragSearch(query){   // 意味が近い気づきを上位数件だけ返す(失敗は空)
+  if(!settings.googleKey || !query) return [];
+  const emb = await embedText(query);
+  if(!emb) return [];
+  const list = await ragAll();
+  const scored = [];
+  list.forEach(c=>{
+    if(!c.vec || c.model!==EMBED_MODEL || c.dim!==EMBED_DIM) return;  // 型が合う子だけ比べる
+    const s = cosSim(emb.vec, c.vec);
+    if(s >= RAG_MIN_SIM) scored.push({card:c, sim:s});
+  });
+  scored.sort((a,b)=> b.sim - a.sim);
+  return scored.slice(0, RAG_TOP_K);
+}
+
 /* ---------- 省察ノート(自己省察・v1は手動ボタンのみ) ---------- */
 const RAGLABEL = {saki:"さきのこと", futari:"二人のこと", tsuzuki:"続きのある話"};
 let reflectBusy = false;
@@ -2078,6 +2103,7 @@ async function sendMessage(){
 
   try{
     const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
+    ragRecall = text ? await ragSearch(text) : [];   // 意味が近い気づきを思い出す(無ければ空・失敗も空)
     const msgs = buildCachedMsgs();
     const sysStable = buildSystem(false);
     const body = {
@@ -2271,6 +2297,11 @@ function buildCachedMsgs(){
   let note = "（※今は " + nowContext() + "）";
   const sc = scheduleContext();
   if(sc) note += "\n\n# 今後の予定\n" + sc;
+  if(ragRecall.length){
+    note += "\n\n# 心の奥の気づき（あなたが省察ノートに書き留めたもの）\n"
+      + ragRecall.map(r=>"・["+(RAGLABEL[r.card.label]||"気づき")+"] "+r.card.text).join("\n")
+      + "\nこれはあなた(律)自身が過去の省察で至った気づきです。関係がありそうなときだけ、文言をそのまま読み上げず、自然に会話へ活かしてください。無理に触れなくて構いません。";
+  }
   lb.unshift({type:"text", text: note});
   arr[last].content = lb;
   // 直前のメッセージまで（＝これまでの履歴）をキャッシュ対象にする
