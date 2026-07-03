@@ -710,7 +710,7 @@
 
     <div class="field">
       <label>📦 データのバックアップ</label>
-      <div class="hint">記憶・日記・チャット・設定をまるごと1ファイルに書き出すよ。iCloud Drive(ファイルアプリ)に保存しておくと、機種変したりSafariを消しても安心。</div>
+      <div class="hint">記憶・日記・チャット・設定・律くんの気づき(省察ノート)をまるごと1ファイルに書き出すよ。iCloud Drive(ファイルアプリ)に保存しておくと、機種変したりSafariを消しても安心。復元したあとは、省察ノートを一度開くと気づきの検索の準備(ベクトル)が自動で整うよ。</div>
       <div class="backup-row">
         <button class="btn ghost" id="export-backup">📤 書き出して保存</button>
         <button class="btn ghost" id="import-backup-btn">📥 復元(読み込み)</button>
@@ -1609,13 +1609,19 @@ function addMessageToMemory(text){
 }
 
 /* ---------- バックアップ(書き出し/復元) ---------- */
-function exportBackup(){
-  const out = { _app:"ritsu", _ver:1, _ts:Date.now(), data:{} };
+async function exportBackup(){
+  const out = { _app:"ritsu", _ver:2, _ts:Date.now(), data:{} };
   try{
     for(let i=0;i<localStorage.length;i++){
       const k = localStorage.key(i);
       if(k && k.indexOf("ritsu-")===0){ out.data[k] = localStorage.getItem(k); }
     }
+  }catch(e){}
+  try{
+    // 律くんの気づき(省察ノート)は「文章+ラベル+日付」だけ入れる。
+    // ベクトルはわざと入れない(重い&モデル変更に弱い)。復元後にragBackfillが作り直す。
+    const list = await ragAll();
+    out.insights = list.map(c=>({id:c.id, text:c.text, label:c.label, ts:c.ts}));
   }catch(e){}
   const blob = new Blob([JSON.stringify(out)], {type:"application/json"});
   const url = URL.createObjectURL(blob);
@@ -1629,7 +1635,7 @@ function exportBackup(){
 function importBackup(file){
   if(!file) return;
   const r = new FileReader();
-  r.onload = ()=>{
+  r.onload = async ()=>{
     let obj;
     try{ obj = JSON.parse(r.result); }catch(e){ alert("ファイルを読み込めなかったよ。バックアップファイルか確認してね"); return; }
     if(!obj || obj._app!=="ritsu" || !obj.data || typeof obj.data!=="object"){ alert("これは律くんアプリのバックアップファイルじゃないみたい"); return; }
@@ -1640,6 +1646,14 @@ function importBackup(file){
       for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.indexOf("ritsu-")===0) rm.push(k); }
       rm.forEach(k=> localStorage.removeItem(k));
       Object.keys(obj.data).forEach(k=>{ if(k.indexOf("ritsu-")===0) localStorage.setItem(k, obj.data[k]); });
+      if(Array.isArray(obj.insights)){
+        // 気づき入りバックアップ → 倉庫を置き換え。ベクトルは空で戻す(省察ノートを開くと自動で作り直る)
+        await ragClear();
+        for(const c of obj.insights){
+          if(c && c.text) await ragAdd({id:c.id||uid(), text:c.text, label:c.label||"", ts:c.ts||Date.now(), vec:null, model:"", dim:0});
+        }
+      }
+      // 古い形式(insights無し)のバックアップなら、今の気づきはそのまま残す(間違って消さない)
       alert("復元したよ！アプリを読み込み直すね🌷");
       location.reload();
     }catch(e){ alert("復元中にエラーが出たよ: "+(e.message||e)); }
