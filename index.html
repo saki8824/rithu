@@ -759,6 +759,11 @@
       <div class="hint">キーは誰にも送らないこと。Anthropicコンソールで月の利用上限(Spend limit)を設定しておくと安心。</div>
     </div>
     <div class="field">
+      <label>Google APIキー(気づきのベクトル用・この端末にだけ保存)</label>
+      <input type="password" id="set-gkey" placeholder="AIza…" autocomplete="off">
+      <div class="hint">省察ノートの気づきを「意味で思い出せる」ようにするためのキーだよ(接続テストで使ったやつ)。空っぽでも省察自体はできる(検索の準備だけお休みになる)。料金はほぼ0円。</div>
+    </div>
+    <div class="field">
       <label>モデル</label>
       <select id="set-model">
         <option value="claude-opus-4-8">Opus 4.8</option>
@@ -1015,7 +1020,7 @@ const store = {
 
 /* ---------- state ---------- */
 let settings = {
-  key:"", model:"claude-opus-4-8", customModel:"",
+  key:"", googleKey:"", model:"claude-opus-4-8", customModel:"",
   think:true, budget:3000, window:30, system:"", pinHash:"",
   memory:"", autoMemory:false, uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
   proactive:false, proMin:3, selfMemFreq:"low",
@@ -1300,10 +1305,43 @@ async function ragClear(){                       // 全消し(お掃除用。呼
   });
 }
 
+/* ---------- ベクトル作り(Google Embedding・失敗しても気づきは守る) ---------- */
+const EMBED_MODEL = "gemini-embedding-001";
+const EMBED_DIM = 768;   // 3072を768に絞って保存(軽い・賢さほぼ同じ)
+async function embedText(text){
+  if(!settings.googleKey || !text) return null;
+  try{
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+EMBED_MODEL+":embedContent?key="+encodeURIComponent(settings.googleKey),{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ model:"models/"+EMBED_MODEL, content:{parts:[{text}]}, outputDimensionality: EMBED_DIM })
+    });
+    const data = await res.json();
+    const v = data && data.embedding && data.embedding.values;
+    if(Array.isArray(v) && v.length) return {vec:v, model:EMBED_MODEL, dim:v.length};
+  }catch(e){}
+  return null;   // 失敗は静かに(気づき本文は無事)
+}
+let backfillBusy = false;
+async function ragBackfill(){   // ベクトル無し・型ちがいの気づきに、裏で静かにベクトルを付ける
+  if(backfillBusy || !settings.googleKey) return;
+  backfillBusy = true;
+  try{
+    const list = await ragAll();
+    for(const c of list){
+      if(c.vec && c.model===EMBED_MODEL && c.dim===EMBED_DIM) continue;
+      const emb = await embedText(c.text);
+      if(!emb) break;             // 失敗したら今回はここまで(また次の機会に)
+      c.vec = emb.vec; c.model = emb.model; c.dim = emb.dim;
+      await ragAdd(c);            // 同じidで上書き保存
+    }
+  }catch(e){}
+  backfillBusy = false;
+}
+
 /* ---------- 省察ノート(自己省察・v1は手動ボタンのみ) ---------- */
 const RAGLABEL = {saki:"さきのこと", futari:"二人のこと", tsuzuki:"続きのある話"};
 let reflectBusy = false;
-function openReflect(){ renderReflectList(); $("reflect").classList.add("open"); }
+function openReflect(){ renderReflectList(); $("reflect").classList.add("open"); ragBackfill(); }
 function closeReflect(){ $("reflect").classList.remove("open"); }
 async function renderReflectList(){
   const box = $("reflect-list"); if(!box) return; box.innerHTML="";
@@ -1374,7 +1412,9 @@ async function reflectNow(){
       else{
         const now = Date.now();
         for(let i=0;i<found.length;i++){
-          await ragAdd({id:uid(), text:found[i].text, label:found[i].label, ts:now+i, vec:null, model:"", dim:0});
+          const emb = await embedText(found[i].text);   // ベクトルも付ける(失敗ならnullのまま保存)
+          await ragAdd({id:uid(), text:found[i].text, label:found[i].label, ts:now+i,
+            vec: emb?emb.vec:null, model: emb?emb.model:"", dim: emb?emb.dim:0});
         }
         await renderReflectList();
       }
@@ -2339,6 +2379,7 @@ function extractMemories(text){
 /* ---------- settings ---------- */
 function openSettings(){
   $("set-key").value = settings.key;
+  $("set-gkey").value = settings.googleKey;
   $("set-model").value = settings.model;
   $("set-model-custom").value = settings.customModel;
   $("set-think").checked = settings.think;
@@ -2436,6 +2477,7 @@ $("set-temp").addEventListener("input", e=>{ $("temp-val").textContent = Number(
 $("set-fs").addEventListener("input", e=>{ const v=Number(e.target.value); $("fs-val").textContent = Math.round(v*100)+"%"; applyFontScale(v); });
 $("save-settings").addEventListener("click", ()=>{
   settings.key = $("set-key").value.trim();
+  settings.googleKey = $("set-gkey").value.trim();
   settings.model = $("set-model").value;
   settings.customModel = $("set-model-custom").value.trim();
   settings.think = $("set-think").checked;
