@@ -1949,10 +1949,36 @@ function extractSchedule(text){
 function loadDiary(){ try{ const d=store.get("ritsu-diary"); diary = d ? (JSON.parse(d)||[]) : []; }catch(e){ diary=[]; } }
 function saveDiary(){ store.set("ritsu-diary", JSON.stringify(diary)); }
 function fmtDiaryDate(ts){ const d=new Date(ts); const wd=["日","月","火","水","木","金","土"][d.getDay()]; return (d.getMonth()+1)+"月"+d.getDate()+"日("+wd+") "+fmtTime(ts); }
+const DIARY_DATE_SWITCH_HOUR = 4;   // ★午前この時刻までに書いた日記は「前日」の日記として扱う(ここを変えれば切替時刻を調整できる)
+function diaryDayStr(){             // 新しく書く日記に付ける「日記としての日付」(YYYY-MM-DD)
+  const now = new Date();
+  const d = new Date(now);
+  if(now.getHours() < DIARY_DATE_SWITCH_HOUR) d.setDate(d.getDate()-1);
+  return ymd(d);
+}
+function diaryDateStr(e){           // 表示用: 日記の日付(d)があればそれ+実際の時刻。無い昔の日記は従来どおり
+  if(e && e.d && /^\d{4}-\d{2}-\d{2}$/.test(e.d)){
+    const p = e.d.split("-").map(Number);
+    const dt = new Date(p[0], p[1]-1, p[2]);
+    const wd = ["日","月","火","水","木","金","土"][dt.getDay()];
+    return p[1]+"月"+p[2]+"日("+wd+") "+fmtTime(e.ts);
+  }
+  return fmtDiaryDate(e.ts);
+}
+function editDiaryDate(e){          // 📅日付ボタン: 日記の日付を手で直せる保険
+  const cur = (e.d && /^\d{4}-\d{2}-\d{2}$/.test(e.d)) ? e.d : ymd(new Date(e.ts));
+  const nv = prompt("この日記の日付(例: 2026-07-01)", cur);
+  if(nv===null) return;
+  const t = nv.trim();
+  if(!/^\d{4}-\d{1,2}-\d{1,2}$/.test(t)){ alert("日付は 2026-07-01 みたいな形で入れてね"); return; }
+  const p = t.split("-");
+  e.d = p[0]+"-"+p[1].padStart(2,"0")+"-"+p[2].padStart(2,"0");
+  saveDiary(); renderDiaryList();
+}
 // 律くんが持ち歩く「最近の日記」(最新2件)
 function diaryContext(){
   if(!diary.length) return "";
-  return diary.slice(-2).map(e=>"［"+fmtDiaryDate(e.ts)+"］\n"+e.text).join("\n\n");
+  return diary.slice(-2).map(e=>"［"+diaryDateStr(e)+"］\n"+e.text).join("\n\n");
 }
 function openDiary(){ renderDiaryList(); $("diary").classList.add("open"); }
 function closeDiary(){ $("diary").classList.remove("open"); }
@@ -1964,11 +1990,15 @@ function renderDiaryList(){
     const head = el("div","diary-card-head");
     const arrow = el("span","diary-arrow","▸");
     head.appendChild(arrow);
-    head.appendChild(el("span","diary-date", fmtDiaryDate(e.ts)));
+    head.appendChild(el("span","diary-date", diaryDateStr(e)));
     card.appendChild(head);
     card.appendChild(el("div","diary-preview", e.text.replace(/\s+/g," ").trim()));
     const full = el("div","diary-full");
     const body = el("div","diary-text"); body.textContent = e.text; full.appendChild(body);
+    const dt = el("button","diary-del","📅 日付");
+    dt.style.marginRight = "14px";
+    dt.addEventListener("click",(ev)=>{ ev.stopPropagation(); editDiaryDate(e); });
+    full.appendChild(dt);
     const del = el("button","diary-del","🗑 削除");
     del.addEventListener("click",(ev)=>{ ev.stopPropagation(); if(confirm("この日記を削除する?この操作は戻せないよ")){ diary=diary.filter(x=>x.id!==e.id); saveDiary(); renderDiaryList(); } });
     full.appendChild(del);
@@ -2006,7 +2036,7 @@ async function writeDiary(){
       let txt=""; (data.content||[]).forEach(b=>{ if(b.type==="text") txt += b.text||""; });
       txt = txt.trim();
       if(txt){
-        diary.push({id:uid(), ts:Date.now(), text:txt});
+        diary.push({id:uid(), ts:Date.now(), d:diaryDayStr(), text:txt});
         saveDiary(); renderDiaryList();
         $("diary-list").scrollIntoView({behavior:"smooth", block:"start"});
       } else { alert("うまく書けなかったみたい。もう一度試してみてね"); }
