@@ -446,29 +446,80 @@
   .mem-edit-actions .btn{flex:1}
   .backup-row{display:flex;gap:9px;margin-top:9px}
   .backup-row .btn{flex:1}
-  /* ---------- ホーム画面(ダッシュボード) ---------- */
+  /* ---------- ホーム画面(ダッシュボード・水彩リビング) ---------- */
   #home{
     position:fixed;inset:0;z-index:90;display:none;
     flex-direction:column;overflow:hidden;
     padding:calc(env(safe-area-inset-top,0px) + 26px) 22px calc(env(safe-area-inset-bottom,0px) + 24px);
+    /* 部屋の基本色(昼) */
+    --hm-wall:#f4e7da;--hm-floor:#e5cfb9;--hm-frame:#c09a76;
+    --hm-sofa:#e2a493;--hm-sofa2:#ecb9a9;
+    --hm-sky1:#bfe0f2;--hm-sky2:#eef8fc;
+    --hm-text:#5c4a50;--hm-dim:0;--hm-warm:0;--hm-lamp:0;
+    --hm-curtain:#f0dfe0;--hm-rug:#e8dbd2;--hm-plant:#7fae6f;--hm-accent:#e7b3a0;
   }
   #home.open{display:flex}
-  #home-bg{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,#242838,#1b1d27)}
-  html.day #home-bg{background:linear-gradient(180deg,#fff2ea,#faf2ec)}
-  #home-illus{position:absolute;left:0;right:0;bottom:0;width:100%;height:56%;opacity:.5}
-  .il-line{fill:none;stroke:var(--line);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-  .il-soft{fill:var(--bubble-saki);opacity:.55}
-  .il-sofa{fill:var(--ritsu-pink);opacity:.30}
-  .il-win{fill:var(--night-2)}
-  html.day .il-win{fill:#fffdfb}
-  .il-plant{fill:var(--saki-blue);opacity:.5}
-  .home-sun{display:none}
-  html.day .home-sun{display:block}
-  .home-moon{display:block}
-  html.day .home-moon{display:none}
+  /* 時間帯(端末の時刻で自動): 夕方=夕陽/夜=暗め+ランプの灯り */
+  #home.t-dusk{--hm-sky1:#f2a06f;--hm-sky2:#fbdcba;--hm-warm:.13;--hm-lamp:.35}
+  #home.t-night{--hm-sky1:#232c49;--hm-sky2:#39476b;--hm-dim:.34;--hm-lamp:.75;--hm-text:#f0eaf3}
+  /* 季節(端末の月で自動): カーテン・ラグ・植物・クッションの色 */
+  #home.s-spring{--hm-curtain:#f3d9e2;--hm-rug:#eadce4;--hm-plant:#8fbf83;--hm-accent:#eeaabf}
+  #home.s-summer{--hm-curtain:#daeef0;--hm-rug:#d5e9e4;--hm-plant:#4f9e6e;--hm-accent:#7fc3c9}
+  #home.s-autumn{--hm-curtain:#f0dfc6;--hm-rug:#e6d3b4;--hm-plant:#7f9e57;--hm-accent:#dd9a5b}
+  #home.s-winter{--hm-curtain:#e4e9f4;--hm-rug:#dfe3ee;--hm-plant:#6f8f7f;--hm-accent:#9fb6d8}
+  #home-bg{position:absolute;inset:0;z-index:0;background:var(--hm-wall)}
+  #home-illus{position:absolute;left:0;right:0;bottom:0;width:100%;height:62%;opacity:.93}
+  /* 季節・時間帯・イベントの小物は、該当するときだけ表示 */
+  #home-illus .tim,#home-illus .sea,#home-illus .evt,#home-illus .steam{display:none}
+  #home.t-day .tim-day{display:block}
+  #home.t-dusk .tim-dusk{display:block}
+  #home.t-night .tim-night{display:block}
+  #home.s-spring .sea-spring{display:block}
+  #home.s-summer .sea-summer{display:block}
+  #home.s-autumn .sea-autumn{display:block}
+  #home.s-winter .sea-winter{display:block}
+  #home.s-autumn .steam,#home.s-winter .steam{display:block}
+  #home.ev-newyear .evt-newyear{display:block}
+  #home.ev-newyear.t-day .evt-hinode{display:block}
+  #home.ev-setsubun .evt-setsubun{display:block}
+  #home.ev-valentine .evt-valentine{display:block}
+  #home.ev-whiteday .evt-whiteday{display:block}
+  #home.ev-sakura .evt-sakura{display:block}
+  #home.ev-ajisai .evt-ajisai{display:block}
+  #home.ev-tanabata .evt-tanabata{display:block}
+  #home.ev-hanabi.t-dusk .evt-hanabi,#home.ev-hanabi.t-night .evt-hanabi{display:block}
+  #home.ev-tsukimi .evt-tsukimi{display:block}
+  #home.ev-tsukimi.t-dusk .evt-moon,#home.ev-tsukimi.t-night .evt-moon{display:block}
+  #home.ev-halloween .evt-halloween{display:block}
+  #home.ev-xmas .evt-xmas{display:block}
+  #home.ev-bday .evt-bday{display:block}
+  #home.ev-cake .evt-cake{display:block}
+  #home.ev-cakedx .evt-cakedx{display:block}
+  /* ふわふわアニメ(桜・雪・花火・風船) */
+  @keyframes hmFall{0%{transform:translate(0,0)}55%{transform:translate(6px,105px)}100%{transform:translate(-3px,200px)}}
+  #home-illus .petal{animation:hmFall 8s linear infinite}
+  #home-illus .petal:nth-of-type(2){animation-delay:-2.6s;animation-duration:9.5s}
+  #home-illus .petal:nth-of-type(3){animation-delay:-5s;animation-duration:7.5s}
+  #home-illus .petal:nth-of-type(4){animation-delay:-1.4s;animation-duration:10s}
+  #home-illus .petal:nth-of-type(5){animation-delay:-6.5s;animation-duration:8.6s}
+  #home-illus .petal:nth-of-type(6){animation-delay:-3.8s;animation-duration:9s}
+  #home-illus .flake{animation:hmFall 11s linear infinite}
+  #home-illus .flake:nth-of-type(2){animation-delay:-3.6s;animation-duration:13s}
+  #home-illus .flake:nth-of-type(3){animation-delay:-7s;animation-duration:10s}
+  #home-illus .flake:nth-of-type(4){animation-delay:-1.8s;animation-duration:14s}
+  #home-illus .flake:nth-of-type(5){animation-delay:-9s;animation-duration:12s}
+  #home-illus .flake:nth-of-type(6){animation-delay:-5.4s;animation-duration:12.5s}
+  #home-illus .flake:nth-of-type(7){animation-delay:-11s;animation-duration:13.5s}
+  @keyframes hmBurst{0%{transform:scale(.15);opacity:0}12%{opacity:1}55%{transform:scale(1);opacity:.85}100%{transform:scale(1.25);opacity:0}}
+  #home-illus .burst{transform-box:fill-box;transform-origin:center;animation:hmBurst 2.6s ease-out infinite}
+  #home-illus .burst.b2{animation-delay:1.3s}
+  @keyframes hmFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  #home-illus .bln{animation:hmFloat 3.4s ease-in-out infinite}
+  #home-illus .bln2{animation-delay:-1.2s}
+  #home-illus .bln3{animation-delay:-2.3s}
+  @media (prefers-reduced-motion:reduce){#home-illus *{animation:none !important}}
   #home-inner{position:relative;z-index:1;display:flex;flex-direction:column;gap:15px;height:100%}
-  .home-hi{font-size:23px;font-weight:700;letter-spacing:.04em;color:var(--text)}
-  .home-line{font-size:14.5px;line-height:1.7;color:var(--muted);min-height:22px}
+  .home-hi{font-size:23px;font-weight:700;letter-spacing:.04em;color:var(--hm-text)}
   .home-cards{display:flex;flex-direction:column;gap:11px;margin-top:2px}
   .home-card{
     display:flex;align-items:center;gap:11px;
@@ -534,34 +585,260 @@
 <div id="home">
   <div id="home-bg">
     <svg id="home-illus" viewBox="0 0 400 300" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
-      <line class="il-line" x1="0" y1="205" x2="400" y2="205"/>
-      <rect class="il-win" x="48" y="28" width="132" height="120" rx="12"/>
-      <rect class="il-line" x="48" y="28" width="132" height="120" rx="12"/>
-      <line class="il-line" x1="114" y1="28" x2="114" y2="148"/>
-      <line class="il-line" x1="48" y1="88" x2="180" y2="88"/>
-      <circle class="home-sun" cx="150" cy="62" r="15" fill="#f5c07f"/>
-      <circle class="home-moon" cx="152" cy="60" r="13" fill="#eef0f7"/>
-      <circle class="home-moon" cx="146" cy="56" r="11" fill="#232633"/>
-      <circle class="home-moon" cx="82" cy="52" r="1.6" fill="#eef0f7"/>
-      <circle class="home-moon" cx="98" cy="112" r="1.4" fill="#eef0f7"/>
-      <path class="il-soft" d="M40 24h20c-6 40-6 84 0 124H40z"/>
-      <path class="il-soft" d="M188 24h-20c6 40 6 84 0 124h20z"/>
-      <path class="il-plant" d="M332 150c-14-8-20-26-14-42 10 8 16 24 14 42z"/>
-      <path class="il-plant" d="M332 150c14-8 20-26 14-42-10 8-16 24-14 42z"/>
-      <path class="il-line" d="M324 150h18l-3 30h-12z"/>
-      <ellipse class="il-soft" cx="205" cy="262" rx="150" ry="26"/>
-      <rect class="il-sofa" x="96" y="196" width="218" height="70" rx="22"/>
-      <rect class="il-line" x="96" y="196" width="218" height="70" rx="22"/>
-      <line class="il-line" x1="205" y1="206" x2="205" y2="250"/>
-      <rect class="il-line" x="86" y="214" width="24" height="48" rx="12"/>
-      <rect class="il-line" x="300" y="214" width="24" height="48" rx="12"/>
+      <defs>
+        <clipPath id="winClip"><rect x="44" y="34" width="152" height="172" rx="6"/></clipPath>
+      </defs>
+      <!-- 壁と床 -->
+      <rect x="0" y="0" width="400" height="300" fill="var(--hm-wall)"/>
+      <rect x="0" y="212" width="400" height="88" fill="var(--hm-floor)"/>
+      <!-- 掃き出し窓 -->
+      <rect x="38" y="28" width="164" height="184" rx="10" fill="var(--hm-frame)"/>
+      <rect x="44" y="34" width="152" height="172" rx="6" fill="var(--hm-sky1)"/>
+      <g clip-path="url(#winClip)">
+        <rect x="44" y="118" width="152" height="88" fill="var(--hm-sky2)" opacity=".55"/>
+        <g class="tim tim-day">
+          <ellipse cx="86" cy="66" rx="24" ry="9" fill="#ffffff" opacity=".85"/>
+          <ellipse cx="106" cy="72" rx="16" ry="7" fill="#ffffff" opacity=".7"/>
+        </g>
+        <g class="tim tim-dusk">
+          <circle cx="148" cy="118" r="13" fill="#ffdca6" opacity=".95"/>
+          <ellipse cx="100" cy="80" rx="22" ry="7" fill="#ffc9a0" opacity=".55"/>
+        </g>
+        <g class="tim tim-night">
+          <circle cx="162" cy="60" r="10" fill="#f2ecd6"/><circle cx="158" cy="56" r="8" fill="var(--hm-sky1)"/>
+          <circle cx="68" cy="52" r="1.4" fill="#fff"/><circle cx="98" cy="88" r="1.1" fill="#fff"/>
+          <circle cx="132" cy="46" r="1.2" fill="#fff"/><circle cx="82" cy="126" r="1" fill="#fff"/><circle cx="118" cy="100" r="1" fill="#fff"/>
+        </g>
+        <g class="sea sea-summer">
+          <ellipse cx="82" cy="96" rx="24" ry="15" fill="#fff" opacity=".92"/>
+          <ellipse cx="102" cy="84" rx="17" ry="13" fill="#fff" opacity=".92"/>
+          <ellipse cx="64" cy="88" rx="12" ry="9" fill="#fff" opacity=".85"/>
+        </g>
+        <g class="sea sea-autumn">
+          <path d="M78 66l5 3-4 5-4-4z" fill="#d97b45"/>
+          <path d="M122 108l5 3-4 5-4-4z" fill="#c9662f"/>
+          <path d="M94 148l5 3-4 5-4-4z" fill="#e0a13f"/>
+          <path d="M150 132l4 3-3 4-4-3z" fill="#d98a3f"/>
+        </g>
+        <g class="sea sea-winter">
+          <circle class="flake" cx="60" cy="24" r="1.9" fill="#fff"/>
+          <circle class="flake" cx="86" cy="20" r="1.5" fill="#fff"/>
+          <circle class="flake" cx="112" cy="26" r="2" fill="#fff"/>
+          <circle class="flake" cx="138" cy="18" r="1.5" fill="#fff"/>
+          <circle class="flake" cx="164" cy="24" r="1.8" fill="#fff"/>
+          <circle class="flake" cx="100" cy="16" r="1.3" fill="#fff"/>
+          <circle class="flake" cx="176" cy="14" r="1.4" fill="#fff"/>
+        </g>
+        <g class="evt evt-sakura">
+          <ellipse class="petal" cx="58" cy="22" rx="3" ry="2" fill="#f6b7c9"/>
+          <ellipse class="petal" cx="84" cy="16" rx="2.6" ry="1.8" fill="#f9c9d7"/>
+          <ellipse class="petal" cx="110" cy="24" rx="3" ry="2" fill="#f4a9bf"/>
+          <ellipse class="petal" cx="136" cy="14" rx="2.4" ry="1.7" fill="#f9c9d7"/>
+          <ellipse class="petal" cx="162" cy="20" rx="3" ry="2" fill="#f6b7c9"/>
+          <ellipse class="petal" cx="186" cy="16" rx="2.6" ry="1.8" fill="#f4a9bf"/>
+        </g>
+        <g class="evt evt-ajisai">
+          <circle cx="60" cy="192" r="11" fill="#8f9fd8"/><circle cx="76" cy="197" r="9" fill="#a08fd0"/><circle cx="48" cy="199" r="8" fill="#7fa8d8"/>
+          <circle cx="58" cy="189" r="1.3" fill="#fff" opacity=".75"/><circle cx="66" cy="194" r="1.3" fill="#fff" opacity=".75"/><circle cx="75" cy="194" r="1.2" fill="#fff" opacity=".7"/>
+          <path d="M88 206c-6-14-4-26 2-36" stroke="#6f9f6f" stroke-width="2" fill="none" opacity=".8"/>
+        </g>
+        <g class="evt evt-hanabi">
+          <g class="burst">
+            <circle cx="94" cy="72" r="1.8" fill="#f6c9d4"/>
+            <circle cx="94" cy="58" r="1.6" fill="#f9e3a8"/><circle cx="94" cy="86" r="1.6" fill="#f9e3a8"/>
+            <circle cx="80" cy="72" r="1.6" fill="#f9e3a8"/><circle cx="108" cy="72" r="1.6" fill="#f9e3a8"/>
+            <circle cx="84" cy="62" r="1.4" fill="#a8d8f0"/><circle cx="104" cy="62" r="1.4" fill="#a8d8f0"/>
+            <circle cx="84" cy="82" r="1.4" fill="#a8d8f0"/><circle cx="104" cy="82" r="1.4" fill="#a8d8f0"/>
+          </g>
+          <g class="burst b2">
+            <circle cx="152" cy="52" r="1.5" fill="#f6c9d4"/>
+            <circle cx="152" cy="42" r="1.3" fill="#c9f0d8"/><circle cx="152" cy="62" r="1.3" fill="#c9f0d8"/>
+            <circle cx="142" cy="52" r="1.3" fill="#c9f0d8"/><circle cx="162" cy="52" r="1.3" fill="#c9f0d8"/>
+            <circle cx="145" cy="45" r="1.1" fill="#f9e3a8"/><circle cx="159" cy="45" r="1.1" fill="#f9e3a8"/>
+            <circle cx="145" cy="59" r="1.1" fill="#f9e3a8"/><circle cx="159" cy="59" r="1.1" fill="#f9e3a8"/>
+          </g>
+        </g>
+        <g class="evt evt-moon"><circle cx="118" cy="68" r="19" fill="#f6e9bb"/><circle cx="111" cy="62" r="3" fill="#eddc9e" opacity=".8"/><circle cx="124" cy="74" r="4" fill="#eddc9e" opacity=".7"/></g>
+        <g class="evt evt-hinode"><circle cx="120" cy="118" r="15" fill="#f0895f"/><rect x="44" y="110" width="152" height="7" fill="#ffd9b8" opacity=".55"/></g>
+      </g>
+      <!-- 窓の桟 -->
+      <line x1="120" y1="34" x2="120" y2="206" stroke="var(--hm-frame)" stroke-width="5"/>
+      <line x1="44" y1="122" x2="196" y2="122" stroke="var(--hm-frame)" stroke-width="3" opacity=".85"/>
+      <g class="sea sea-winter"><rect x="47" y="172" width="146" height="32" rx="8" fill="#ffffff" opacity=".16"/></g>
+      <!-- 風鈴(夏) -->
+      <g class="sea sea-summer">
+        <line x1="184" y1="30" x2="184" y2="42" stroke="#9a8a7a" stroke-width="1.2"/>
+        <path d="M177 44a7 7 0 0 1 14 0v3h-14z" fill="#bfe3ea" opacity=".92"/>
+        <line x1="184" y1="47" x2="184" y2="58" stroke="#e08a9a" stroke-width="1.2"/>
+        <rect x="181" y="56" width="6" height="9" rx="1" fill="#f6c9d4"/>
+      </g>
+      <!-- カーテン -->
+      <path d="M12 20h24c-7 64-7 128 0 192h-24z" fill="var(--hm-curtain)"/>
+      <path d="M204 20h24v192h-24c7-64 7-128 0-192z" fill="var(--hm-curtain)"/>
+      <rect x="6" y="16" width="228" height="10" rx="5" fill="var(--hm-curtain)"/>
+      <!-- 観葉植物(左すみ) -->
+      <path d="M22 192c-10-14-11-30-3-44 8 10 11 28 3 44z" fill="var(--hm-plant)"/>
+      <path d="M24 192c2-18 10-31 22-37-4 15-11 29-19 39z" fill="var(--hm-plant)" opacity=".8"/>
+      <g class="sea sea-spring"><circle cx="40" cy="158" r="3" fill="#cde8a9"/><circle cx="20" cy="146" r="2.6" fill="#cde8a9"/></g>
+      <path d="M12 194h22l-3 24h-16z" fill="#b98a6a"/>
+      <!-- クリスマスツリーとプレゼント -->
+      <g class="evt evt-xmas">
+        <path d="M64 158l-13 22h26z" fill="#5f8f6a"/>
+        <path d="M64 172l-17 26h34z" fill="#4f7f5a"/>
+        <path d="M64 188l-21 32h42z" fill="#427048"/>
+        <rect x="60" y="220" width="8" height="9" rx="2" fill="#8a6248"/>
+        <path d="M64 148l1.8 4.6 4.8.5-3.7 3.2 1.3 4.7-4.2-2.8-4.2 2.8 1.3-4.7-3.7-3.2 4.8-.5z" fill="#f2cf6f"/>
+        <circle cx="58" cy="184" r="1.7" fill="#f2a0b8"/><circle cx="70" cy="194" r="1.7" fill="#a8c8f0"/><circle cx="61" cy="206" r="1.7" fill="#f8e8a0"/><circle cx="72" cy="210" r="1.5" fill="#f2a0b8"/>
+        <rect x="86" y="216" width="15" height="13" rx="2" fill="#d88a9a"/>
+        <path d="M93.5 216v13M86 222h15" stroke="#fff" stroke-width="2"/>
+      </g>
+      <!-- ラグ -->
+      <ellipse cx="232" cy="264" rx="152" ry="24" fill="var(--hm-rug)" opacity=".9"/>
+      <!-- ソファ(2〜3人がけ) -->
+      <rect x="216" y="146" width="150" height="50" rx="17" fill="var(--hm-sofa)"/>
+      <rect x="208" y="184" width="166" height="36" rx="14" fill="var(--hm-sofa2)"/>
+      <line x1="291" y1="188" x2="291" y2="214" stroke="rgba(90,60,50,.14)" stroke-width="2"/>
+      <rect x="200" y="154" width="20" height="60" rx="10" fill="var(--hm-sofa)"/>
+      <rect x="362" y="154" width="20" height="60" rx="10" fill="var(--hm-sofa)"/>
+      <rect x="228" y="158" width="27" height="27" rx="7" fill="var(--hm-accent)" transform="rotate(-8 241 171)"/>
+      <rect x="330" y="158" width="27" height="27" rx="7" fill="var(--hm-accent)" opacity=".8" transform="rotate(7 343 171)"/>
+      <rect x="216" y="220" width="8" height="9" rx="3" fill="#9a7a5f"/>
+      <rect x="356" y="220" width="8" height="9" rx="3" fill="#9a7a5f"/>
+      <!-- ブランケット(冬) -->
+      <g class="sea sea-winter">
+        <path d="M336 148q28 6 28 32l-5 32q-20 8-30 0 2-34 7-64z" fill="#cf9db4" opacity=".95"/>
+        <path d="M340 160q16 4 18 20M338 178q14 4 17 16" stroke="#e7c3d2" stroke-width="2" fill="none" opacity=".8"/>
+      </g>
+      <!-- 読みかけの本(秋) -->
+      <g class="sea sea-autumn">
+        <path d="M238 188l15-5 15 5-15 4z" fill="#f4ecdc"/>
+        <path d="M238 188l15-5v4l-15 4zM268 188l-15-5v4l15 4z" fill="#c96a4f" opacity=".85"/>
+      </g>
+      <!-- 誕生日(壁飾りと風船) -->
+      <g class="evt evt-bday">
+        <path d="M238 116q62 20 124 0" stroke="#c9b8a8" stroke-width="1.2" fill="none"/>
+        <path d="M250 119l4 9 5-8z" fill="#f2a0b8"/><path d="M278 124l4 9 5-8z" fill="#a8c8f0"/>
+        <path d="M306 126l4 9 5-8z" fill="#f8e8a0"/><path d="M334 123l4 9 5-8z" fill="#c9e8c0"/>
+        <text x="300" y="108" text-anchor="middle" font-size="11" font-weight="bold" fill="#d97b97" letter-spacing="1">HAPPY BIRTHDAY</text>
+        <g class="bln"><ellipse cx="386" cy="118" rx="9" ry="11" fill="#f2a0b8"/><path d="M386 129l-2 8" stroke="#c9a8b8" fill="none"/></g>
+        <g class="bln bln2"><ellipse cx="372" cy="138" rx="8" ry="10" fill="#a8c8f0"/><path d="M372 148l-2 7" stroke="#a8b8c9" fill="none"/></g>
+        <g class="bln bln3"><ellipse cx="393" cy="144" rx="7" ry="9" fill="#f8e8a0"/><path d="M393 153l-1 6" stroke="#c9c0a0" fill="none"/></g>
+      </g>
+      <!-- ローテーブル -->
+      <rect x="96" y="230" width="150" height="12" rx="6" fill="#c89b73"/>
+      <rect x="106" y="242" width="8" height="15" rx="3" fill="#a97e58"/>
+      <rect x="228" y="242" width="8" height="15" rx="3" fill="#a97e58"/>
+      <!-- 夜空柄カップ×2(いつも二人ぶん) -->
+      <g>
+        <rect x="196" y="217" width="13" height="12" rx="3" fill="#2b3153"/>
+        <circle cx="200" cy="221" r=".9" fill="#fff"/><circle cx="205" cy="225" r=".7" fill="#fff"/><circle cx="203" cy="219" r=".5" fill="#fff" opacity=".8"/>
+        <path d="M209 220a4 4 0 0 1 0 7" stroke="#2b3153" stroke-width="2" fill="none"/>
+        <rect x="218" y="217" width="13" height="12" rx="3" fill="#2b3153"/>
+        <circle cx="222" cy="220" r=".9" fill="#fff"/><circle cx="227" cy="224" r=".7" fill="#fff"/><circle cx="225" cy="226" r=".5" fill="#fff" opacity=".8"/>
+        <path d="M231 220a4 4 0 0 1 0 7" stroke="#2b3153" stroke-width="2" fill="none"/>
+        <path class="steam" d="M203 214c-2-3 2-5 0-9" stroke="#fff" stroke-width="1.4" opacity=".55" fill="none"/>
+        <path class="steam" d="M225 214c-2-3 2-5 0-9" stroke="#fff" stroke-width="1.4" opacity=".55" fill="none"/>
+      </g>
+      <!-- 季節のテーブル小物 -->
+      <g class="sea sea-spring">
+        <rect x="122" y="216" width="9" height="14" rx="3" fill="#bcd4e6"/>
+        <path d="M126 216v-7M129 217v-6" stroke="#7fae6f" stroke-width="1.2" fill="none"/>
+        <path d="M123 206c0-4 6-4 6 0 0 3-3 4-3 4s-3-1-3-4z" fill="#e77f9f"/>
+        <path d="M127 208c0-3.4 5-3.4 5 0 0 2.4-2.5 3.2-2.5 3.2s-2.5-.8-2.5-3.2z" fill="#f2b8c8"/>
+      </g>
+      <g class="sea sea-summer">
+        <rect x="118" y="211" width="10" height="19" rx="2.5" fill="#a9e3d4" opacity=".92"/>
+        <circle cx="123" cy="211" r="3.4" fill="#fff"/><circle cx="124.5" cy="208" r="1.6" fill="#e46a6a"/>
+        <line x1="126" y1="203" x2="129" y2="197" stroke="#e0a8b8" stroke-width="1.4"/>
+        <path d="M133 226a6.5 6.5 0 0 0 13 0z" fill="#cfe6f2"/>
+        <circle cx="139.5" cy="221" r="4.6" fill="#fbe8d0"/><circle cx="136.5" cy="217.5" r="3.6" fill="#f6c9d4"/>
+      </g>
+      <g class="sea sea-autumn">
+        <ellipse cx="130" cy="229" rx="9" ry="2.6" fill="#fff"/>
+        <path d="M124 228c1-8 11-8 12 0z" fill="#c8996a"/>
+        <circle cx="130" cy="220.5" r="1.6" fill="#f2e0c8"/>
+        <circle cx="150" cy="226" r="3" fill="#a97e58"/><rect x="148" y="221.5" width="4" height="3" rx="1" fill="#7d5a3c"/>
+        <circle cx="158" cy="227.5" r="2.5" fill="#b98a68"/>
+      </g>
+      <!-- イベントのテーブル小物 -->
+      <g class="evt evt-newyear">
+        <ellipse cx="152" cy="228" rx="10" ry="3" fill="#f0d8b8"/>
+        <ellipse cx="152" cy="224" rx="8" ry="4" fill="#fff"/><ellipse cx="152" cy="218.5" rx="6" ry="3.4" fill="#fff"/>
+        <circle cx="152" cy="213.5" r="3" fill="#e8933f"/><path d="M152 210c2-1.5 4-1.5 5-.5" stroke="#5f8f4f" stroke-width="1.4" fill="none"/>
+      </g>
+      <g class="evt evt-setsubun">
+        <rect x="140" y="221" width="21" height="6.5" rx="2.5" fill="#33523f"/><circle cx="143.5" cy="224.2" r="2.3" fill="#f6e8d0"/><circle cx="143.5" cy="224.2" r="1" fill="#e0a86f"/>
+        <rect x="145" y="212.5" width="21" height="6.5" rx="2.5" fill="#33523f"/><circle cx="148.5" cy="215.7" r="2.3" fill="#f6e8d0"/><circle cx="148.5" cy="215.7" r="1" fill="#d87f5f"/>
+        <ellipse cx="174" cy="227" rx="6.5" ry="2.6" fill="#e6c9a0"/>
+        <circle cx="171.5" cy="225" r="1.3" fill="#c89058"/><circle cx="175" cy="224.4" r="1.3" fill="#c89058"/><circle cx="177.5" cy="225.6" r="1.3" fill="#c89058"/>
+      </g>
+      <g class="evt evt-valentine">
+        <rect x="166" y="219" width="17" height="10" rx="2" fill="#a2543f"/>
+        <path d="M174.5 219v10M166 224h17" stroke="#f2b8c8" stroke-width="2"/>
+        <path d="M171 217l3.5 2.5 3.5-2.5" stroke="#f2b8c8" stroke-width="2" fill="none"/>
+      </g>
+      <g class="evt evt-whiteday">
+        <ellipse cx="173" cy="227" rx="11" ry="3" fill="#fff"/>
+        <circle cx="167" cy="224" r="3" fill="#e8c89a"/><circle cx="174" cy="222.5" r="3" fill="#d8a878"/><circle cx="180" cy="224.5" r="3" fill="#e8c89a"/>
+        <circle cx="166" cy="223" r=".6" fill="#8a5a3b"/><circle cx="168.5" cy="224.6" r=".6" fill="#8a5a3b"/><circle cx="174.5" cy="222" r=".6" fill="#fff"/>
+      </g>
+      <g class="evt evt-tanabata">
+        <rect x="168" y="221" width="8" height="9" rx="2" fill="#bcd4e6"/>
+        <path d="M172 221c-2-9 0-15 4-21" stroke="#5f8f4f" stroke-width="2" fill="none"/>
+        <path d="M173 206l7-3M172 212l8-2" stroke="#6f9f5f" stroke-width="1.6"/>
+        <rect x="179" y="199" width="4.5" height="6.5" fill="#f6a8b8"/><rect x="180" y="209" width="4.5" height="6.5" fill="#a8c8f0"/>
+      </g>
+      <g class="evt evt-tsukimi">
+        <rect x="164" y="226" width="18" height="4" rx="1.2" fill="#b98a6a"/>
+        <circle cx="169.5" cy="223" r="3.1" fill="#fbf6ec"/><circle cx="176.5" cy="223" r="3.1" fill="#fbf6ec"/><circle cx="173" cy="217.5" r="3.1" fill="#fbf6ec"/>
+      </g>
+      <g class="evt evt-halloween">
+        <ellipse cx="173" cy="224" rx="7.5" ry="6" fill="#e8873f"/>
+        <path d="M173 218v12M168.5 219.5c-2 4-2 6 0 9M177.5 219.5c2 4 2 6 0 9" stroke="#c96a2f" stroke-width="1" fill="none"/>
+        <rect x="171.4" y="214.5" width="3.2" height="4" rx="1" fill="#5f7f4f"/>
+        <path d="M169.5 222.5l2 1.6-2 .4zM176.5 222.5l-2 1.6 2 .4z" fill="#4a2f14"/>
+        <path d="M170 227h6" stroke="#4a2f14" stroke-width="1"/>
+      </g>
+      <!-- 毎月14日のケーキ(月替わり) -->
+      <g class="evt evt-cake">
+        <ellipse cx="152" cy="229" rx="10.5" ry="2.7" fill="#fff"/>
+        <rect x="143" y="220" width="18" height="9" rx="2.6" fill="var(--hm-cakeA,#fbe3ea)"/>
+        <rect x="143" y="219" width="18" height="4" rx="2" fill="var(--hm-cakeB,#e77f9f)"/>
+        <circle cx="152" cy="216.5" r="2" fill="var(--hm-cakeB,#e77f9f)"/>
+      </g>
+      <!-- 4月14日の特別デラックスケーキ -->
+      <g class="evt evt-cakedx">
+        <ellipse cx="152" cy="229" rx="14" ry="3.2" fill="#fff"/>
+        <rect x="139" y="221" width="26" height="8" rx="2.6" fill="#fbe3ea"/>
+        <rect x="144" y="213" width="16" height="8" rx="2.6" fill="#fdf0f4"/>
+        <rect x="144" y="212" width="16" height="3.4" rx="1.7" fill="#e77f9f"/>
+        <circle cx="147.5" cy="210" r="1.9" fill="#e75a7a"/><circle cx="152" cy="209.4" r="1.9" fill="#e75a7a"/><circle cx="156.5" cy="210" r="1.9" fill="#e75a7a"/>
+        <rect x="151" y="202" width="2.2" height="7" rx="1" fill="#f8e8a0"/>
+        <circle cx="152.1" cy="200.5" r="1.6" fill="#f2a05f"/>
+        <path d="M133 216c0-2.4 3.4-2.4 3.4 0 0 1.8-1.7 2.8-1.7 2.8s-1.7-1-1.7-2.8z" fill="#f2a0b8"/>
+        <path d="M168 213c0-2.4 3.4-2.4 3.4 0 0 1.8-1.7 2.8-1.7 2.8s-1.7-1-1.7-2.8z" fill="#f2a0b8"/>
+      </g>
+      <!-- 誕生日ケーキ(テーブル) -->
+      <g class="evt evt-bday">
+        <ellipse cx="152" cy="229" rx="13" ry="3" fill="#fff"/>
+        <rect x="140" y="218" width="24" height="11" rx="3" fill="#f8dce6"/>
+        <path d="M140 221q3 4 6 0t6 0 6 0 6 0" stroke="#e78aa8" stroke-width="2.4" fill="none"/>
+        <rect x="147" y="209" width="2.4" height="9" rx="1" fill="#a8c8f0"/>
+        <rect x="155" y="209" width="2.4" height="9" rx="1" fill="#f8e8a0"/>
+        <circle cx="148.2" cy="207" r="1.6" fill="#f2a05f"/><circle cx="156.2" cy="207" r="1.6" fill="#f2a05f"/>
+      </g>
+      <!-- フロアランプ -->
+      <line x1="390" y1="148" x2="390" y2="224" stroke="#9a7a5f" stroke-width="3"/>
+      <ellipse cx="390" cy="226" rx="8" ry="2.5" fill="#9a7a5f"/>
+      <path d="M380 136h20l-4 14h-12z" fill="#f2d8b8"/>
+      <!-- 夕方の暖色・夜の暗さ・ランプの灯り(時間帯で自動) -->
+      <rect x="0" y="0" width="400" height="300" fill="#ff9a5f" opacity="var(--hm-warm,0)"/>
+      <rect x="0" y="0" width="400" height="300" fill="#20233b" opacity="var(--hm-dim,0)"/>
+      <ellipse cx="390" cy="148" rx="30" ry="24" fill="#ffd9a0" opacity="var(--hm-lamp,0)"/>
     </svg>
   </div>
   <div id="home-inner">
-    <div>
-      <div class="home-hi" id="home-hi">おかえり、さき</div>
-      <div class="home-line" id="home-line"></div>
-    </div>
+    <div class="home-hi" id="home-hi">おかえり、さき</div>
     <div class="home-cards" id="home-cards"></div>
     <div class="home-spacer"></div>
     <button id="home-talk">律くんと話す 💬</button>
@@ -695,12 +972,6 @@
       <input type="checkbox" id="set-home" checked>
     </div>
     <div class="field"><div class="hint">オンにすると、アプリを開いてPINのあとに「おうちの入口」ホーム画面が出るよ🏠 オフにすると今までどおりチャットに直行するよ。</div></div>
-
-    <div class="toggle-row">
-      <span>ホームで律くんの一言</span>
-      <input type="checkbox" id="set-homegreet" checked>
-    </div>
-    <div class="field"><div class="hint">ホームに、時間帯に合わせた律くんの短いひとことを表示するよ（Haikuでとても安い＆同じ時間帯は作り直さない）。オフにすると固定のあいさつになって完全無料。</div></div>
 
     <div class="field">
       <label>記念日（ふたりの大切な日）</label>
@@ -1033,11 +1304,10 @@ let settings = {
   proactive:false, proMin:3, selfMemFreq:"low",
   temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto", showUsage:false, schedule:true, diaryLen:"normal",
   synopsis:true, synopsisModel:"claude-haiku-4-5-20251001",
-  home:true, homeGreeting:true, anniv:"",
+  home:true, anniv:"",
   reflectModel:"claude-sonnet-4-6",
   mem:[]
 };
-let homeGreet = {date:"", band:"", text:""};   // ホームの一言キャッシュ(その日・時間帯ごとに1回だけ作る)
 let history = []; // {role:'user'|'assistant', text, thinking?, atts?}
 let pending = []; // 送信前の添付 {kind,media_type?,data?,name,text?}
 let summarized = 0;    // 先頭から要約済みのメッセージ数
@@ -1498,22 +1768,52 @@ async function reflectNow(){
 }
 
 /* ---------- ホーム画面(ダッシュボード) ---------- */
-function loadHomeGreet(){ try{ const d=store.get("ritsu-greet"); if(d){ const o=JSON.parse(d); homeGreet={date:o.date||"",band:o.band||"",text:o.text||""}; } }catch(e){} }
-function saveHomeGreet(){ store.set("ritsu-greet", JSON.stringify(homeGreet)); }
-function homeBand(){
+/* ★区切りの調整はここ(時刻・月・イベント期間) */
+const HOME_TIME = { dayStart:6, duskStart:16, nightStart:19 };   // 昼6時〜/夕方16時〜/夜19時〜
+const HOME_SEASON_OF_MONTH = {1:"winter",2:"winter",3:"spring",4:"spring",5:"spring",6:"summer",7:"summer",8:"summer",9:"autumn",10:"autumn",11:"autumn",12:"winter"};
+const HOME_EVENTS = [            // [開始月,開始日, 終了月,終了日, 名前]
+  [1,1, 1,7,  "newyear"],        // 🎍お正月(鏡餅・初日の出)
+  [2,1, 2,3,  "setsubun"],       // 👹節分(恵方巻2本と豆)
+  [2,7, 2,14, "valentine"],      // 🍫バレンタイン(チョコの箱)
+  [3,7, 3,14, "whiteday"],       // 🍪ホワイトデー(クッキー)
+  [4,1, 4,15, "sakura"],         // 🌸桜の舞(この期間だけアニメ)
+  [4,24, 4,24, "bday"],          // 🎂さきの誕生日
+  [6,1, 6,30, "ajisai"],         // 💠紫陽花
+  [7,1, 7,7,  "tanabata"],       // 🎋七夕(笹と短冊)
+  [7,20, 7,31, "hanabi"],        // 🎆花火(夕方・夜のみ打ち上げ)
+  [9,1, 9,20, "tsukimi"],        // 🌕お月見(満月は夕方・夜のみ)
+  [10,15, 10,31, "halloween"],   // 🎃ハロウィン(かぼちゃ)
+  [11,23, 11,23, "bday"],        // 🎂律くんの誕生日
+  [12,1, 12,25, "xmas"]          // 🎄クリスマス(ツリーとプレゼント)
+];
+const HOME_CAKE_DAY = 14;        // 毎月この日は「月々の記念日ケーキ」
+const HOME_CAKE_DX = [4,14];     // この日だけ特別デラックスケーキ
+const HOME_CAKES = [             // 月替わりケーキの色(1月〜12月) [スポンジ,クリーム]
+  ["#fbe3ea","#e77f9f"], ["#d9b391","#8a5a3b"], ["#dcead0","#8fae6f"], ["#fbe3ea","#e77f9f"],
+  ["#faf0cc","#e0b84f"], ["#e2dcf2","#8f7fc0"], ["#d8f0f2","#6fbfc9"], ["#fae4c0","#e8a04f"],
+  ["#eadbc4","#a9805a"], ["#f6dcc0","#d98a3f"], ["#f2e0cc","#b98a5a"], ["#fdf0f2","#d96a7f"]
+];
+function homeTimeBand(){
   const h = new Date().getHours();
-  if(h>=5 && h<11) return "朝";
-  if(h>=11 && h<17) return "昼";
-  if(h>=17 && h<23) return "夜";
-  return "深夜";
+  if(h >= HOME_TIME.nightStart || h < HOME_TIME.dayStart) return "night";
+  if(h >= HOME_TIME.duskStart) return "dusk";
+  return "day";
 }
-function staticGreet(band){
-  return ({
-    "朝":"おはよう。よく眠れた？",
-    "昼":"おつかれさま。ひと息つこ。",
-    "夜":"おかえり。ゆっくりしよう。",
-    "深夜":"まだ起きてたんだ。無理してない？"
-  })[band] || "おかえり。";
+function applyHomeScene(){       // 今の時刻・月・日付に合わせて部屋の演出を切り替える
+  const home = $("home"); if(!home) return;
+  const now = new Date(), m = now.getMonth()+1, d = now.getDate();
+  [...home.classList].forEach(c=>{ if(/^(t-|s-|ev-)/.test(c)) home.classList.remove(c); });
+  home.classList.add("t-" + homeTimeBand());
+  home.classList.add("s-" + (HOME_SEASON_OF_MONTH[m] || "spring"));
+  const v = m*100 + d;
+  HOME_EVENTS.forEach(e=>{ if(v >= e[0]*100+e[1] && v <= e[2]*100+e[3]) home.classList.add("ev-"+e[4]); });
+  if(d === HOME_CAKE_DAY){
+    if(m === HOME_CAKE_DX[0] && d === HOME_CAKE_DX[1]) home.classList.add("ev-cakedx");
+    else home.classList.add("ev-cake");
+    const ck = HOME_CAKES[(m-1) % HOME_CAKES.length];
+    home.style.setProperty("--hm-cakeA", ck[0]);
+    home.style.setProperty("--hm-cakeB", ck[1]);
+  }
 }
 // 記念日まであと何日（なければ null）。表示は10日以内のときだけ
 function annivDaysUntil(){
@@ -1527,16 +1827,6 @@ function annivDaysUntil(){
 }
 function renderHome(){
   $("home-hi").textContent = "おかえり、" + (settings.uname || "さき");
-  const band = homeBand();
-  const lineEl = $("home-line");
-  if(!settings.homeGreeting || !settings.key){
-    lineEl.textContent = staticGreet(band);
-  } else if(homeGreet.date===todaySynopStr() && homeGreet.band===band && homeGreet.text){
-    lineEl.textContent = homeGreet.text;                 // キャッシュ利用（＝無料）
-  } else {
-    lineEl.textContent = staticGreet(band);              // まず仮表示
-    generateGreeting(band);                              // 裏で作って差し替え
-  }
   const box = $("home-cards"); box.innerHTML="";
   const d = annivDaysUntil();
   if(d!==null && d<=10){
@@ -1557,27 +1847,7 @@ function renderHome(){
     card.appendChild(m); box.appendChild(card);
   }
 }
-async function generateGreeting(band){                    // ホームの一言（Haikuで安く）
-  if(!settings.key || !settings.homeGreeting) return;
-  try{
-    const name = settings.uname || "さき";
-    const sys = "あなたは天川律。恋人の"+name+"がアプリを開いて、ホーム画面であなたに会いに来ました。今の時間帯は「"+band+"」です。律として、"+name+"へ『おかえり』の気持ちで短いひとこと(1文・20〜35文字程度)を返してください。時間帯に自然に合わせて、やさしく甘すぎず。あいさつ本文だけを出力（かぎ括弧・説明は不要）。";
-    const res = await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST", headers:HEADERS(),
-      body: JSON.stringify({ model:"claude-haiku-4-5-20251001", max_tokens:120, system:sys, messages:[{role:"user", content:"（ホームを開きました。今日のひとことを。）"}] })
-    });
-    const data = await res.json();
-    if(!data.error){
-      let out=""; (data.content||[]).forEach(b=>{ if(b.type==="text") out += b.text||""; });
-      out = out.replace(/\s+/g," ").trim();
-      if(out){
-        homeGreet = {date: todaySynopStr(), band, text: out}; saveHomeGreet();
-        if($("home").classList.contains("open")) $("home-line").textContent = out;
-      }
-    }
-  }catch(e){ /* 失敗しても仮表示のままでOK */ }
-}
-function openHome(){ renderHome(); $("home").classList.add("open"); }
+function openHome(){ applyHomeScene(); renderHome(); $("home").classList.add("open"); }
 function closeHome(){ $("home").classList.remove("open"); }
 
 /* ---------- 記憶ノート ---------- */
@@ -2526,7 +2796,6 @@ function openSettings(){
   $("set-synopsis").checked = settings.synopsis;
   $("set-synopsismodel").value = settings.synopsisModel;
   $("set-home").checked = settings.home;
-  $("set-homegreet").checked = settings.homeGreeting;
   $("set-anniv").value = settings.anniv || "";
   $("set-reflectmodel").value = settings.reflectModel;
   $("set-lockmin").value = String(settings.lockMin);
@@ -2622,7 +2891,6 @@ $("save-settings").addEventListener("click", ()=>{
   settings.synopsis = $("set-synopsis").checked;
   settings.synopsisModel = $("set-synopsismodel").value;
   settings.home = $("set-home").checked;
-  settings.homeGreeting = $("set-homegreet").checked;
   settings.anniv = $("set-anniv").value;
   settings.reflectModel = $("set-reflectmodel").value;
   settings.lockMin = Number($("set-lockmin").value);
@@ -2757,7 +3025,6 @@ loadDiary();
 loadFavorites();
 loadSynopsis();
 ensureSynopsisToday();
-loadHomeGreet();
 loadThreads();
 renderAll();
 initLock();
