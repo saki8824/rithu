@@ -453,7 +453,7 @@
     padding:calc(env(safe-area-inset-top,0px) + 26px) 22px calc(env(safe-area-inset-bottom,0px) + 24px);
     /* 部屋の基本色(昼) */
     --hm-wall:#f4e7da;--hm-floor:#e5cfb9;--hm-frame:#c09a76;
-    --hm-sofa:#e2a493;--hm-sofa2:#ecb9a9;
+    --hm-sofa:#c7c5cf;--hm-sofa2:#dbd9e2;   /* 淡いグレーのソファ */
     --hm-sky1:#bfe0f2;--hm-sky2:#eef8fc;
     --hm-text:#5c4a50;--hm-dim:0;--hm-warm:0;--hm-lamp:0;
     --hm-curtain:#f0dfe0;--hm-rug:#e8dbd2;--hm-plant:#7fae6f;--hm-accent:#e7b3a0;
@@ -990,6 +990,16 @@
       <div class="hint" style="margin-top:7px">※このファイルにはAPIキーも含まれるよ。人には送らず、自分のiCloud等にそっと保存してね(万一漏れても料金は上限3000円で止まるけど、念のため)。</div>
     </div>
 
+    <div class="field">
+      <label>📊 保存箱の使用量</label>
+      <div class="hint" id="storage-meter" style="white-space:pre-wrap">「いま測る」を押すと、どこがどれだけ使ってるか表示するよ。</div>
+      <div class="backup-row">
+        <button class="btn ghost" id="measure-storage">📊 いま測る</button>
+        <button class="btn ghost" id="clean-old-threads">🧹 旧コピーを掃除</button>
+      </div>
+      <div class="hint" style="margin-top:7px">🧹は、大倉庫への引っ越しが確認できたチャットの「古い置き場所」だけを空にするよ(中身は大倉庫に残る)。押す前に📤バックアップしてあると安心。</div>
+    </div>
+
   </div>
 
   <!-- ===== プロフィール ===== -->
@@ -1292,9 +1302,99 @@
 /* ---------- storage (artifact プレビューでも落ちないように try/catch) ---------- */
 const store = {
   get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
-  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){ storageWarn("保存に失敗したよ…(容量不足かも)。📤バックアップと📊使用量チェックをしてね"); } },
   del(k){ try{ localStorage.removeItem(k); }catch(e){} }
 };
+/* 保存失敗を黙らせない(1回だけalert・チャットにも赤く表示) */
+let storageWarned = false;
+function storageWarn(msg){
+  try{ chat.appendChild(el("div","err","⚠️ "+msg)); scrollEnd(); }catch(e){}
+  if(!storageWarned){ storageWarned = true; try{ alert("⚠️ "+msg); }catch(e){} }
+}
+
+/* ---------- 大倉庫(IndexedDB)・チャットの保存先 ---------- */
+// localStorage(約5MB)ではなく、こちら(数百MB級)にチャット本文を保存する。
+let bigDB = null;
+function bigOpen(){
+  return new Promise((resolve)=>{
+    if(bigDB){ resolve(bigDB); return; }
+    try{
+      const req = indexedDB.open("ritsu-big", 1);
+      req.onupgradeneeded = (e)=>{
+        const db = e.target.result;
+        if(!db.objectStoreNames.contains("threads")) db.createObjectStore("threads", {keyPath:"id"});
+      };
+      req.onsuccess = ()=>{ bigDB = req.result; resolve(bigDB); };
+      req.onerror = ()=>resolve(null);
+    }catch(e){ resolve(null); }
+  });
+}
+async function thSave(id, data){
+  const db = await bigOpen(); if(!db) return false;
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("threads","readwrite");
+      tx.objectStore("threads").put(data);
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>resolve(false);
+    }catch(e){ resolve(false); }
+  });
+}
+async function thLoad(id){
+  const db = await bigOpen(); if(!db) return null;
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("threads","readonly");
+      const rq = tx.objectStore("threads").get(id);
+      rq.onsuccess = ()=>resolve(rq.result||null);
+      rq.onerror = ()=>resolve(null);
+    }catch(e){ resolve(null); }
+  });
+}
+async function thDelete(id){
+  const db = await bigOpen(); if(!db) return false;
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("threads","readwrite");
+      tx.objectStore("threads").delete(id);
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>resolve(false);
+    }catch(e){ resolve(false); }
+  });
+}
+async function thAll(){
+  const db = await bigOpen(); if(!db) return [];
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("threads","readonly");
+      const rq = tx.objectStore("threads").getAll();
+      rq.onsuccess = ()=>resolve(rq.result||[]);
+      rq.onerror = ()=>resolve([]);
+    }catch(e){ resolve([]); }
+  });
+}
+async function thClear(){
+  const db = await bigOpen(); if(!db) return false;
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("threads","readwrite");
+      tx.objectStore("threads").clear();
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>resolve(false);
+    }catch(e){ resolve(false); }
+  });
+}
+// 旧箱(localStorage)のチャットを、大倉庫へ自動コピー(元は消さない。掃除はさきがボタンで)
+async function migrateThreadsToBig(){
+  for(const t of threads){
+    try{
+      const has = await thLoad(t.id);
+      if(has) continue;
+      const d = store.get("ritsu-thread-"+t.id);
+      if(d){ const o = JSON.parse(d); await thSave(t.id, {id:t.id, history:o.history||[], summarized:o.summarized||0, anchor:o.anchor||0}); }
+    }catch(e){}
+  }
+}
 
 /* ---------- state ---------- */
 let settings = {
@@ -1353,26 +1453,24 @@ function deriveTitle(h){
   return s.length>18 ? s.slice(0,18)+"…" : (s||"新しいチャット");
 }
 function saveThreads(){ store.set("ritsu-threads", JSON.stringify(threads)); }
-function loadCurrent(){
+async function loadCurrent(){
   history=[]; summarized=0; anchor=0;
-  try{ const d = store.get("ritsu-thread-"+currentId); if(d){ const o=JSON.parse(d); history=o.history||[]; summarized=o.summarized||0; anchor=o.anchor||0; } }catch(e){}
+  let o = await thLoad(currentId);                    // まず大倉庫から
+  if(!o){ try{ const d = store.get("ritsu-thread-"+currentId); if(d) o = JSON.parse(d); }catch(e){} }  // 無ければ旧箱から
+  if(o){ history=o.history||[]; summarized=o.summarized||0; anchor=o.anchor||0; }
 }
 function persistThread(){
-  for(let i=0;i<8;i++){
-    try{ localStorage.setItem("ritsu-thread-"+currentId, JSON.stringify({history, summarized, anchor})); break; }
-    catch(e){
-      const m = history.find(x=>x.atts && x.atts.some(a=>a.data));
-      if(!m) break;                          // もう削れる添付がない
-      m.atts.forEach(a=>{ if(a.data) a.data=null; });
-    }
-  }
+  // チャット本文は大倉庫(IndexedDB)へ。失敗したら黙らず知らせる
+  thSave(currentId, {id:currentId, history, summarized, anchor}).then(ok=>{
+    if(!ok) storageWarn("チャットの保存に失敗したよ…。今の会話を📋コピーで控えて、📤バックアップもとってね");
+  });
   const t = threads.find(t=>t.id===currentId);
   if(t){ if(!t.named) t.title = deriveTitle(history); if(!t.archived) t.updatedAt = Date.now(); }
   threads.sort((a,b)=> (b.updatedAt||0) - (a.updatedAt||0));
   saveThreads();
   store.set("ritsu-current", currentId);
 }
-function loadThreads(){
+async function loadThreads(){
   try{ const t = store.get("ritsu-threads"); if(t) threads = JSON.parse(t)||[]; }catch(e){ threads=[]; }
   currentId = store.get("ritsu-current") || "";
   if(!threads.length){
@@ -1382,41 +1480,43 @@ function loadThreads(){
     try{ const mt = store.get("ritsu-meta"); if(mt) oldS = JSON.parse(mt).summarized||0; }catch(e){}
     const id = uid();
     threads = [{id, title:deriveTitle(oldH), updatedAt:Date.now()}];
-    store.set("ritsu-thread-"+id, JSON.stringify({history:oldH, summarized:oldS}));
+    await thSave(id, {id, history:oldH, summarized:oldS, anchor:0});
     currentId = id; saveThreads(); store.set("ritsu-current", currentId);
   }
   if(!currentId || !threads.some(t=>t.id===currentId)) currentId = threads[0].id;
-  loadCurrent();
+  await migrateThreadsToBig();     // 旧箱のチャットを大倉庫へ自動コピー(元は消さない)
+  await loadCurrent();
 }
 function newThread(){
   persistThread();
   const id = uid();
   threads.unshift({id, title:"新しいチャット", updatedAt:Date.now()});
-  store.set("ritsu-thread-"+id, JSON.stringify({history:[], summarized:0, anchor:0}));
+  thSave(id, {id, history:[], summarized:0, anchor:0});
   currentId = id; saveThreads(); store.set("ritsu-current", currentId);
   history=[]; summarized=0; anchor=0; renderAll(); renderThreadList();
   closeThreads();
 }
-function switchThread(id){
+async function switchThread(id){
   if(id===currentId){ closeThreads(); return; }
   persistThread();
   currentId = id; store.set("ritsu-current", currentId);
-  loadCurrent(); renderAll(); closeThreads();
+  await loadCurrent(); renderAll(); closeThreads();
 }
 function renameThread(id){
   const t = threads.find(t=>t.id===id); if(!t) return;
   const nv = prompt("チャットの名前を変える", t.title);
   if(nv!==null){ t.title = nv.trim() || t.title; t.named = true; saveThreads(); renderThreadList(); }
 }
-function deleteThread(id){
-  store.del("ritsu-thread-"+id);
+async function deleteThread(id){
+  thDelete(id);                       // 大倉庫から削除
+  store.del("ritsu-thread-"+id);      // 旧箱にコピーが残っていればそれも
   threads = threads.filter(t=>t.id!==id);
   if(!threads.length){
     const nid=uid(); threads=[{id:nid,title:"新しいチャット",updatedAt:Date.now()}];
-    store.set("ritsu-thread-"+nid, JSON.stringify({history:[],summarized:0})); currentId=nid;
+    thSave(nid, {id:nid, history:[], summarized:0, anchor:0}); currentId=nid;
   } else if(id===currentId){ const n = threads.find(x=>!x.archived) || threads[0]; currentId = n.id; }
   store.set("ritsu-current", currentId); saveThreads();
-  loadCurrent(); renderAll(); renderThreadList();
+  await loadCurrent(); renderAll(); renderThreadList();
 }
 function relTime(ts){
   if(!ts) return "";
@@ -1453,7 +1553,7 @@ function closeMenu(){ $("menu").classList.remove("open"); }
 function closeThreads(){ $("menu").classList.remove("open"); }
 
 /* ---------- アーカイブ（棚にしまう・表示を分けるだけ・中身は消さない） ---------- */
-function archiveThread(id){
+async function archiveThread(id){
   const t = threads.find(x=>x.id===id); if(!t) return;
   t.archived = true;                                  // 旗を立てるだけ（会話データは触らない）
   if(id===currentId){
@@ -1463,12 +1563,12 @@ function archiveThread(id){
     else {                                            // 全部しまったら新しい空チャットを用意
       const nid = uid();
       threads.unshift({id:nid, title:"新しいチャット", updatedAt:Date.now()});
-      store.set("ritsu-thread-"+nid, JSON.stringify({history:[], summarized:0, anchor:0}));
+      thSave(nid, {id:nid, history:[], summarized:0, anchor:0});
       currentId = nid;
     }
     store.set("ritsu-current", currentId);
     saveThreads();
-    loadCurrent(); renderAll();
+    await loadCurrent(); renderAll();
   } else {
     saveThreads();
   }
@@ -1502,11 +1602,11 @@ function renderArchiveList(){
   });
 }
 // アーカイブを開いて読む（そのチャットに切り替える。閲覧のみで表示される）
-function openArchivedThread(id){
+async function openArchivedThread(id){
   if(id!==currentId){
     persistThread();
     currentId = id; store.set("ritsu-current", currentId);
-    loadCurrent(); renderAll();
+    await loadCurrent(); renderAll();
   }
   closeArchive(); closeMenu();
 }
@@ -1942,6 +2042,9 @@ async function exportBackup(){
     const list = await ragAll();
     out.insights = list.map(c=>({id:c.id, text:c.text, label:c.label, ts:c.ts}));
   }catch(e){}
+  try{
+    out.threadsBig = await thAll();   // 大倉庫のチャット本文もまるごと同梱
+  }catch(e){}
   const blob = new Blob([JSON.stringify(out)], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1972,12 +2075,79 @@ function importBackup(file){
           if(c && c.text) await ragAdd({id:c.id||uid(), text:c.text, label:c.label||"", ts:c.ts||Date.now(), vec:null, model:"", dim:0});
         }
       }
-      // 古い形式(insights無し)のバックアップなら、今の気づきはそのまま残す(間違って消さない)
+      if(Array.isArray(obj.threadsBig)){
+        // 大倉庫入りバックアップ → チャット本文を置き換え
+        await thClear();
+        for(const o of obj.threadsBig){ if(o && o.id) await thSave(o.id, o); }
+      }
+      // 古い形式のバックアップでも大丈夫: チャットはobj.data(旧箱)から復元され、起動時に大倉庫へ自動お引っ越しされる
       alert("復元したよ！アプリを読み込み直すね🌷");
       location.reload();
     }catch(e){ alert("復元中にエラーが出たよ: "+(e.message||e)); }
   };
   r.readAsText(file);
+}
+
+/* ---------- 保存箱の使用量メーターと掃除 ---------- */
+function fmtBytes(b){ return b>1048576 ? (b/1048576).toFixed(2)+"MB" : Math.max(1,Math.round(b/1024))+"KB"; }
+function storageKeyName(k){
+  if(k==="ritsu-settings") return "設定(記憶カード含む)";
+  if(k==="ritsu-diary") return "日記";
+  if(k==="ritsu-threads") return "チャット一覧(名前など)";
+  if(k==="ritsu-events") return "予定";
+  if(k==="ritsu-favorites") return "お気に入り";
+  if(k==="ritsu-synopsis") return "あらすじ";
+  if(k==="ritsu-current") return "開いてるチャットの記録";
+  if(k==="ritsu-history"||k==="ritsu-meta") return "旧形式の会話データ";
+  if(k.indexOf("ritsu-thread-")===0){ const t = threads.find(x=>x.id===k.slice(13)); return "旧コピー:"+(t?(t.title||"チャット"):"(削除済みチャット)"); }
+  return k;
+}
+async function measureStorage(){
+  const box = $("storage-meter"); if(!box) return;
+  box.textContent = "測ってるよ…";
+  const items = []; let total = 0;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(!k || k.indexOf("ritsu-")!==0) continue;
+      const v = localStorage.getItem(k)||"";
+      const bytes = (k.length+v.length)*2;
+      total += bytes; items.push([k,bytes]);
+    }
+  }catch(e){}
+  items.sort((a,b)=>b[1]-a[1]);
+  const lines = [];
+  lines.push("【小さい箱(設定など用)】 合計 "+fmtBytes(total)+" / 目安5MB ("+Math.min(100,Math.round(total/5242880*100))+"%)");
+  items.slice(0,8).forEach(it=> lines.push("・"+storageKeyName(it[0])+" … "+fmtBytes(it[1])));
+  try{
+    const ths = await thAll();
+    let tb=0; ths.forEach(o=>{ try{ tb += JSON.stringify(o).length*2; }catch(e){} });
+    const ins = await ragAll();
+    lines.push("");
+    lines.push("【大倉庫(チャット・気づき用)】 チャット"+ths.length+"件 約"+fmtBytes(tb)+" ・ 気づき"+ins.length+"件");
+    if(navigator.storage && navigator.storage.estimate){
+      const est = await navigator.storage.estimate();
+      if(est && est.quota) lines.push("大倉庫の上限のめやす: 約"+fmtBytes(est.quota)+"(じゅうぶん広い)");
+    }
+  }catch(e){}
+  box.textContent = lines.join("\n");
+}
+async function cleanOldThreads(){
+  const keys = [];
+  try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.indexOf("ritsu-thread-")===0) keys.push(k); } }catch(e){}
+  if(!keys.length){ alert("掃除できる旧コピーは無いよ。もうスッキリしてる✨"); return; }
+  if(!confirm("旧コピー("+keys.length+"件)を掃除する?\n\n大倉庫に無事コピーされているチャットの「古い置き場所」だけを空けるよ。中身は大倉庫に残るから消えない。先に📤バックアップしてあると安心。")) return;
+  let done=0, skip=0;
+  for(const k of keys){
+    const id = k.slice("ritsu-thread-".length);
+    let oldLen = 0;
+    try{ const o = JSON.parse(store.get(k)||"{}"); oldLen = (o.history||[]).length; }catch(e){}
+    const big = await thLoad(id);
+    if(big && (big.history||[]).length >= oldLen){ store.del(k); done++; }   // 大倉庫側が同等以上のときだけ掃除
+    else skip++;
+  }
+  alert("掃除かんりょう🧹 "+done+"件を空けたよ"+(skip? "("+skip+"件は念のため残した)" : "")+"。「📊いま測る」で確認してみてね");
+  measureStorage();
 }
 
 /* ---------- 絶対(システムプロンプト) ---------- */
@@ -2833,6 +3003,8 @@ $("mem-edit-save").addEventListener("click", saveMemEdit);
 $("mem-edit").addEventListener("click", e=>{ if(e.target.id==="mem-edit") closeMemEdit(); });
 $("export-backup").addEventListener("click", exportBackup);
 $("import-backup-btn").addEventListener("click", ()=> $("import-file").click());
+$("measure-storage").addEventListener("click", measureStorage);
+$("clean-old-threads").addEventListener("click", cleanOldThreads);
 $("import-file").addEventListener("change", e=>{ if(e.target.files && e.target.files[0]) importBackup(e.target.files[0]); e.target.value=""; });
 $("close-vault").addEventListener("click", ()=> $("save-vault").click());
 $("save-vault").addEventListener("click", saveVault);
@@ -3025,10 +3197,12 @@ loadDiary();
 loadFavorites();
 loadSynopsis();
 ensureSynopsisToday();
-loadThreads();
-renderAll();
-initLock();
-scheduleProactive();
+(async ()=>{
+  await loadThreads();      // 大倉庫から読み込み(旧箱からの自動お引っ越し込み)
+  renderAll();
+  initLock();
+  scheduleProactive();
+})();
 </script>
 </body>
 </html>
