@@ -342,6 +342,7 @@
   .ic-settings{--ic-bg:rgba(150,170,196,.20);--ic-fg:#8ea2bd}
   .ic-archive {--ic-bg:rgba(201,162,122,.20);--ic-fg:#c79b6f}
   .ic-reflect {--ic-bg:rgba(138,148,224,.18);--ic-fg:#8a94e0}
+  .ic-ayumi   {--ic-bg:rgba(196,146,199,.18);--ic-fg:#b984bd}
   .menu-ver{text-align:center;font-size:11px;color:var(--muted);margin-top:16px;letter-spacing:.05em}
   #memory{
     position:fixed;inset:0;background:var(--night);z-index:55;
@@ -399,6 +400,13 @@
     display:none;flex-direction:column;gap:12px;
   }
   #reflect.open{display:flex}
+  /* 📖 ふたりのあゆみ画面(読むだけのアルバム・お気に入り等と同じつくり) */
+  #ayumi{
+    position:fixed;inset:0;background:var(--night);z-index:55;
+    overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
+    display:none;flex-direction:column;gap:12px;
+  }
+  #ayumi.open{display:flex}
   /* ---------- 記憶カード ---------- */
   .mem-filters{display:flex;flex-wrap:wrap;gap:7px}
   .mem-chip{
@@ -1107,6 +1115,7 @@
         <button class="btn ghost" id="export-backup">📤 書き出して保存</button>
         <button class="btn ghost" id="import-backup-btn">📥 復元(読み込み)</button>
       </div>
+      <div class="hint" id="backup-last" style="margin-top:7px"></div>
       <input type="file" id="import-file" accept="application/json,.json" hidden>
       <div class="hint" style="margin-top:7px">※このファイルにはAPIキーも含まれるよ。人には送らず、自分のiCloud等にそっと保存してね(万一漏れても料金は上限3000円で止まるけど、念のため)。</div>
     </div>
@@ -1314,6 +1323,10 @@
       <span class="menu-ic ic-reflect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 6.8l3 3L8 19l-4.2.9L4.7 15.8Z"/><path d="M14.2 6.8l1.6-1.6a1.4 1.4 0 0 1 2 0l1 1a1.4 1.4 0 0 1 0 2l-1.6 1.6"/><path d="M19 15.5c.25 1.4.65 1.8 2 2-1.35.25-1.75.65-2 2-.25-1.35-.65-1.75-2-2 1.35-.2 1.75-.6 2-2Z"/></svg></span>
       <span class="menu-cat-label">省察ノート</span>
     </button>
+    <button class="menu-cat" data-go="ayumi">
+      <span class="menu-ic ic-ayumi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 20c6 0 3-6.5 7.5-7.5s2.5-5 5.5-5.8"/><path d="M18.5 2.9c.4 2.2 1 2.8 3.2 3.2-2.2.4-2.8 1-3.2 3.2-.4-2.2-1-2.8-3.2-3.2 2.2-.4 2.8-1 3.2-3.2Z"/></svg></span>
+      <span class="menu-cat-label">あゆみ</span>
+    </button>
   </div>
   <div class="menu-ver">律くんアプリ 💗</div>
 </div>
@@ -1417,6 +1430,16 @@
   </div>
   <div id="reflect-list"></div>
   <button class="btn ghost" id="reflect-migrate">🔄 Embedding移行(ベクトルを作り直す)</button>
+</div>
+
+<!-- ===== ふたりのあゆみ(読むだけのアルバム) ===== -->
+<div id="ayumi">
+  <div class="set-head">
+    <h2>ふたりのあゆみ</h2>
+    <button class="set-close" id="close-ayumi" aria-label="閉じる">×</button>
+  </div>
+  <div class="hint">律くんが持ち歩いている、ふたりの日々の記録だよ📖 日付が変わると、その日のあらすじが1ページずつここにたまって、7日ぶんたまると1週間のまとめに綴じ直されるの。ここは読み返すためのアルバムだよ（律くんの記憶そのものだから、編集や削除はできないようにしてあるよ）。</div>
+  <div id="ayumi-list"></div>
 </div>
 
 <script>
@@ -2071,6 +2094,20 @@ function renderHome(){
     m.appendChild(el("div","home-card-sub", evs.map(e=>(e.time?e.time+" ":"")+e.title).join(" ・ ")));
     card.appendChild(m); box.appendChild(card);
   }
+  // バックアップのお知らせ(最後の📤からBACKUP_REMIND_DAYS日すぎたときだけ・ふだんは出ない)
+  const bts = Number(store.get("ritsu-backup-ts")||0);
+  const bdays = bts ? Math.floor((Date.now()-bts)/86400000) : -1;
+  if(bdays < 0 || bdays >= BACKUP_REMIND_DAYS){
+    const card = el("div","home-card");
+    card.appendChild(el("div","home-card-ic","💾"));
+    const m = el("div","home-card-main");
+    m.appendChild(el("div","home-card-ttl", bdays<0 ? "バックアップをはじめよう" : "そろそろバックアップの時期だよ"));
+    m.appendChild(el("div","home-card-sub", (bdays<0 ? "まだ記録がないみたい" : "最後の📤から "+bdays+"日") + " ・ タップで設定へ"));
+    card.appendChild(m);
+    card.style.cursor = "pointer";
+    card.addEventListener("click", ()=>{ closeHome(); openSettings(); });
+    box.appendChild(card);
+  }
 }
 function openHome(){ applyHomeScene(); renderHome(); $("home").classList.add("open"); }
 function closeHome(){ $("home").classList.remove("open"); }
@@ -2178,6 +2215,21 @@ async function exportBackup(){
   a.download = "ritsu-backup-"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+".json";
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 1500);
+  // 最後にバックアップした日時を覚えておく(ホームの「そろそろ📤してね」カードの目安になる)
+  store.set("ritsu-backup-ts", String(Date.now()));
+  renderBackupLast();
+}
+const BACKUP_REMIND_DAYS = 7;   // ★最後の📤からこの日数をすぎると、ホームに「そろそろバックアップ」カードが出る
+// 設定画面の「最後のバックアップ: ◯月◯日」表示
+function renderBackupLast(){
+  const box = $("backup-last"); if(!box) return;
+  const ts = Number(store.get("ritsu-backup-ts")||0);
+  if(ts){
+    const d = new Date(ts);
+    box.textContent = "最後のバックアップ: " + d.getFullYear() + "/" + (d.getMonth()+1) + "/" + d.getDate();
+  }else{
+    box.textContent = "最後のバックアップ: まだ記録がないよ(📤を1回押すとここに日付が出るよ)";
+  }
 }
 function importBackup(file){
   if(!file) return;
@@ -2206,6 +2258,8 @@ function importBackup(file){
         for(const o of obj.threadsBig){ if(o && o.id) await thSave(o.id, o); }
       }
       // 古い形式のバックアップでも大丈夫: チャットはobj.data(旧箱)から復元され、起動時に大倉庫へ自動お引っ越しされる
+      // 復元できた=そのバックアップファイルが手元にある、なので「最後のバックアップ」も今にしておく
+      store.set("ritsu-backup-ts", String(Date.now()));
       alert("復元したよ！アプリを読み込み直すね🌷");
       location.reload();
     }catch(e){ alert("復元中にエラーが出たよ: "+(e.message||e)); }
@@ -2432,6 +2486,26 @@ async function compressAyumi(){
     }
   }catch(e){}
   ayumiBusy = false;
+}
+/* ---------- ふたりのあゆみ(読むだけのアルバム画面) ---------- */
+function openAyumi(){ renderAyumiList(); $("ayumi").classList.add("open"); }
+function closeAyumi(){ $("ayumi").classList.remove("open"); }
+function renderAyumiList(){
+  const box = $("ayumi-list"); if(!box) return; box.innerHTML="";
+  const es = (ayumi.entries||[]).slice().reverse();   // 新しい順に読む
+  if(!es.length){
+    box.appendChild(el("div","cal-empty","まだ記録はないよ。日付が変わると、その日のあらすじが最初のページとしてここに残るよ🌱"));
+    return;
+  }
+  es.forEach(e=>{
+    const wrap = el("div","mem-card");
+    const top = el("div","mem-card-top");
+    top.appendChild(el("span","mem-card-tag", e.kind==="week" ? "🗓 週のまとめ" : "📄 1日の記録"));
+    top.appendChild(el("span","mem-card-date", e.label||""));
+    wrap.appendChild(top);
+    wrap.appendChild(el("div","mem-card-text", e.text||""));
+    box.appendChild(wrap);
+  });
 }
 function openSynopsis(){ renderSynopsis(); $("synopsis").classList.add("open"); }
 function closeSynopsis(){ $("synopsis").classList.remove("open"); }
@@ -3184,6 +3258,7 @@ function openSettings(){
   document.querySelectorAll("#settings .pane").forEach(p=> p.classList.toggle("on", p.dataset.pane==="general"));
   $("set-pin").value = "";
   $("pin-state").textContent = settings.pinHash ? "現在: 設定済み 🔒" : "現在: 未設定";
+  renderBackupLast();
   $("settings").classList.add("open");
 }
 $("open-menu").addEventListener("click", openMenu);
@@ -3231,7 +3306,9 @@ $("menu").addEventListener("click", e=>{
   else if(go==="settings") openSettings();
   else if(go==="archive") openArchive();
   else if(go==="reflect") openReflect();
+  else if(go==="ayumi") openAyumi();
 });
+$("close-ayumi").addEventListener("click", closeAyumi);
 $("tabbar").addEventListener("click", e=>{
   const b = e.target.closest(".tab"); if(!b) return;
   const p = b.dataset.pane;
