@@ -495,6 +495,18 @@
   #home-photo{width:100%;height:100%;display:block}
   #home.photo #home-photo-wrap{display:block}
   #home.photo #home-illus{display:none}
+  /* 🎨 写真の上の小物レイヤー(座標は写真ピクセルと1:1) */
+  #home-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  #home-overlay .shf{display:none}   /* 棚の季節小物: その季節だけ表示 */
+  #home.photo.s-spring .shf-spring{display:block}
+  #home.photo.s-summer .shf-summer{display:block}
+  #home.photo.s-autumn .shf-autumn{display:block}
+  #home.photo.s-winter .shf-winter{display:block}
+  #home-overlay .shf-flame{display:none}   /* キャンドルの火: 夕方・夜だけ灯る */
+  #home.t-dusk #home-overlay .shf-flame,#home.t-night #home-overlay .shf-flame{display:block}
+  /* 時間帯に合わせて小物もなじませる(夜は暗く) */
+  #home.t-dusk #home-overlay{filter:brightness(.94)}
+  #home.t-night #home-overlay{filter:brightness(.74) saturate(.9)}
   /* 季節・時間帯・イベントの小物は、該当するときだけ表示 */
   #home-illus .tim,#home-illus .sea,#home-illus .evt,#home-illus .steam{display:none}
   #home.t-day .tim-day{display:block}
@@ -623,7 +635,113 @@
 <!-- ===== ホーム画面(ダッシュボード) ===== -->
 <div id="home">
   <div id="home-bg">
-    <div id="home-photo-wrap"><img id="home-photo" alt=""></div>
+    <div id="home-photo-wrap">
+      <img id="home-photo" alt="">
+      <!-- 🎨 写真に重ねる小物レイヤー(viewBoxは写真と同じ1066x1422・座標=写真のピクセル) -->
+      <svg id="home-overlay" viewBox="0 0 1066 1422" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="hgGlass" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff" stop-opacity=".62"/><stop offset="1" stop-color="#d8e4ea" stop-opacity=".38"/>
+          </linearGradient>
+          <radialGradient id="hgFlame">
+            <stop offset="0" stop-color="#ffe4a0" stop-opacity=".9"/><stop offset="1" stop-color="#ffe4a0" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="hsoft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="1.6"/></filter>
+          <filter id="hshadow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+        </defs>
+
+        <!-- 🌸 春: チューリップの一輪挿し・写真フレーム・つぼみの小枝 -->
+        <g class="shf shf-spring">
+          <ellipse cx="781" cy="352" rx="30" ry="5" fill="#6b4a33" opacity=".2" filter="url(#hshadow)"/>
+          <ellipse cx="876" cy="352" rx="34" ry="5" fill="#6b4a33" opacity=".2" filter="url(#hshadow)"/>
+          <ellipse cx="956" cy="352" rx="38" ry="4" fill="#6b4a33" opacity=".16" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <path d="M781 306c0-16 3-28 7-40" stroke="#7fae6f" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <path d="M783 292c-11 1-18 9-19 18 9-1 16-8 19-18z" fill="#8fbf83" opacity=".9"/>
+            <ellipse cx="790" cy="262" rx="9" ry="13" fill="#ee9ab5"/>
+            <ellipse cx="783" cy="265" rx="7" ry="11" fill="#f3b1c6"/>
+            <ellipse cx="797" cy="265" rx="7" ry="11" fill="#f3b1c6"/>
+            <rect x="768" y="304" width="26" height="47" rx="9" fill="url(#hgGlass)"/>
+            <rect x="850" y="298" width="52" height="53" rx="6" fill="#f4e6cf"/>
+            <rect x="858" y="306" width="36" height="37" rx="3" fill="#cfe3ec"/>
+            <circle cx="871" cy="322" r="7" fill="#f0aabf" opacity=".85"/>
+            <circle cx="884" cy="330" r="5" fill="#fbd9e4" opacity=".9"/>
+            <path d="M925 349c22-6 40-18 52-34" stroke="#9a7a55" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <path d="M947 336c-2-8-8-12-8-12" stroke="#9a7a55" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <circle cx="977" cy="315" r="6" fill="#f3b1c6"/>
+            <circle cx="939" cy="323" r="5" fill="#f3b1c6"/>
+            <circle cx="960" cy="327" r="4.5" fill="#f7c9d6"/>
+          </g>
+        </g>
+
+        <!-- 🍹 夏: 貝がらのガラスびん・ミニ観葉・青いガラスの置物 -->
+        <g class="shf shf-summer">
+          <ellipse cx="784" cy="352" rx="32" ry="5" fill="#6b4a33" opacity=".2" filter="url(#hshadow)"/>
+          <ellipse cx="878" cy="352" rx="30" ry="5" fill="#6b4a33" opacity=".2" filter="url(#hshadow)"/>
+          <ellipse cx="952" cy="352" rx="24" ry="4" fill="#6b4a33" opacity=".18" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <rect x="763" y="303" width="42" height="48" rx="9" fill="url(#hgGlass)"/>
+            <rect x="761" y="297" width="46" height="9" rx="4" fill="#d8c8a8"/>
+            <ellipse cx="775" cy="341" rx="7" ry="5" fill="#eed9b8"/>
+            <ellipse cx="791" cy="343" rx="6" ry="4.5" fill="#f5e7cb"/>
+            <ellipse cx="783" cy="332" rx="5" ry="4" fill="#e8cfae"/>
+            <ellipse cx="866" cy="318" rx="6" ry="11" fill="#74b27f" transform="rotate(-24 866 318)"/>
+            <ellipse cx="890" cy="318" rx="6" ry="11" fill="#74b27f" transform="rotate(24 890 318)"/>
+            <ellipse cx="878" cy="311" rx="7" ry="14" fill="#5fa06e"/>
+            <path d="M858 327h40l-5 24h-30z" fill="#c08a5c"/>
+            <circle cx="952" cy="333" r="17" fill="#7fb8d8" opacity=".7"/>
+            <circle cx="946" cy="327" r="5" fill="#ffffff" opacity=".7"/>
+          </g>
+        </g>
+
+        <!-- 🍁 秋: 積んだ本・どんぐりのびん・紅葉の枝 -->
+        <g class="shf shf-autumn">
+          <ellipse cx="791" cy="352" rx="42" ry="5" fill="#6b4a33" opacity=".2" filter="url(#hshadow)"/>
+          <ellipse cx="887" cy="352" rx="26" ry="5" fill="#6b4a33" opacity=".2" filter="url(#hshadow)"/>
+          <ellipse cx="962" cy="352" rx="34" ry="4" fill="#6b4a33" opacity=".16" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <rect x="752" y="337" width="78" height="14" rx="3" fill="#b5714f"/>
+            <rect x="758" y="323" width="66" height="14" rx="3" fill="#8a9a5b"/>
+            <rect x="868" y="308" width="38" height="43" rx="8" fill="url(#hgGlass)"/>
+            <circle cx="879" cy="343" r="6" fill="#9a6b43"/>
+            <circle cx="893" cy="341" r="6" fill="#8a5c38"/>
+            <circle cx="886" cy="331" r="5.5" fill="#a87950"/>
+            <path d="M930 349c24-8 44-20 60-36" stroke="#8a5f43" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <circle cx="988" cy="315" r="8" fill="#d87f4a"/>
+            <circle cx="962" cy="327" r="7" fill="#c9663f"/>
+            <circle cx="944" cy="337" r="6" fill="#e09a5f"/>
+          </g>
+        </g>
+
+        <!-- ❄️ 冬: キャンドル(夕方・夜は灯る)・松ぼっくり・小さな雪だるま -->
+        <g class="shf shf-winter">
+          <ellipse cx="785" cy="352" rx="26" ry="5" fill="#6b4a33" opacity=".2" filter="url(#hshadow)"/>
+          <ellipse cx="861" cy="352" rx="26" ry="4" fill="#6b4a33" opacity=".18" filter="url(#hshadow)"/>
+          <ellipse cx="940" cy="352" rx="24" ry="5" fill="#6b4a33" opacity=".2" filter="url(#hshadow)"/>
+          <g class="shf-flame">
+            <circle cx="785" cy="282" r="22" fill="url(#hgFlame)"/>
+            <ellipse cx="785" cy="284" rx="5" ry="9" fill="#ffd98f"/>
+            <ellipse cx="785" cy="286" rx="2.5" ry="5" fill="#fff3d0"/>
+          </g>
+          <g filter="url(#hsoft)" opacity=".95">
+            <rect x="770" y="300" width="30" height="51" rx="6" fill="#f6ecd8"/>
+            <ellipse cx="785" cy="301" rx="15" ry="4" fill="#efe0c5"/>
+            <line x1="785" y1="297" x2="785" y2="291" stroke="#8a7a5f" stroke-width="2"/>
+            <ellipse cx="852" cy="341" rx="10" ry="11" fill="#8a5f3f"/>
+            <ellipse cx="871" cy="344" rx="8" ry="9" fill="#9a6f4b"/>
+            <circle cx="849" cy="337" r="1.6" fill="#6f4a2f"/>
+            <circle cx="856" cy="344" r="1.6" fill="#6f4a2f"/>
+            <circle cx="869" cy="341" r="1.4" fill="#6f4a2f"/>
+            <circle cx="940" cy="339" r="14" fill="#ffffff"/>
+            <circle cx="940" cy="318" r="10" fill="#fbfbfb"/>
+            <path d="M931 327c6 4 12 4 18 0" stroke="#d98a8f" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <circle cx="936" cy="316" r="1.5" fill="#5c4a50"/>
+            <circle cx="944" cy="316" r="1.5" fill="#5c4a50"/>
+            <path d="M940 319l7 2-7 2z" fill="#e8954f"/>
+          </g>
+        </g>
+      </svg>
+    </div>
     <svg id="home-illus" viewBox="0 0 400 300" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <clipPath id="winClip"><rect x="44" y="34" width="152" height="172" rx="6"/></clipPath>
