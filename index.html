@@ -97,6 +97,14 @@
   }
   .saki .bubble{background:var(--bubble-saki);border-bottom-right-radius:6px;color:#f3f6fb}
   .ritsu .bubble{background:var(--bubble-ritsu);border:1px solid var(--line);border-bottom-left-radius:6px}
+  /* 📱 LINE風の吹き出し(LINEモード中のメッセージだけ) */
+  .msg.line.saki .bubble{background:#06c755;color:#fff;border:none;border-radius:18px;border-bottom-right-radius:5px}
+  .msg.line.ritsu .bubble{background:#ffffff;color:#1c1c1e;border:1px solid rgba(0,0,0,.08);border-radius:18px;border-bottom-left-radius:5px}
+  html.day .msg.line.ritsu .bubble{color:#1c1c1e}
+  /* 既読(さきのLINEメッセージを律くんが読んだとき) */
+  .read-mark{font-size:10px;color:var(--muted);opacity:.85;margin-top:-2px;padding-right:2px}
+  /* 📱ボタン(LINEモードON) */
+  #line-toggle.on{background:#06c755;border-color:#06c755;color:#fff}
   /* 思考プロセス */
   details.think{width:100%;}
   details.think summary{
@@ -989,6 +997,7 @@
 <div class="attbar" id="attbar"></div>
 <div class="composer">
   <button id="attach" class="cbtn" aria-label="ファイルを追加">＋</button>
+  <button id="line-toggle" class="cbtn" aria-label="LINE風の表示に切り替え" title="LINE風に切り替え">📱</button>
   <textarea id="input" rows="1" placeholder="律くんにメッセージ…"></textarea>
   <button id="send">↑</button>
 </div>
@@ -2825,8 +2834,10 @@ function attachActions(wrap, bub, text, role){
     bar.classList.toggle("open", !open);
   });
 }
-function renderMsg(m){
-  const wrap = el("div", "msg " + (m.role==="user" ? "saki" : "ritsu"));
+function renderMsg(m, idx){
+  if(idx===undefined) idx = history.indexOf(m);
+  const wrap = el("div", "msg " + (m.role==="user" ? "saki" : "ritsu") + (m.line ? " line" : ""));
+  if(idx>=0) wrap.dataset.hi = idx;
   if(m.role==="assistant" && m.thinking){
     const d = el("details","think");
     const s = el("summary",null,"思考プロセス");
@@ -2867,15 +2878,36 @@ function renderAll(){
   if(history.length===0){
     chat.appendChild(el("div","sysnote","——リビングの灯りがついている。律はもう帰ってきているみたい。"));
   }
-  history.forEach(renderMsg);
+  history.forEach((m,i)=> renderMsg(m,i));
+  refreshReadMarks();
   applyReadOnly();
   scrollEnd();
+}
+// 「既読」の表示を付け直す(さきの最後のLINEメッセージを律くんが読んだとき、その1つだけに付ける)
+function refreshReadMarks(){
+  document.querySelectorAll("#chat .read-mark").forEach(e=> e.remove());
+  let lastAsst = -1;
+  for(let i=history.length-1;i>=0;i--){ if(history[i].role==="assistant"){ lastAsst=i; break; } }
+  if(lastAsst < 1) return;
+  for(let i=lastAsst-1;i>=0;i--){
+    if(history[i].role==="user"){          // 律くんの直近の返事の、すぐ前にあるさきの発言
+      if(history[i].line){                  // それがLINEのメッセージなら「既読」を付ける
+        const wrap = chat.querySelector('[data-hi="'+i+'"]');
+        if(wrap) wrap.appendChild(el("div","read-mark","既読"));
+      }
+      break;
+    }
+  }
 }
 function scrollEnd(){ chat.scrollTop = chat.scrollHeight; }
 function showError(t){ chat.appendChild(el("div","err",t)); scrollEnd(); }
 
 /* ---------- send ---------- */
 let busy=false;
+/* 📱 LINEモード(オンの間、送受信のメッセージがLINE風になる。アプリを閉じても覚えている) */
+let lineMode = (store.get("ritsu-linemode")==="1");
+function applyLineToggle(){ const b=$("line-toggle"); if(b) b.classList.toggle("on", lineMode); }
+function toggleLineMode(){ lineMode = !lineMode; store.set("ritsu-linemode", lineMode?"1":"0"); applyLineToggle(); }
 async function sendMessage(){
   if(isCurrentArchived()) return;                 // アーカイブは閲覧のみ（書き込み不可）
   const text = input.value.trim();
@@ -2884,9 +2916,10 @@ async function sendMessage(){
 
   const atts = pending.slice(); pending = []; renderAtts();
   input.value=""; autoGrow();
-  const um = {role:"user", text, atts, ts:Date.now()};
+  const lm = lineMode;   // 送信した瞬間のLINEモードを、返事にも同じように使う
+  const um = {role:"user", text, atts, ts:Date.now(), line: lm};
   history.push(um);
-  renderMsg(um); scrollEnd();
+  renderMsg(um); refreshReadMarks(); scrollEnd();
   persistHistory();
 
   // typing indicator
@@ -2925,8 +2958,8 @@ async function sendMessage(){
       });
       const mem = extractMemories(textOut);
       const sch = extractSchedule(mem.text);
-      const m = {role:"assistant", text: sch.text || "……", thinking: thinking||null, ts:Date.now(), usage: data.usage||null};
-      history.push(m); renderMsg(m); scrollEnd(); persistHistory();
+      const m = {role:"assistant", text: sch.text || "……", thinking: thinking||null, ts:Date.now(), usage: data.usage||null, line: lm};
+      history.push(m); renderMsg(m); refreshReadMarks(); scrollEnd(); persistHistory();
       if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
       if(sch.added.length){ chat.appendChild(el("div","sysnote","📅 予定を追加したよ: "+sch.added.join(" / "))); scrollEnd(); }
       maybeGenerateSynopsis();
@@ -2973,8 +3006,8 @@ async function sendProactive(){
       if(textOut.trim()){
         const mem = extractMemories(textOut);
         const sch = extractSchedule(mem.text);
-        const m = {role:"assistant", text: sch.text || "……", thinking:null, ts:Date.now()};
-        history.push(m); renderMsg(m); scrollEnd(); persistHistory();
+        const m = {role:"assistant", text: sch.text || "……", thinking:null, ts:Date.now(), line: lineMode};
+        history.push(m); renderMsg(m); refreshReadMarks(); scrollEnd(); persistHistory();
         if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
         if(sch.added.length){ chat.appendChild(el("div","sysnote","📅 予定を追加したよ: "+sch.added.join(" / "))); scrollEnd(); }
       }
@@ -2985,6 +3018,8 @@ async function sendProactive(){
 }
 
 send.addEventListener("click", sendMessage);
+$("line-toggle").addEventListener("click", toggleLineMode);
+applyLineToggle();   // 起動時、覚えているLINEモードの状態にボタンを合わせる
 input.addEventListener("keydown", e=>{
   if(e.key==="Enter" && (e.metaKey||e.ctrlKey)){ e.preventDefault(); sendMessage(); }
 });
