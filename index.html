@@ -2635,6 +2635,17 @@ function scheduleContext(){
     .sort((a,b)=>(a.date+(a.time||"")).localeCompare(b.date+(b.time||""))).slice(0,8);
   return up.length ? up.map(e=>"・"+fmtJDate(e.date)+(e.time?" "+e.time:"")+" "+e.title).join("\n") : "";
 }
+// 同じ予定がもう入っていないか調べる(同じ日付＋タイトルがほぼ一致ならtrue=重複)
+function scheduleExists(date, title){
+  const norm = s => (s||"").replace(/\s+/g,"").toLowerCase();
+  const nt = norm(title);
+  if(!nt) return false;
+  return events.some(e=>{
+    if(e.date !== date) return false;
+    const ne = norm(e.title);
+    return ne===nt || ne.includes(nt) || nt.includes(ne);
+  });
+}
 // 律くんの返信から <schedule>YYYY-MM-DD|HH:MM|タイトル</schedule> を取り込む(time任意)
 function extractSchedule(text){
   if(!settings.schedule) return {text, added:[]};
@@ -2647,7 +2658,7 @@ function extractSchedule(text){
       let time = "", titleParts = parts.slice(1);
       if(/^\d{1,2}:\d{2}$/.test(parts[1])){ const tp=parts[1].split(":"); time = tp[0].padStart(2,"0")+":"+tp[1]; titleParts = parts.slice(2); }
       const title = titleParts.join(" ").trim();
-      if(title){
+      if(title && !scheduleExists(date, title)){   // 同じ予定がもう無いときだけ追加(重複ふせぎ)
         events.push({id:uid(), date, time, title, note:""});
         added.push(fmtJDate(date)+(time?" "+time:"")+" "+title);
       }
