@@ -2411,8 +2411,7 @@ function ensureSynopsisToday(){
   if(synopsis.date !== t){
     // 昨日のあらすじは消す前に「ふたりのあゆみ」へ日ごとの記録として保存
     if(synopsis.date && (synopsis.text||"").trim()){
-      const p = synopsis.date.split("-");
-      ayumi.entries.push({id:uid(), kind:"day", label:(p[1]*1)+"/"+(p[2]*1), text:synopsis.text.trim(), ts:Date.now()});
+      ayumi.entries.push({id:uid(), kind:"day", label:mdw(synopsis.date), text:synopsis.text.trim(), ts:Date.now()});
       saveAyumi();
     }
     synopsis = {date:t, text:"", turns:0, upTs:0}; saveSynopsis();
@@ -2474,7 +2473,7 @@ async function compressAyumi(){
   try{
     const batch = days.slice(0,7);
     const src = batch.map(e=>"【"+e.label+"】"+e.text).join("\n");
-    const sys = "あなたは会話の記録係です。さきと律(恋人どうし)の、1週間ぶんの日ごとの記録を読み、大事な出来事・約束・気持ちの流れを落とさずに3〜6行へ要約してください。日付の言及は「◯日ごろ」程度でよい。前置きや説明は不要で、要約本文だけを出力。";
+    const sys = "あなたは会話の記録係です。さきと律(恋人どうし)の、1週間ぶんの日ごとの記録を読み、大事な出来事・約束・気持ちの流れを落とさずに3〜6行へ要約してください。日付の言及は「◯日ごろ」程度でよい。日付や曜日を書くときは、渡された記録にある『7/8(水)』のような表記をそのまま使い、曜日を自分で計算し直さないこと。前置きや説明は不要で、要約本文だけを出力。";
     const model = (settings.synopsisModel && settings.synopsisModel!=="same") ? settings.synopsisModel
       : (settings.model==="custom" ? (settings.customModel||"").trim() : settings.model);
     const res = await fetch("https://api.anthropic.com/v1/messages",{
@@ -2523,7 +2522,9 @@ function renderSynopsis(){
   const meta = $("synopsis-meta");
   if(meta){
     const onoff = settings.synopsis ? "自動更新オン" : "自動更新オフ";
-    meta.textContent = synopsis.date + "（" + onoff + " ・ 今日 " + (synopsis.turns||0) + " 往復）";
+    // 日付を「7月8日(水)」表示に(曜日はJSで計算)。まだ日付が無いときはそのまま
+    const dstr = /^\d{4}-\d{2}-\d{2}$/.test(synopsis.date) ? fmtJDate(synopsis.date) : synopsis.date;
+    meta.textContent = dstr + "（" + onoff + " ・ 今日 " + (synopsis.turns||0) + " 往復）";
   }
   const box = $("synopsis-body"); if(!box) return; box.innerHTML="";
   const txt = (synopsis.text||"").trim();
@@ -2561,6 +2562,8 @@ function loadEvents(){ try{ const d=store.get("ritsu-events"); events = d ? (JSO
 function saveEvents(){ store.set("ritsu-events", JSON.stringify(events)); }
 function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function fmtJDate(ds){ const p=ds.split("-").map(Number); const wd=["日","月","火","水","木","金","土"][new Date(p[0],p[1]-1,p[2]).getDay()]; return p[1]+"月"+p[2]+"日("+wd+")"; }
+// "YYYY-MM-DD" → "7/8(水)" 形式(曜日はJSで計算。あゆみのラベル用)
+function mdw(ds){ const p=ds.split("-").map(Number); const wd=["日","月","火","水","木","金","土"][new Date(p[0],p[1]-1,p[2]).getDay()]; return p[1]+"/"+p[2]+"("+wd+")"; }
 function eventsOn(ds){ return events.filter(e=>e.date===ds).sort((a,b)=>(a.time||"99:99").localeCompare(b.time||"99:99")); }
 
 function openCalendar(){ const t=new Date(); calY=t.getFullYear(); calM=t.getMonth(); calSelected=ymd(t); renderCalendar(); selectDay(calSelected); $("calendar").classList.add("open"); }
