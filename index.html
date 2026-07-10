@@ -488,11 +488,21 @@
   /* 📷 写真モード: AI生成のリビング3枚(昼/夕方/夜)を背景に。画面いっぱいに敷いて中央を見せる。
      写真が読み込めないときは .photo が付かず、従来の手描きSVGのまま(自動フォールバック) */
   #home-photo-wrap{
-    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-    width:max(100vw, 74.97vh);height:max(133.4vw, 100vh);   /* 画像の縦横比1066:1422を保ったまま画面を覆う */
+    position:absolute;left:0;right:0;bottom:0;height:133.4vw;   /* 画面の下側に部屋まるごと(写真の比率1066:1422) */
     display:none;
   }
   #home-photo{width:100%;height:100%;display:block}
+  /* 写真の上の空きは、写真の壁と同じ色でつなぐ(色は各写真の上端から採取済み) */
+  #home.photo #home-bg{background:#c7ac8f}
+  #home.photo.t-dusk #home-bg{background:#875739}
+  #home.photo.t-night #home-bg{background:#483c3e}
+  /* つなぎ目をなめらかにするグラデーション */
+  #home-photo-wrap::before{
+    content:"";position:absolute;left:0;right:0;top:-1px;height:90px;z-index:1;
+    background:linear-gradient(to bottom, #c7ac8f, rgba(199,172,143,0));
+  }
+  #home.t-dusk #home-photo-wrap::before{background:linear-gradient(to bottom, #875739, rgba(135,87,57,0))}
+  #home.t-night #home-photo-wrap::before{background:linear-gradient(to bottom, #483c3e, rgba(72,60,62,0))}
   #home.photo #home-photo-wrap{display:block}
   #home.photo #home-illus{display:none}
   /* 🎨 写真の上の小物レイヤー(座標は写真ピクセルと1:1) */
@@ -507,6 +517,20 @@
   /* 時間帯に合わせて小物もなじませる(夜は暗く) */
   #home.t-dusk #home-overlay{filter:brightness(.94)}
   #home.t-night #home-overlay{filter:brightness(.74) saturate(.9)}
+  /* ✨ ふだんのアニメ(湯気/昼のきらきら/夜の星/ランプのゆらぎ) */
+  #home-overlay .anim{display:none}
+  #home.photo .anim-steam{display:block}
+  #home.photo.t-day .anim-day{display:block}
+  #home.photo.t-night .anim-night{display:block}
+  #home.photo.t-dusk .anim-lamp,#home.photo.t-night .anim-lamp{display:block}
+  #home-overlay .steam-p{animation:hmSteam 3.6s ease-out infinite}
+  #home-overlay .mote{animation:hmMote 5.5s ease-in-out infinite}
+  #home-overlay .ntw{animation:hmTwinkle 2.6s ease-in-out infinite}
+  #home-overlay .lampglow{animation:hmLamp 3.8s ease-in-out infinite}
+  @keyframes hmSteam{0%{opacity:0;transform:translateY(10px)}25%{opacity:.5}60%{opacity:.3}100%{opacity:0;transform:translateY(-22px)}}
+  @keyframes hmMote{0%{opacity:0;transform:translateY(0)}25%{opacity:.75}100%{opacity:0;transform:translateY(-30px)}}
+  @keyframes hmLamp{0%,100%{opacity:.4}50%{opacity:.75}}
+  @media (prefers-reduced-motion:reduce){#home-overlay *{animation:none !important}}
   /* 季節・時間帯・イベントの小物は、該当するときだけ表示 */
   #home-illus .tim,#home-illus .sea,#home-illus .evt,#home-illus .steam{display:none}
   #home.t-day .tim-day{display:block}
@@ -743,6 +767,38 @@
             <circle cx="823" cy="321" r="1.3" fill="#5c4a50"/>
             <path d="M820 324l6 1.5-6 1.5z" fill="#e8954f"/>
           </g>
+        </g>
+
+        <!-- ☕ マグの湯気(いつでも・ふたりぶん) -->
+        <g class="anim anim-steam">
+          <g class="steam-p"><path d="M706 812c-6-12 6-18 0-32" stroke="#ffffff" stroke-width="3.5" fill="none" stroke-linecap="round" opacity=".6"/></g>
+          <g class="steam-p" style="animation-delay:1.8s"><path d="M718 810c6-12-6-18 0-32" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".5"/></g>
+          <g class="steam-p" style="animation-delay:.9s"><path d="M846 818c-6-12 6-18 0-32" stroke="#ffffff" stroke-width="3.5" fill="none" stroke-linecap="round" opacity=".6"/></g>
+          <g class="steam-p" style="animation-delay:2.6s"><path d="M858 816c6-12-6-18 0-32" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" opacity=".5"/></g>
+        </g>
+
+        <!-- ✨ 昼: 陽だまりの光のきらきら -->
+        <g class="anim anim-day" fill="#fff6d8">
+          <circle class="mote" cx="380" cy="1060" r="3"/>
+          <circle class="mote" cx="470" cy="1110" r="2.5" style="animation-delay:1.2s"/>
+          <circle class="mote" cx="560" cy="1050" r="3" style="animation-delay:2.4s"/>
+          <circle class="mote" cx="300" cy="860" r="2.5" style="animation-delay:3.4s"/>
+          <circle class="mote" cx="640" cy="1130" r="2" style="animation-delay:4.3s"/>
+          <circle class="mote" cx="250" cy="960" r="2" style="animation-delay:2s"/>
+        </g>
+
+        <!-- 🌙 夜: 窓の星のまたたき -->
+        <g class="anim anim-night" fill="#ffffff">
+          <circle class="ntw" cx="95" cy="200" r="2.2"/>
+          <circle class="ntw" cx="260" cy="160" r="2" style="animation-delay:.7s"/>
+          <circle class="ntw" cx="310" cy="300" r="2.2" style="animation-delay:1.3s"/>
+          <circle class="ntw" cx="150" cy="360" r="1.8" style="animation-delay:1.9s"/>
+          <circle class="ntw" cx="240" cy="440" r="2" style="animation-delay:.4s"/>
+        </g>
+
+        <!-- 💡 夕方・夜: サイドテーブルのランプのゆらぎ -->
+        <g class="anim anim-lamp">
+          <circle class="lampglow" cx="150" cy="772" r="80" fill="url(#hgFlame)"/>
         </g>
       </svg>
     </div>
