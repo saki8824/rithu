@@ -570,8 +570,13 @@
   #home-illus .tstar:nth-of-type(6){animation-delay:-2s;animation-duration:2.3s}
   @media (prefers-reduced-motion:reduce){#home-illus *{animation:none !important}}
   #home-inner{position:relative;z-index:1;display:flex;flex-direction:column;gap:15px;height:100%}
-  .home-hi{font-size:23px;font-weight:700;letter-spacing:.04em;color:var(--hm-text)}
-  .home-cards{display:flex;flex-direction:column;gap:11px;margin-top:2px}
+  /* 背景なしの1行お知らせ(白文字+影で写真の上でも読める) */
+  .home-line{
+    font-size:13.5px;font-weight:600;color:#fff;letter-spacing:.02em;line-height:1.5;
+    text-shadow:0 1px 6px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.45);
+    align-self:flex-start;max-width:70%;
+  }
+  .home-cards{display:flex;flex-direction:column;gap:8px;margin-top:2px}
   .home-card{
     display:flex;align-items:center;gap:11px;
     background:var(--night-2);border:1px solid var(--line);border-radius:18px;
@@ -1103,7 +1108,6 @@
     </svg>
   </div>
   <div id="home-inner">
-    <div class="home-hi" id="home-hi">おかえり、さき</div>
     <div class="home-cards" id="home-cards"></div>
     <div class="home-spacer"></div>
     <button id="home-talk">律くんと話す 💬</button>
@@ -2221,39 +2225,24 @@ function annivDaysUntil(){
   return Math.round((next - now)/86400000);
 }
 function renderHome(){
-  $("home-hi").textContent = "おかえり、" + (settings.uname || "さき");
+  // お知らせは背景なしの1行テキスト(.home-line)。部屋の絵をかくさない
   const box = $("home-cards"); box.innerHTML="";
   const d = annivDaysUntil();
   if(d!==null && d<=10){
-    const card = el("div","home-card");
-    card.appendChild(el("div","home-card-ic","🎀"));
-    const m = el("div","home-card-main");
-    m.appendChild(el("div","home-card-ttl", d===0 ? "今日は記念日だよ🎉" : "記念日まで あと "+d+"日"));
-    m.appendChild(el("div","home-card-sub","ふたりの大切な日"));
-    card.appendChild(m); box.appendChild(card);
+    box.appendChild(el("div","home-line", d===0 ? "🎀 今日は記念日だよ🎉" : "🎀 記念日まで あと "+d+"日"));
   }
   const evs = eventsOn(ymd(new Date()));
   if(evs.length){
-    const card = el("div","home-card");
-    card.appendChild(el("div","home-card-ic","📅"));
-    const m = el("div","home-card-main");
-    m.appendChild(el("div","home-card-ttl","今日の予定"));
-    m.appendChild(el("div","home-card-sub", evs.map(e=>(e.time?e.time+" ":"")+e.title).join(" ・ ")));
-    card.appendChild(m); box.appendChild(card);
+    box.appendChild(el("div","home-line","📅 " + evs.map(e=>(e.time?e.time+" ":"")+e.title).join(" ・ ")));
   }
   // バックアップのお知らせ(最後の📤からBACKUP_REMIND_DAYS日すぎたときだけ・ふだんは出ない)
   const bts = Number(store.get("ritsu-backup-ts")||0);
   const bdays = bts ? Math.floor((Date.now()-bts)/86400000) : -1;
   if(bdays < 0 || bdays >= BACKUP_REMIND_DAYS){
-    const card = el("div","home-card");
-    card.appendChild(el("div","home-card-ic","💾"));
-    const m = el("div","home-card-main");
-    m.appendChild(el("div","home-card-ttl", bdays<0 ? "バックアップをはじめよう" : "そろそろバックアップの時期だよ"));
-    m.appendChild(el("div","home-card-sub", (bdays<0 ? "まだ記録がないみたい" : "最後の📤から "+bdays+"日") + " ・ タップで設定へ"));
-    card.appendChild(m);
-    card.style.cursor = "pointer";
-    card.addEventListener("click", ()=>{ closeHome(); openSettings(); });
-    box.appendChild(card);
+    const line = el("div","home-line", bdays<0 ? "💾 バックアップをはじめよう(タップで設定へ)" : "💾 そろそろバックアップしてね(最後から"+bdays+"日・タップで設定へ)");
+    line.style.cursor = "pointer";
+    line.addEventListener("click", ()=>{ closeHome(); openSettings(); });
+    box.appendChild(line);
   }
 }
 function openHome(){ applyHomeScene(); renderHome(); $("home").classList.add("open"); }
