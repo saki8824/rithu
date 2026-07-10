@@ -514,6 +514,22 @@
   #home.photo.s-winter .shf-winter{display:block}
   #home-overlay .shf-flame{display:none}   /* キャンドルの火: 夕方・夜だけ灯る */
   #home.t-dusk #home-overlay .shf-flame,#home.t-night #home-overlay .shf-flame{display:block}
+  /* 🎉 イベント小物(写真の部屋用): 期間中だけ表示 */
+  #home-overlay .evp{display:none}
+  #home.photo.ev-newyear .evp-newyear{display:block}
+  #home.photo.ev-newyear.t-day .evp-hinode{display:block}
+  #home.photo.ev-setsubun .evp-setsubun{display:block}
+  #home.photo.ev-valentine .evp-valentine{display:block}
+  #home.photo.ev-whiteday .evp-whiteday{display:block}
+  #home.photo.ev-ajisai .evp-ajisai{display:block}
+  #home.photo.ev-tanabata .evp-tanabata{display:block}
+  #home.photo.ev-tsukimi .evp-dango{display:block}
+  #home.photo.ev-tsukimi.t-night .evp-moon{display:block}
+  #home.photo.ev-halloween .evp-halloween{display:block}
+  #home.photo.ev-xmas .evp-xmas{display:block}
+  #home.photo.ev-bday .evp-bday{display:block}
+  #home.photo.ev-cake .evp-cake{display:block}
+  #home.photo.ev-cakedx .evp-cakedx{display:block}
   /* 時間帯に合わせて小物もなじませる(夜は暗く) */
   #home.t-dusk #home-overlay{filter:brightness(.94)}
   #home.t-night #home-overlay{filter:brightness(.74) saturate(.9)}
@@ -766,6 +782,207 @@
             <circle cx="817" cy="321" r="1.3" fill="#5c4a50"/>
             <circle cx="823" cy="321" r="1.3" fill="#5c4a50"/>
             <path d="M820 324l6 1.5-6 1.5z" fill="#e8954f"/>
+          </g>
+        </g>
+
+        <!-- 🎍 お正月: テーブルに鏡餅 -->
+        <g class="evp evp-newyear">
+          <ellipse cx="610" cy="882" rx="34" ry="5" fill="#3f2f22" opacity=".25" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <rect x="580" y="872" width="60" height="9" rx="3" fill="#b5804f"/>
+            <ellipse cx="610" cy="862" rx="26" ry="13" fill="#fbf6ee"/>
+            <ellipse cx="610" cy="845" rx="19" ry="10" fill="#ffffff"/>
+            <circle cx="610" cy="830" r="8" fill="#e8944f"/>
+            <path d="M610 823c3-4 7-5 10-4-1 4-5 6-10 4z" fill="#6f9f5f"/>
+          </g>
+        </g>
+        <!-- 🎍 お正月×昼: 窓に初日の出 -->
+        <g class="evp evp-hinode">
+          <circle cx="190" cy="330" r="55" fill="url(#hgFlame)"/>
+          <circle cx="190" cy="330" r="24" fill="#f0895f" opacity=".9" filter="url(#hsoft)"/>
+        </g>
+
+        <!-- 👹 節分: 恵方巻2本と豆ます -->
+        <g class="evp evp-setsubun">
+          <ellipse cx="612" cy="882" rx="40" ry="5" fill="#3f2f22" opacity=".25" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <ellipse cx="614" cy="874" rx="40" ry="8" fill="#f4ede2"/>
+            <rect x="584" y="856" width="56" height="15" rx="7.5" fill="#3f3a34"/>
+            <circle cx="637" cy="863" r="6" fill="#f4efe4"/>
+            <rect x="590" y="842" width="50" height="14" rx="7" fill="#4a443c"/>
+            <circle cx="637" cy="849" r="5.5" fill="#f4efe4"/>
+            <rect x="552" y="852" width="24" height="19" rx="2" fill="#c08a5c"/>
+            <circle cx="559" cy="851" r="2.4" fill="#e8ceA0"/>
+            <circle cx="566" cy="849" r="2.4" fill="#e8cea0"/>
+            <circle cx="571" cy="852" r="2.4" fill="#e8cea0"/>
+          </g>
+        </g>
+
+        <!-- 🍫 バレンタイン: チョコの箱 -->
+        <g class="evp evp-valentine">
+          <ellipse cx="600" cy="882" rx="32" ry="5" fill="#3f2f22" opacity=".25" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <rect x="572" y="852" width="56" height="26" rx="5" fill="#8a4b3f"/>
+            <rect x="595" y="852" width="10" height="26" fill="#e8a0b0"/>
+            <rect x="572" y="862" width="56" height="7" fill="#e8a0b0"/>
+            <circle cx="596" cy="852" r="5" fill="#f3b1c6"/>
+            <circle cx="604" cy="852" r="5" fill="#f3b1c6"/>
+            <path d="M596 856l4 6 4-6" fill="#f3b1c6"/>
+          </g>
+        </g>
+
+        <!-- 🍪 ホワイトデー: クッキーのお皿 -->
+        <g class="evp evp-whiteday">
+          <ellipse cx="600" cy="882" rx="34" ry="5" fill="#3f2f22" opacity=".25" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <ellipse cx="600" cy="872" rx="34" ry="9" fill="#ffffff"/>
+            <circle cx="586" cy="862" r="10" fill="#e0b378"/>
+            <circle cx="608" cy="858" r="10" fill="#d8a868"/>
+            <circle cx="598" cy="868" r="9" fill="#e8bd85"/>
+            <circle cx="583" cy="859" r="1.5" fill="#8a5c38"/><circle cx="590" cy="864" r="1.5" fill="#8a5c38"/>
+            <circle cx="605" cy="855" r="1.5" fill="#8a5c38"/><circle cx="612" cy="861" r="1.5" fill="#8a5c38"/>
+          </g>
+        </g>
+
+        <!-- 💠 紫陽花: 窓ぎわの鉢植え -->
+        <g class="evp evp-ajisai">
+          <ellipse cx="272" cy="1075" rx="34" ry="6" fill="#3f2f22" opacity=".25" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <path d="M248 1032h48l-6 40h-36z" fill="#b5714f"/>
+            <ellipse cx="252" cy="1022" rx="9" ry="6" fill="#6f9f5f"/>
+            <ellipse cx="292" cy="1024" rx="9" ry="6" fill="#7fae6f"/>
+            <g fill="#8f9fd8"><circle cx="262" cy="1000" r="6"/><circle cx="272" cy="994" r="6"/><circle cx="282" cy="1000" r="6"/><circle cx="272" cy="1006" r="6"/></g>
+            <g fill="#a08fd0"><circle cx="292" cy="1008" r="5"/><circle cx="300" cy="1002" r="5"/><circle cx="298" cy="1012" r="5"/></g>
+            <g fill="#7f9ed8"><circle cx="248" cy="1010" r="5"/><circle cx="242" cy="1002" r="5"/><circle cx="252" cy="1002" r="5"/></g>
+          </g>
+        </g>
+
+        <!-- 🎋 七夕: 窓ぎわの笹と短冊 -->
+        <g class="evp evp-tanabata">
+          <ellipse cx="278" cy="1100" rx="26" ry="5" fill="#3f2f22" opacity=".25" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <path d="M278 1098c-4-110 2-220 16-320" stroke="#6f8f57" stroke-width="6" fill="none" stroke-linecap="round"/>
+            <path d="M282 1000c-24-10-38-26-44-42" stroke="#6f8f57" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <path d="M288 900c22-12 34-28 38-44" stroke="#6f8f57" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <ellipse cx="296" cy="778" rx="6" ry="16" fill="#7fae6f" transform="rotate(12 296 778)"/>
+            <ellipse cx="282" cy="800" rx="5" ry="14" fill="#8fbf83" transform="rotate(-20 282 800)"/>
+            <ellipse cx="322" cy="862" rx="5" ry="14" fill="#7fae6f" transform="rotate(38 322 862)"/>
+            <ellipse cx="240" cy="962" rx="5" ry="14" fill="#8fbf83" transform="rotate(-42 240 962)"/>
+            <ellipse cx="252" cy="978" rx="5" ry="13" fill="#7fae6f" transform="rotate(-28 252 978)"/>
+            <line x1="252" y1="972" x2="252" y2="988" stroke="#c9b89a" stroke-width="1.4"/>
+            <rect x="245" y="988" width="14" height="26" rx="2" fill="#f3b1c6"/>
+            <line x1="308" y1="874" x2="308" y2="890" stroke="#c9b89a" stroke-width="1.4"/>
+            <rect x="301" y="890" width="14" height="26" rx="2" fill="#f7e08f"/>
+            <line x1="268" y1="1012" x2="268" y2="1028" stroke="#c9b89a" stroke-width="1.4"/>
+            <rect x="261" y="1028" width="14" height="26" rx="2" fill="#9fd8c9"/>
+            <line x1="296" y1="948" x2="296" y2="964" stroke="#c9b89a" stroke-width="1.4"/>
+            <rect x="289" y="964" width="14" height="26" rx="2" fill="#9fb6e8"/>
+          </g>
+        </g>
+
+        <!-- 🌕 お月見×夜: 満月(写真の三日月をやさしく覆う) -->
+        <g class="evp evp-moon">
+          <circle cx="178" cy="225" r="58" fill="url(#hgFlame)" opacity=".7"/>
+          <circle cx="178" cy="225" r="40" fill="#f2e3ae" filter="url(#hsoft)"/>
+          <circle cx="166" cy="214" r="7" fill="#e8d494" opacity=".8"/>
+          <circle cx="190" cy="238" r="9" fill="#e8d494" opacity=".7"/>
+          <circle cx="188" cy="212" r="4" fill="#e8d494" opacity=".7"/>
+        </g>
+        <!-- 🌕 お月見: お団子 -->
+        <g class="evp evp-dango">
+          <ellipse cx="565" cy="882" rx="26" ry="5" fill="#3f2f22" opacity=".25" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <ellipse cx="565" cy="874" rx="26" ry="7" fill="#f4ede2"/>
+            <circle cx="556" cy="864" r="7" fill="#fbf6ee"/>
+            <circle cx="574" cy="864" r="7" fill="#fbf6ee"/>
+            <circle cx="565" cy="852" r="7" fill="#ffffff"/>
+          </g>
+        </g>
+
+        <!-- 🎃 ハロウィン: 棚のかぼちゃランタン -->
+        <g class="evp evp-halloween">
+          <ellipse cx="900" cy="352" rx="22" ry="4.5" fill="#6b4a33" opacity=".2" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <rect x="896" y="312" width="8" height="9" rx="3" fill="#6f8f57"/>
+            <ellipse cx="900" cy="336" rx="21" ry="17" fill="#e0813f"/>
+            <ellipse cx="888" cy="336" rx="7" ry="15" fill="#d8742f" opacity=".7"/>
+            <ellipse cx="912" cy="336" rx="7" ry="15" fill="#d8742f" opacity=".7"/>
+            <path d="M890 331l6 5-9 2z" fill="#4a3428"/>
+            <path d="M910 331l-6 5 9 2z" fill="#4a3428"/>
+            <path d="M890 344c7 6 13 6 20 0-2 5-6 8-10 8s-8-3-10-8z" fill="#4a3428"/>
+          </g>
+        </g>
+
+        <!-- 🎄 クリスマス: 窓ぎわのツリーとプレゼント -->
+        <g class="evp evp-xmas">
+          <ellipse cx="272" cy="1102" rx="40" ry="6" fill="#3f2f22" opacity=".25" filter="url(#hshadow)"/>
+          <ellipse cx="348" cy="1108" rx="34" ry="5" fill="#3f2f22" opacity=".2" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".97">
+            <path d="M256 1058h32l-4 40h-24z" fill="#b5714f"/>
+            <path d="M272 878l-34 62h68z" fill="#5f8f63"/>
+            <path d="M272 918l-42 72h84z" fill="#4f7f57"/>
+            <path d="M272 968l-50 90h100z" fill="#45734d"/>
+            <path d="M272 866l4 9 10 1-7 7 2 10-9-5-9 5 2-10-7-7 10-1z" fill="#f7d878"/>
+            <circle cx="256" cy="944" r="5" fill="#d9666f"/>
+            <circle cx="288" cy="972" r="5" fill="#f7d878"/>
+            <circle cx="262" cy="1010" r="5" fill="#e8a0b0"/>
+            <circle cx="296" cy="1024" r="5" fill="#9fb6d8"/>
+            <circle cx="244" cy="1032" r="5" fill="#d9666f"/>
+            <rect x="318" y="1074" width="38" height="30" rx="4" fill="#d98a8f"/>
+            <rect x="334" y="1074" width="7" height="30" fill="#fbf0e0"/>
+            <rect x="356" y="1086" width="28" height="20" rx="3" fill="#8fa8d8"/>
+            <rect x="367" y="1086" width="6" height="20" fill="#fbf0e0"/>
+          </g>
+        </g>
+
+        <!-- 🎂 誕生日: 壁のガーランド+テーブルのケーキ -->
+        <g class="evp evp-bday">
+          <path d="M560 240q225 70 450 0" stroke="#caa77f" stroke-width="2.5" fill="none"/>
+          <g filter="url(#hsoft)" opacity=".95">
+            <path d="M596 252l11 24 11-19z" fill="#f3b1c6"/>
+            <path d="M652 268l11 24 11-19z" fill="#f7e08f"/>
+            <path d="M710 278l11 24 11-19z" fill="#9fd8c9"/>
+            <path d="M768 282l11 23 11-19z" fill="#9fb6e8"/>
+            <path d="M826 276l11 24 11-19z" fill="#f3b1c6"/>
+            <path d="M884 264l11 23 11-19z" fill="#f7e08f"/>
+            <path d="M940 248l11 23 11-19z" fill="#9fd8c9"/>
+          </g>
+          <ellipse cx="612" cy="882" rx="36" ry="5" fill="#3f2f22" opacity=".25" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".97">
+            <ellipse cx="612" cy="876" rx="36" ry="8" fill="#ffffff"/>
+            <path d="M584 846h56v26c-18 6-38 6-56 0z" fill="#fbe3ea"/>
+            <path d="M584 846c8 8 16 2 28 6 12-4 20 2 28-6v-8h-56z" fill="#e77f9f"/>
+            <rect x="592" y="822" width="40" height="18" rx="4" fill="#fdf0f2"/>
+            <line x1="612" y1="814" x2="612" y2="822" stroke="#e8b04f" stroke-width="2.5"/>
+            <ellipse cx="612" cy="810" rx="3.5" ry="5.5" fill="#ffd98f"/>
+          </g>
+        </g>
+
+        <!-- 🍰 毎月14日: 月替わりケーキ(色はプログラムが差し替え) -->
+        <g class="evp evp-cake">
+          <ellipse cx="622" cy="882" rx="30" ry="5" fill="#3f2f22" opacity=".25" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".97">
+            <ellipse cx="622" cy="876" rx="30" ry="7" fill="#ffffff"/>
+            <path d="M598 850h48v22c-15 5-33 5-48 0z" fill="var(--hm-cakeA,#fbe3ea)"/>
+            <path d="M598 850c7 7 14 2 24 5 10-3 17 2 24-5v-7h-48z" fill="var(--hm-cakeB,#e77f9f)"/>
+            <circle cx="622" cy="838" r="5" fill="#d9666f"/>
+          </g>
+        </g>
+
+        <!-- 🍰✨ 4/14: 特別デラックスケーキ -->
+        <g class="evp evp-cakedx">
+          <ellipse cx="618" cy="884" rx="38" ry="5.5" fill="#3f2f22" opacity=".25" filter="url(#hshadow)"/>
+          <g filter="url(#hsoft)" opacity=".97">
+            <ellipse cx="618" cy="878" rx="38" ry="8" fill="#ffffff"/>
+            <path d="M586 852h64v22c-20 6-44 6-64 0z" fill="var(--hm-cakeA,#fbe3ea)"/>
+            <path d="M586 852c8 8 17 2 32 5 15-3 24 3 32-5v-8h-64z" fill="var(--hm-cakeB,#e77f9f)"/>
+            <path d="M596 828h44v18c-14 4-30 4-44 0z" fill="var(--hm-cakeA,#fbe3ea)"/>
+            <path d="M596 828c6 6 12 1 22 4 10-3 16 2 22-4v-6h-44z" fill="var(--hm-cakeB,#e77f9f)"/>
+            <circle cx="602" cy="846" r="4.5" fill="#d9666f"/>
+            <circle cx="634" cy="846" r="4.5" fill="#d9666f"/>
+            <circle cx="618" cy="822" r="5" fill="#d9666f"/>
+            <line x1="618" y1="806" x2="618" y2="817" stroke="#e8b04f" stroke-width="2.5"/>
+            <ellipse cx="618" cy="801" rx="3.5" ry="6" fill="#ffd98f"/>
           </g>
         </g>
 
