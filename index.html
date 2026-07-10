@@ -529,7 +529,7 @@
   #home-overlay .lampglow{animation:hmLamp 3.8s ease-in-out infinite}
   @keyframes hmSteam{0%{opacity:0;transform:translateY(10px)}25%{opacity:.5}60%{opacity:.3}100%{opacity:0;transform:translateY(-22px)}}
   @keyframes hmMote{0%{opacity:0;transform:translateY(0)}25%{opacity:.75}100%{opacity:0;transform:translateY(-30px)}}
-  @keyframes hmLamp{0%,100%{opacity:.4}50%{opacity:.75}}
+  @keyframes hmLamp{0%,100%{opacity:.3}50%{opacity:.9}}
   @media (prefers-reduced-motion:reduce){#home-overlay *{animation:none !important}}
   /* 季節・時間帯・イベントの小物は、該当するときだけ表示 */
   #home-illus .tim,#home-illus .sea,#home-illus .evt,#home-illus .steam{display:none}
@@ -794,11 +794,19 @@
           <circle class="ntw" cx="310" cy="300" r="2.2" style="animation-delay:1.3s"/>
           <circle class="ntw" cx="150" cy="360" r="1.8" style="animation-delay:1.9s"/>
           <circle class="ntw" cx="240" cy="440" r="2" style="animation-delay:.4s"/>
+          <circle class="ntw" cx="65" cy="150" r="1.8" style="animation-delay:1s;animation-duration:3.2s"/>
+          <circle class="ntw" cx="185" cy="140" r="2.4" style="animation-delay:2.2s"/>
+          <circle class="ntw" cx="300" cy="210" r="1.6" style="animation-delay:.2s;animation-duration:3.4s"/>
+          <circle class="ntw" cx="110" cy="300" r="2" style="animation-delay:1.6s;animation-duration:2.2s"/>
+          <circle class="ntw" cx="205" cy="330" r="1.6" style="animation-delay:2.8s"/>
+          <circle class="ntw" cx="285" cy="390" r="1.8" style="animation-delay:.9s;animation-duration:3s"/>
+          <circle class="ntw" cx="80" cy="450" r="1.6" style="animation-delay:2s;animation-duration:2.4s"/>
         </g>
 
-        <!-- 💡 夕方・夜: サイドテーブルのランプのゆらぎ -->
+        <!-- 💡 夕方・夜: サイドテーブルのランプのゆらぎ(外側の光+中心の明かりの2枚重ね) -->
         <g class="anim anim-lamp">
-          <circle class="lampglow" cx="150" cy="772" r="80" fill="url(#hgFlame)"/>
+          <circle class="lampglow" cx="150" cy="772" r="95" fill="url(#hgFlame)"/>
+          <circle class="lampglow" cx="150" cy="772" r="45" fill="url(#hgFlame)" style="animation-delay:1.4s"/>
         </g>
       </svg>
     </div>
