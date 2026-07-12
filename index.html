@@ -1647,6 +1647,25 @@
       <textarea id="set-uinfo" placeholder="呼ばれたい呼び方、好きなもの、大事なこと…" style="min-height:90px"></textarea>
     </div>
     <div class="field">
+      <label>🌙 周期設定(律くんがそっと体調を気遣うため)</label>
+      <div class="toggle-row">
+        <span>周期を律くんに伝える</span>
+        <input type="checkbox" id="set-cycle-on">
+      </div>
+      <div class="hint">オンにすると「さきの周期: ◯日目(生理中/生理前など)」の1行だけを律くんに渡すよ。この情報はこの端末の中(他の設定と同じ場所)にだけ保存して、律くん(Anthropic)以外へは一切送らないよ🔒</div>
+    </div>
+    <div class="field">
+      <label>直近の開始日</label>
+      <input type="date" id="set-cycle-start">
+      <div class="backup-row">
+        <button class="btn ghost" id="cycle-today">📅 今日から開始</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>平均周期(日数)</label>
+      <input type="number" id="set-cycle-len" min="15" max="60" placeholder="28">
+    </div>
+    <div class="field">
       <label>あなたのアイコン</label>
       <div class="icon-pick">
         <img id="uicon-prev" class="u-prev" alt="">
@@ -2053,6 +2072,7 @@ let settings = {
   temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto", showUsage:false, schedule:true, diaryLen:"normal",
   synopsis:true, synopsisModel:"claude-haiku-4-5-20251001",
   home:true, anniv:"",
+  cycleOn:false, cycleStart:"", cycleLen:28,
   reflectModel:"claude-sonnet-4-6",
   mem:[]
 };
@@ -3646,6 +3666,8 @@ function buildCachedMsgs(){
   // 最新メッセージにだけ現実の時刻＋今後の予定を添える（毎回変わる＝キャッシュの外側に置く）
   const lb = asBlocks(arr[last].content);
   let note = "（※今は " + nowContext() + "）";
+  const cyc = cycleContext();
+  if(cyc) note += "\n（※" + cyc + "）";
   const sc = scheduleContext();
   if(sc) note += "\n\n# 今後の予定\n" + sc;
   if(ragRecall.length){
@@ -3705,6 +3727,22 @@ function nowContext(){
   else if(h>=18 && h<23) band="夜";
   return d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日("+wd+") "+h+"時"+String(d.getMinutes()).padStart(2,"0")+"分ごろ（"+band+"）";
 }
+// 🌙 周期の1行(オンで開始日があるときだけ)。計算はぜんぶ端末の中・律くん(Anthropic)以外へは送らない
+function cycleContext(){
+  if(!settings.cycleOn || !settings.cycleStart) return "";
+  const p = String(settings.cycleStart).split("-").map(Number);
+  if(p.length<3 || !p[1] || !p[2]) return "";
+  const start = new Date(p[0], p[1]-1, p[2]);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diff = Math.floor((today - start)/86400000);
+  if(diff < 0) return "";                            // 開始日が未来なら何も出さない
+  const len = Math.max(15, Math.min(60, Number(settings.cycleLen)||28));
+  const day = (diff % len) + 1;                      // いま周期の何日目か(1はじまり)
+  let phase = "その他";
+  if(day <= 5) phase = "生理中";
+  else if(day >= len - 3) phase = "生理前";           // 次回予定日の4日前から
+  return "さきの周期: " + day + "日目(" + phase + ")";
+}
 function buildSystem(withTime){
   withTime = withTime!==false;
   let s = settings.system || "";
@@ -3720,6 +3758,8 @@ function buildSystem(withTime){
   s += (s ? "\n\n" : "") + "# 現実の日時について\n各メッセージに「（※今は …）」という形で現実の時刻が添えられることがあります。これは現実の時刻です。普段は、その時間帯に合った自然な空気づくりにさりげなく使う程度でOK（毎回わざわざ時刻を口に出さなくてよい）。ロールプレイの中で別の時間が流れているときは、物語側の流れを優先してください。ただし、さきが「今何時？」「今日は何日？」のように、現実の時刻や日付そのものを尋ねてきたら、添えられた時刻を正確に答えること。決して適当な時刻をでっち上げないでください。また、会話の途中に「（※ここから ◯月◯日 の会話）」という印が入ることがあります。それ以降のやり取りがその日のものという意味です。「昨日」「一昨日」など日数の感覚は、この印と今の日時を基準に正確に数えてください。";
   if(withTime){
     s += (s ? "\n\n" : "") + "# 今の現実の日時\n" + nowContext();
+    const cyc = cycleContext();
+    if(cyc) s += "\n" + cyc;
     const sc = scheduleContext();
     if(sc) s += "\n\n# 今後の予定\n" + sc;
   }
@@ -3799,6 +3839,9 @@ function openSettings(){
   $("set-synopsismodel").value = settings.synopsisModel;
   $("set-home").checked = settings.home;
   $("set-anniv").value = settings.anniv || "";
+  $("set-cycle-on").checked = !!settings.cycleOn;
+  $("set-cycle-start").value = settings.cycleStart || "";
+  $("set-cycle-len").value = settings.cycleLen || 28;
   $("set-reflectmodel").value = settings.reflectModel;
   $("set-lockmin").value = String(settings.lockMin);
   $("set-fs").value = settings.fontScale; $("fs-val").textContent = Math.round(settings.fontScale*100)+"%";
@@ -3899,6 +3942,9 @@ $("save-settings").addEventListener("click", ()=>{
   settings.synopsisModel = $("set-synopsismodel").value;
   settings.home = $("set-home").checked;
   settings.anniv = $("set-anniv").value;
+  settings.cycleOn = $("set-cycle-on").checked;
+  settings.cycleStart = $("set-cycle-start").value;
+  settings.cycleLen = Math.max(15, Math.min(60, Number($("set-cycle-len").value)||28));
   settings.reflectModel = $("set-reflectmodel").value;
   settings.lockMin = Number($("set-lockmin").value);
   settings.fontScale = Number($("set-fs").value);
@@ -3916,6 +3962,7 @@ $("save-settings").addEventListener("click", ()=>{
   armIdle();
   scheduleProactive();
 });
+$("cycle-today").addEventListener("click", ()=>{ $("set-cycle-start").value = ymd(new Date()); });
 $("remove-pin").addEventListener("click", ()=>{
   if(confirm("PINロックを解除する?")){
     settings.pinHash = ""; store.set("ritsu-settings", JSON.stringify(settings));
