@@ -3517,6 +3517,7 @@ function renderAll(){
   history.forEach((m,i)=> renderMsg(m,i));
   refreshReadMarks();
   applyReadOnly();
+  refreshEditButtons();
   scrollEnd();
 }
 // 「既読」の表示を付け直す(さきの最後のLINEメッセージを律くんが読んだとき、その1つだけに付ける)
@@ -3557,15 +3558,16 @@ async function sendMessage(){
   const lm = lineMode;   // 送信した瞬間のLINEモードを、返事にも同じように使う
   const um = {role:"user", text, atts, ts:Date.now(), line: lm};
   history.push(um);
-  renderMsg(um); refreshReadMarks(); scrollEnd();
+  renderMsg(um); refreshReadMarks(); refreshEditButtons(); scrollEnd();
   persistHistory();
-
-  // typing indicator
+  await generateReply(text, lm);
+}
+// 律くんの返事を作って履歴に足す(通常の送信・編集後の送り直し で共用)
+async function generateReply(text, lm){
   busy=true; send.disabled=true;
   const tip = el("div","msg ritsu");
   const t = el("div","bubble typing"); t.appendChild(el("i"));t.appendChild(el("i"));t.appendChild(el("i"));
   tip.appendChild(t); chat.appendChild(tip); scrollEnd();
-
   try{
     const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
     ragRecall = text ? await ragSearch(text) : [];   // 意味が近い気づきを思い出す(無ければ空・失敗も空)
@@ -3602,7 +3604,7 @@ async function sendMessage(){
       const mem = extractMemories(textOut);
       const sch = extractSchedule(mem.text);
       const m = {role:"assistant", text: sch.text || "……", thinking: thinking||null, ts:Date.now(), usage: data.usage||null, line: lm};
-      history.push(m); renderMsg(m); refreshReadMarks(); scrollEnd(); persistHistory();
+      history.push(m); renderMsg(m); refreshReadMarks(); refreshEditButtons(); scrollEnd(); persistHistory();
       if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
       if(sch.added.length){ chat.appendChild(el("div","sysnote","📅 予定を追加したよ: "+sch.added.join(" / "))); scrollEnd(); }
       maybeGenerateSynopsis();
@@ -3613,6 +3615,37 @@ async function sendMessage(){
   }
   busy=false; send.disabled=false;
   scheduleProactive();
+}
+// ✏️ 自分の最新メッセージを編集→律くんが返事し直す(最新の1件だけ・送り直し方式)
+async function editLastUserMessage(m){
+  if(busy || isCurrentArchived()) return;
+  const nv = prompt("メッセージを直す（保存すると、律くんがこの内容で返事し直すよ）", m.text||"");
+  if(nv===null) return;                        // キャンセル
+  const t = nv.trim();
+  if(!t){ alert("空っぽにはできないよ🙏"); return; }
+  if(t === m.text) return;                      // 変わってなければ何もしない
+  const idx = history.indexOf(m);
+  if(idx < 0) return;
+  m.text = t; m.ts = Date.now();
+  history.length = idx + 1;                     // このメッセージより後(律の返事など)を取り除く
+  const lm = !!m.line;                          // このメッセージのLINE有無を返事に引き継ぐ
+  persistHistory(); renderAll();
+  await generateReply(t, lm);
+}
+// 最新の「自分の発言」にだけ ✏️編集 ボタンを付け直す(古い発言からは外す)
+function refreshEditButtons(){
+  document.querySelectorAll("#chat .edit-mine").forEach(b=>b.remove());
+  if(isCurrentArchived()) return;              // アーカイブ(閲覧のみ)では出さない
+  let li=-1; for(let i=history.length-1;i>=0;i--){ if(history[i].role==="user"){ li=i; break; } }
+  if(li<0) return;
+  const wrap = chat.querySelector('[data-hi="'+li+'"]');
+  if(!wrap) return;
+  const bar = wrap.querySelector(".msg-actions");
+  if(!bar) return;
+  const m = history[li];
+  const btn = el("button","msg-act-btn edit-mine","✏️ 編集");
+  btn.addEventListener("click", e=>{ e.stopPropagation(); editLastUserMessage(m); });
+  bar.appendChild(btn);
 }
 function persistHistory(){ persistThread(); }
 
@@ -3653,7 +3686,7 @@ async function sendProactive(){
         const mem = extractMemories(textOut);
         const sch = extractSchedule(mem.text);
         const m = {role:"assistant", text: sch.text || "……", thinking:null, ts:Date.now(), line: lineMode};
-        history.push(m); renderMsg(m); refreshReadMarks(); scrollEnd(); persistHistory();
+        history.push(m); renderMsg(m); refreshReadMarks(); refreshEditButtons(); scrollEnd(); persistHistory();
         if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
         if(sch.added.length){ chat.appendChild(el("div","sysnote","📅 予定を追加したよ: "+sch.added.join(" / "))); scrollEnd(); }
       }
