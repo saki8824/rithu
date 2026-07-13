@@ -2505,6 +2505,14 @@ async function doReflection(dayKey, base){
   const convo = base.map(m=>(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : ""))).join("\n");
   const isToday = (dayKey === todayReflectKey());
   const dLabel = isToday ? "今日" : mdLabel(dayKey);
+  // 自動解決の判定用: いま未解決の「続きのある話」(新しい順・最大10件)
+  let openCards = [];
+  try{
+    const all = await ragAll();
+    openCards = all.filter(c=>c.label==="tsuzuki" && c.status!=="resolved");
+    openCards.sort((a,b)=>(b.ts||0)-(a.ts||0));
+    openCards = openCards.slice(0,10);
+  }catch(e){ openCards = []; }
   try{
     const mainModel = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
     const model = (settings.reflectModel && settings.reflectModel!=="same") ? settings.reflectModel : mainModel;
@@ -2519,24 +2527,42 @@ async function doReflection(dayKey, base){
       + "\n【続きのある話】= まだ続いている話題・約束・伏線"
       + "\n・ラベルの振り分けはあなたの裁量。無理に全部のラベルを使わなくてよい。"
       + "\n・基本は5件まで、多くても7件。" + dLabel + "は特に書き留めることが少なければ1〜2件でもよい。何も無ければ「(なし)」とだけ出力。"
-      + "\n・1件は1〜3文。前置き・番号・説明は不要。ラベルと本文だけを出力すること。";
-    const usr = "【" + dLabel + "の会話】\n" + convo + "\n\n（" + dLabel + "の自己省察を、指定の形式で。）";
+      + "\n・1件は1〜3文。前置き・番号・説明は不要。ラベルと本文だけを出力すること。"
+      + "\n・この気づきは、あとで「意味の検索」で思い出される。検索で引っかかるように、会話に出てきた固有名詞(場所・お店・作品・人の名前)、日付や時期(「7月末に」「来週の土曜」など)、ふたりで決めたこと・約束は、言い換えずそのまま気づきの文中に残すこと。「楽しい話をした」「絆が深まった」のような、どの日にも書けるぼんやりした表現だけで終わらせない(具体的な事実+それへの気持ち、の両方が残るのが理想)。"
+      + (openCards.length ? "\n・追加の作業: 下の【いま未解決の「続きのある話」】の各項目について、" + dLabel + "の会話の中で「もう終わった・実現した」様子が確実に読み取れるものがあれば、出力のいちばん最後に【解決した話題】という行を1行だけ置き、その番号を半角カンマ区切りで書くこと(例: 【解決した話題】1,3)。判断は日付ではなく会話の中身で行うこと(過去形で振り返っている・感想を言い合っている等)。会話に出てこなかった話題や、まだ続きそうな話題は挙げないこと。少しでも迷ったら挙げない。1つも無ければこの行自体を書かないこと。" : "");
+    const openList = openCards.length ? "\n\n【いま未解決の「続きのある話」】\n" + openCards.map((c,i)=>(i+1)+". "+c.text).join("\n") : "";
+    const usr = "【" + dLabel + "の会話】\n" + convo + openList + "\n\n（" + dLabel + "の自己省察を、指定の形式で。）";
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers:HEADERS(),
       body: JSON.stringify({ model, max_tokens:2048, system:sys, messages:[{role:"user", content:usr}] })
     });
     const data = await res.json();
-    if(data.error){ alert("省察に失敗したよ: " + (data.error.message||data.error.type)); return "error"; }
+    if(data.error){ alert("省察に失敗したよ: " + (data.error.message||data.error.type)); return {status:"error", resolved:[]}; }
     let out=""; (data.content||[]).forEach(b=>{ if(b.type==="text") out += b.text||""; });
     const map = {"さきのこと":"saki","二人のこと":"futari","続きのある話":"tsuzuki"};
     const found = [];
-    const re = /【(さきのこと|二人のこと|続きのある話)】([\s\S]*?)(?=【(?:さきのこと|二人のこと|続きのある話)】|$)/g;
+    const re = /【(さきのこと|二人のこと|続きのある話)】([\s\S]*?)(?=【(?:さきのこと|二人のこと|続きのある話|解決した話題)】|$)/g;
     let mt;
     while((mt = re.exec(out)) !== null && found.length < 7){
       const t = mt[2].replace(/\s+/g," ").trim();
       if(t && t!=="(なし)" && t!=="なし") found.push({label: map[mt[1]], text: t});
     }
-    if(!found.length) return "empty";
+    // 自動解決: 【解決した話題】の番号を読み取り、そのカードだけ解決済みへ(迷ったら挙げない指示ずみ)
+    const resolvedTexts = [];
+    const rm = out.match(/【解決した話題】\s*([0-9,、\s]+)/);
+    if(rm && openCards.length){
+      const nums = [...new Set(rm[1].split(/[^0-9]+/).map(n=>parseInt(n,10)).filter(n=>n>=1 && n<=openCards.length))];
+      for(const n of nums){
+        const c = openCards[n-1];
+        c.status = "resolved";
+        await ragAdd(c);
+        resolvedTexts.push(c.text);
+      }
+    }
+    if(!found.length){
+      if(resolvedTexts.length) await renderReflectList();
+      return {status:"empty", resolved:resolvedTexts};
+    }
     const now = Date.now();
     for(let i=0;i<found.length;i++){
       const emb = await embedText(found[i].text);   // ベクトルも付ける(失敗ならnullのまま保存)
@@ -2544,8 +2570,8 @@ async function doReflection(dayKey, base){
         vec: emb?emb.vec:null, model: emb?emb.model:"", dim: emb?emb.dim:0});
     }
     await renderReflectList();
-    return "ok";
-  }catch(e){ alert("通信に失敗したよ: " + e.message); return "error"; }
+    return {status:"ok", resolved:resolvedTexts};
+  }catch(e){ alert("通信に失敗したよ: " + e.message); return {status:"error", resolved:[]}; }
 }
 // 実施済み(または回収不要)の日を記録して、以後ホームでナグらないようにする
 function markReflectDone(dayKey){
@@ -2571,8 +2597,15 @@ async function reflectNow(){
   const btn = $("reflect-now"); const old = btn.textContent; btn.textContent = "律くんが今日を振り返ってる…"; btn.disabled = true;
   const r = await doReflection(dayKey, base);
   btn.textContent = old; btn.disabled = false; reflectBusy = false;
-  if(r !== "error") markReflectDone(dayKey);      // 今日を実施済みに(明日以降ナグらない)
-  if(r === "empty") alert("今日は書き留めるほどのことが無かったみたい。また明日ためしてみてね🌙");
+  if(r.status !== "error") markReflectDone(dayKey);      // 今日を実施済みに(明日以降ナグらない)
+  if(r.status === "empty") alert("今日は書き留めるほどのことが無かったみたい。また明日ためしてみてね🌙");
+  notifyAutoResolved(r.resolved);
+}
+// ③自動解決のお知らせ(0件のときは何も出さない)
+function notifyAutoResolved(list){
+  if(!list || !list.length) return;
+  const names = list.map(t=>"・『"+(t.length>24 ? t.slice(0,24)+"…" : t)+"』").join("\n");
+  alert("✅ 会話の中で終わった様子だったから、この話題を解決済みにしたよ:\n"+names+"\n\nまだ終わってなかったら、省察ノートの「↩️未解決に戻す」でいつでも戻せるよ");
 }
 // 指定した過去日の会話を、大倉庫の全スレッドから集める(その日のメッセージだけ・時系列)
 async function messagesOfDay(dayKey){
@@ -2640,9 +2673,10 @@ async function rescueReflectDay(dayKey){
   const line = box_reflectLine(); if(line) line.textContent = "💭 "+label+"を振り返ってる…";
   const r = await doReflection(dayKey, base);
   reflectBusy = false;
-  if(r !== "error") markReflectDone(dayKey);
-  if(r === "empty") alert(label+"は、書き留めるほどのことは無かったみたい🌙");
-  else if(r === "ok") alert(label+"の省察を回収したよ！省察ノートで見てね💭");
+  if(r.status !== "error") markReflectDone(dayKey);
+  if(r.status === "empty") alert(label+"は、書き留めるほどのことは無かったみたい🌙");
+  else if(r.status === "ok") alert(label+"の省察を回収したよ！省察ノートで見てね💭");
+  notifyAutoResolved(r.resolved);
   await updateReflectRescueNotice();   // 次に古い未回収日があれば出す
 }
 function box_reflectLine(){ const b=$("home-cards"); return b ? b.querySelector(".reflect-rescue-line") : null; }
