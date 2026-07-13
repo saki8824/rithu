@@ -632,15 +632,6 @@
     align-self:flex-start;max-width:70%;
   }
   .home-cards{display:flex;flex-direction:column;gap:8px;margin-top:2px}
-  .home-card{
-    display:flex;align-items:center;gap:11px;
-    background:var(--night-2);border:1px solid var(--line);border-radius:18px;
-    padding:14px 16px;box-shadow:0 4px 14px rgba(0,0,0,.06);
-  }
-  .home-card-ic{font-size:20px;flex:0 0 auto}
-  .home-card-main{min-width:0}
-  .home-card-ttl{font-size:14px;font-weight:600;color:var(--text)}
-  .home-card-sub{font-size:12px;color:var(--muted);margin-top:2px}
   .home-spacer{flex:1 1 auto;min-height:10px}
   #home-talk{
     border:none;border-radius:22px;padding:16px;font-family:inherit;
@@ -2070,9 +2061,9 @@ async function migrateThreadsToBig(){
 let settings = {
   key:"", googleKey:"", model:"claude-opus-4-8", customModel:"",
   think:true, budget:3000, window:30, system:"", pinHash:"",
-  memory:"", autoMemory:false, uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
+  memory:"", uname:"", uinfo:"", uicon:"", aicon:"", selfMemory:true,
   proactive:false, proMin:3, selfMemFreq:"low",
-  temp:1, summaryModel:"claude-haiku-4-5-20251001", lockMin:15, fontScale:1, theme:"auto", showUsage:false, schedule:true, diaryLen:"normal",
+  temp:1, lockMin:15, fontScale:1, theme:"auto", showUsage:false, schedule:true, diaryLen:"normal",
   synopsis:true, synopsisModel:"claude-haiku-4-5-20251001",
   home:true, anniv:"",
   cycleOn:false, cycleStart:"", cycleLen:28,
@@ -2113,7 +2104,6 @@ if(!Array.isArray(settings.mem)){
   CATKEYS.forEach(k=> addLines(old[k], k));
   if(typeof settings.memory==="string" && settings.memory.trim()){ addLines(settings.memory, "other"); settings.memory=""; }
   settings.mem = cards;
-  settings.autoMemory = false; // カード式では自動要約(全書き換え)は使わない
   store.set("ritsu-settings", JSON.stringify(settings));
 }
 if(!Array.isArray(settings.mem)) settings.mem = [];
@@ -3196,16 +3186,6 @@ async function refreshSynopsisNow(){
   await generateSynopsis();
   btn.textContent = old; btn.disabled = false;
   renderSynopsis();
-}
-
-/* ---------- 設定を指定タブで開く ---------- */
-function openSettingsPane(pane){
-  openSettings();
-  if(pane){
-    document.querySelectorAll("#tabbar .tab").forEach(t=> t.classList.toggle("on", t.dataset.pane===pane));
-    document.querySelectorAll("#settings .pane").forEach(p=> p.classList.toggle("on", p.dataset.pane===pane));
-    $("settings").scrollTop = 0;
-  }
 }
 
 /* ---------- 予定表(カレンダー) ---------- */
