@@ -3647,6 +3647,7 @@ async function generateReply(text, lm){
     const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
     ragRecall = text ? await ragSearch(text) : [];   // 意味が近い気づきを思い出す(無ければ空・失敗も空)
     await refreshTsuzukiCtx();                        // 続きのある話(未解決)を毎回そのまま渡すぶんを用意
+    await refreshWeather();                            // 🌤️ 名古屋の今日の天気を用意(30分に1回だけ取り直す)
     const msgs = buildCachedMsgs(lm);
     const sysStable = buildSystem(false);
     // システムは[キャッシュされる本体]+[LINEモード中だけの文体指示(キャッシュ外)]の2ブロック。
@@ -3747,6 +3748,7 @@ async function sendProactive(){
     const base = windowSlice().map(m=>({role:m.role==="user"?"user":"assistant", content: toContent(m) || "…"}));
     const nudge = {role:"user", content:"[システム] ユーザーはしばらく静かにしています。律として、あなたの方から自然に、短めに話しかけてください。"};
     await refreshTsuzukiCtx();                        // 続きのある話(未解決)を用意
+    await refreshWeather();                            // 🌤️ 名古屋の今日の天気を用意(30分に1回だけ取り直す)
     // LINEモード中は自発メッセージもLINEの文体で(見た目とおそろい)
     const sysP = (buildSystem() || "") + (lineMode ? "\n\n" + LINE_MODE_RULE : "");
     const res = await fetch("https://api.anthropic.com/v1/messages",{
@@ -3896,6 +3898,7 @@ function buildCachedMsgs(lineOn){
   // 最新メッセージにだけ現実の時刻＋今後の予定を添える（毎回変わる＝キャッシュの外側に置く）
   const lb = asBlocks(arr[last].content);
   let note = "（※今は " + nowContext() + "）";
+  if(weatherCtx) note += "\n（※" + weatherCtx + "）";
   const cyc = cycleContext();
   if(cyc) note += "\n（※" + cyc + "）";
   const sc = scheduleContext();
@@ -3981,6 +3984,50 @@ async function refreshTsuzukiCtx(){
     tsuzukiCtx = top.length ? "【続きのある話(未解決)】\n" + top.map(c=>"・"+c.text).join("\n") : "";
   }catch(e){ tsuzukiCtx = ""; }                  // 失敗しても会話は止めない
 }
+// 🌤️ 名古屋の今日の天気(無料のOpen-Meteo・登録不要)。GPSは送らず街のだいたいの座標だけ使う。1行だけ律くんに渡す
+const WEATHER_LAT = 35.18, WEATHER_LON = 136.91;   // 名古屋のだいたいの位置
+const WEATHER_CITY = "名古屋";
+const WEATHER_TTL = 30*60000;                      // 30分は取り直さない(無駄打ちふせぎ)
+let weatherCtx = "";                               // 律くんに渡す1行(例: 今日の名古屋は 晴れ、28度ごろ)
+let weatherAt = 0, weatherTriedAt = 0;             // 最後に取れた時刻 / 最後に試した時刻
+function weatherName(code){                        // 天気コード(数字)を日本語に
+  const c = Number(code);
+  if(c===0) return "快晴";
+  if(c===1) return "晴れ";
+  if(c===2) return "晴れときどきくもり";
+  if(c===3) return "くもり";
+  if(c===45||c===48) return "霧";
+  if(c>=51&&c<=57) return "霧雨";
+  if(c>=61&&c<=67) return "雨";
+  if(c>=71&&c<=77) return "雪";
+  if(c>=80&&c<=82) return "にわか雨";
+  if(c>=85&&c<=86) return "にわか雪";
+  if(c===95) return "雷雨";
+  if(c>=96&&c<=99) return "雷雨（ひょうを伴うことも）";
+  return "";
+}
+async function refreshWeather(){
+  const now = Date.now();
+  if(weatherCtx && (now-weatherAt) < WEATHER_TTL) return;   // まだ新しいのがあるので取り直さない
+  if((now-weatherTriedAt) < 5*60000) return;               // 直近5分で試したばかりなら再挑戦しない(連打ふせぎ)
+  weatherTriedAt = now;
+  try{
+    const ctl = new AbortController();
+    const to = setTimeout(()=>ctl.abort(), 8000);          // 8秒で見切り(天気が取れなくても会話は止めない)
+    const url = "https://api.open-meteo.com/v1/forecast?latitude="+WEATHER_LAT+"&longitude="+WEATHER_LON
+      + "&current=temperature_2m,weather_code&timezone=Asia%2FTokyo";
+    const res = await fetch(url, {signal: ctl.signal});
+    clearTimeout(to);
+    const d = await res.json();
+    const cur = d && d.current;
+    if(!cur) return;                                       // 取れなければ前のまま
+    const name = weatherName(cur.weather_code);
+    const temp = Math.round(Number(cur.temperature_2m));
+    if(!name || isNaN(temp)) return;
+    weatherCtx = "今日の" + WEATHER_CITY + "は " + name + "、" + temp + "度ごろ";
+    weatherAt = now;
+  }catch(e){ /* 失敗しても前のまま・会話は止めない */ }
+}
 // 🌙 周期の1行(オンで開始日があるときだけ)。計算はぜんぶ端末の中・律くん(Anthropic)以外へは送らない
 function cycleContext(){
   if(!settings.cycleOn || !settings.cycleStart) return "";
@@ -4009,9 +4056,10 @@ function buildSystem(withTime){
     s += (s ? "\n\n" : "") + "# これまでの記憶\n" + mt;
   }
   const ay = ayumiContext();   // あゆみは下の【過去の記録】の枠にまとめて入れる(今日との混同ふせぎ)
-  s += (s ? "\n\n" : "") + "# 現実の日時について\n各メッセージに「（※今は …）」という形で現実の時刻が添えられることがあります。これは現実の時刻です。普段は、その時間帯に合った自然な空気づくりにさりげなく使う程度でOK（毎回わざわざ時刻を口に出さなくてよい）。ロールプレイの中で別の時間が流れているときは、物語側の流れを優先してください。ただし、さきが「今何時？」「今日は何日？」のように、現実の時刻や日付そのものを尋ねてきたら、添えられた時刻を正確に答えること。決して適当な時刻をでっち上げないでください。また、会話の途中に「（※ここから ◯月◯日 の会話）」という印が入ることがあります。それ以降のやり取りがその日のものという意味です。「昨日」「一昨日」など日数の感覚は、この印と今の日時を基準に正確に数えてください。";
+  s += (s ? "\n\n" : "") + "# 現実の日時について\n各メッセージに「（※今は …）」という形で現実の時刻が添えられることがあります。これは現実の時刻です。普段は、その時間帯に合った自然な空気づくりにさりげなく使う程度でOK（毎回わざわざ時刻を口に出さなくてよい）。ロールプレイの中で別の時間が流れているときは、物語側の流れを優先してください。ただし、さきが「今何時？」「今日は何日？」のように、現実の時刻や日付そのものを尋ねてきたら、添えられた時刻を正確に答えること。決して適当な時刻をでっち上げないでください。また、会話の途中に「（※ここから ◯月◯日 の会話）」という印が入ることがあります。それ以降のやり取りがその日のものという意味です。「昨日」「一昨日」など日数の感覚は、この印と今の日時を基準に正確に数えてください。また、メッセージに「（※今日の名古屋は 晴れ、28度ごろ）」のような、現実の天気が添えられることがあります。これも現実の天気です。普段は会話の空気づくりや、さきの体調をさりげなく気づかう手がかりに使う程度でよく、毎回わざわざ天気の話題を持ち出す必要はありません。さきが天気そのものを尋ねてきたときは、添えられた内容を正確に答えてください。";
   if(withTime){
     s += (s ? "\n\n" : "") + "# 今の現実の日時\n" + nowContext();
+    if(weatherCtx) s += "\n（※" + weatherCtx + "）";
     const cyc = cycleContext();
     if(cyc) s += "\n" + cyc;
     const sc = scheduleContext();
