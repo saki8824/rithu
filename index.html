@@ -3130,7 +3130,7 @@ async function generateSynopsis(){
     const model = (settings.synopsisModel && settings.synopsisModel!=="same")
       ? settings.synopsisModel
       : (settings.model==="custom" ? (settings.customModel||"").trim() : settings.model);
-    const sys = "あなたは会話の記録係です。さきと律の『今日の会話のあらすじ』を作ります。これまでのあらすじ(あれば)に新しい会話の流れを自然につなげて、今日一日の出来事・話題・気持ちの流れが分かる簡潔なあらすじに更新してください。短い箇条書きでも文章でもよいですが、全体で8行程度までに収めること。日付や前置きは書かず、あらすじ本文だけを出力してください。";
+    const sys = "あなたは会話の記録係です。さきと律の『今日の会話のあらすじ』を作ります。これまでのあらすじ(あれば)に新しい会話の流れを自然につなげて、今日一日の出来事・話題・気持ちの流れが分かる簡潔なあらすじに更新してください。決まったこと・約束・結論（日付・場所・名前・数など）は、ぼかしたり言い換えたりせず具体的にそのまま残すこと。『〜について話した』だけで終わらせず、決まったのなら『〜に決まった』と書くこと。短い箇条書きでも文章でもよいですが、全体で10行程度までに収めること。日付や前置きは書かず、あらすじ本文だけを出力してください。";
     const usr = "【これまでの今日のあらすじ】\n" + (synopsis.text || "(まだ無い)") + "\n\n【新しい会話】\n" + recent + "\n\n更新後の今日のあらすじ:";
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers:HEADERS(),
@@ -3152,6 +3152,19 @@ function maybeGenerateSynopsis(){
   compressAyumi();   // 日ごとの記録が7日ぶんたまっていたら週まとめに(中では何もしない日がほとんど)
   synopsis.turns = (synopsis.turns||0) + 1; saveSynopsis();
   if(synopsis.turns % 10 === 0) generateSynopsis();
+}
+// 朝の会話などが「10往復たまる前」に途切れると、あらすじに入らないまま置き去りになる。
+// アプリを開いたとき等に呼ばれ、2時間以上前の未収録会話があれば裏でそっとあらすじを追いつかせる(会話は邪魔しない)。
+function maybeCatchupSynopsis(){
+  if(!settings.synopsis || !settings.key || synopsisBusy) return;
+  ensureSynopsisToday();
+  const day0 = new Date();
+  if(day0.getHours() < DIARY_DATE_SWITCH_HOUR) day0.setDate(day0.getDate()-1);
+  day0.setHours(DIARY_DATE_SWITCH_HOUR,0,0,0);
+  const fromTs = Math.max(synopsis.upTs||0, day0.getTime());
+  const cutoff = Date.now() - 2*3600000;   // 「2時間以上前」の会話だけ対象(直近の話はまだ会話の窓にあるので急がない)
+  const stale = history.some(m=> (m.ts||0) > fromTs && (m.ts||0) < cutoff && ((m.text||"").trim() || (m.atts&&m.atts.length)));
+  if(stale) generateSynopsis();
 }
 // 「ふたりのあゆみ」圧縮: 日ごとの記録7日ぶん→週まとめ1つ(Haiku・週1回だけ動く)
 let ayumiBusy = false;
@@ -3981,7 +3994,10 @@ async function refreshTsuzukiCtx(){
     const open = all.filter(c=> c.label==="tsuzuki" && c.status!=="resolved");
     open.sort((a,b)=>(b.ts||0)-(a.ts||0));      // 新しい順
     const top = open.slice(0,5);                 // 最大5件
-    tsuzukiCtx = top.length ? "【続きのある話(未解決)】\n" + top.map(c=>"・"+c.text).join("\n") : "";
+    tsuzukiCtx = top.length
+      ? "【続きのある話(未解決)】\n" + top.map(c=>"・"+c.text).join("\n")
+        + "\n※これは過去の省察の時点でのメモ。今日の会話や「今日のあらすじ」の方が新しい情報なので、すでに進展・解決していたらそちらが正しい。解決済みのことをあらためて切り出したり、蒸し返したりしないこと。"
+      : "";
   }catch(e){ tsuzukiCtx = ""; }                  // 失敗しても会話は止めない
 }
 // 🌤️ 名古屋の今日の天気(無料のOpen-Meteo・登録不要)。GPSは送らず街のだいたいの座標だけ使う。1行だけ律くんに渡す
@@ -4363,6 +4379,7 @@ document.addEventListener("visibilitychange", ()=>{
     if(settings.pinHash && m!==-1 && (m===0 || (Date.now()-hiddenAt) >= m*60000)){ showLock(); }
     else { armIdle(); }
     scheduleProactive();
+    maybeCatchupSynopsis();   // 戻ってきたとき、置き去りの会話があれば、あらすじを裏で追いつかせる
   }
 });
 function afterUnlock(){ if(!settings.key) openSettings(); else if(settings.home) openHome(); armIdle(); }
@@ -4397,6 +4414,7 @@ ensureSynopsisToday();
   renderAll();
   initLock();
   scheduleProactive();
+  maybeCatchupSynopsis();   // 置き去りの会話(朝の分など)があれば、あらすじを裏で追いつかせる
 })();
 </script>
 </body>
