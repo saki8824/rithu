@@ -3031,7 +3031,7 @@ function toggleLike(m, btn, wrap){
     if(likes.length>50) likes = likes.slice(-50);      // 記録は最新50件まで
   }
   saveLikes(); persistHistory();                       // 印はメッセージ本体(大倉庫)にも乗る
-  if(btn) btn.textContent = m.liked ? "❤️ いいね済み" : "🤍 いいね";
+  if(btn) btn.textContent = m.liked ? "❤️" : "🤍";
   if(wrap){
     const mk = wrap.querySelector(".like-mark");
     if(m.liked && !mk){ const row = wrap.querySelector(".bubble-row"); if(row) row.appendChild(el("span","like-mark","❤️")); }
@@ -3502,31 +3502,32 @@ async function copyText(t){
 }
 function attachActions(wrap, bub, text, role, m){
   const bar = el("div","msg-actions");
-  const copyBtn = el("button","msg-act-btn","📋 コピー");
+  // ボタンは絵文字のみ表示(スマホでのはみ出しふせぎ)。長押しで名前が出るようtitleを付ける
+  const copyBtn = el("button","msg-act-btn","📋"); copyBtn.title = "コピー";
   copyBtn.addEventListener("click", async e=>{
     e.stopPropagation();
     const ok = await copyText(text);
-    copyBtn.textContent = ok ? "✓ コピーしたよ" : "コピー失敗…";
-    setTimeout(()=>{ copyBtn.textContent = "📋 コピー"; }, 1500);
+    copyBtn.textContent = ok ? "✅" : "⚠️";
+    setTimeout(()=>{ copyBtn.textContent = "📋"; }, 1200);
   });
   bar.appendChild(copyBtn);
-  const memBtn = el("button","msg-act-btn","🧠 記憶に追加");
+  const memBtn = el("button","msg-act-btn","🧠"); memBtn.title = "記憶に追加";
   memBtn.addEventListener("click", e=>{ e.stopPropagation(); addMessageToMemory(text); });
   bar.appendChild(memBtn);
   // 律くんのセリフだけ「🔖 お気に入り」を出す（記憶とは別もの）
   if(role==="assistant"){
-    const favBtn = el("button","msg-act-btn","🔖 お気に入り");
+    const favBtn = el("button","msg-act-btn","🔖"); favBtn.title = "お気に入り";
     favBtn.addEventListener("click", e=>{
       e.stopPropagation();
       addToFavorites(text);
-      favBtn.textContent = "⭐ 保存したよ";
-      setTimeout(()=>{ favBtn.textContent = "🔖 お気に入り"; }, 1500);
+      favBtn.textContent = "⭐";
+      setTimeout(()=>{ favBtn.textContent = "🔖"; }, 1200);
     });
     bar.appendChild(favBtn);
   }
   // ❤️いいね(律くんの返答だけ・「この感じをもっと」のリクエスト。押し直しで取り消せる)
   if(role==="assistant" && m){
-    const likeBtn = el("button","msg-act-btn", m.liked ? "❤️ いいね済み" : "🤍 いいね");
+    const likeBtn = el("button","msg-act-btn", m.liked ? "❤️" : "🤍"); likeBtn.title = "いいね";
     likeBtn.addEventListener("click", e=>{ e.stopPropagation(); toggleLike(m, likeBtn, wrap); });
     bar.appendChild(likeBtn);
   }
@@ -3717,7 +3718,7 @@ function refreshEditButtons(){
   const bar = wrap.querySelector(".msg-actions");
   if(!bar) return;
   const m = history[li];
-  const btn = el("button","msg-act-btn edit-mine","✏️ 編集");
+  const btn = el("button","msg-act-btn edit-mine","✏️"); btn.title = "編集";
   btn.addEventListener("click", e=>{ e.stopPropagation(); editLastUserMessage(m); });
   bar.appendChild(btn);
 }
