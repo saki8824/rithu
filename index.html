@@ -3647,7 +3647,7 @@ async function generateReply(text, lm){
     const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
     ragRecall = text ? await ragSearch(text) : [];   // 意味が近い気づきを思い出す(無ければ空・失敗も空)
     await refreshTsuzukiCtx();                        // 続きのある話(未解決)を毎回そのまま渡すぶんを用意
-    const msgs = buildCachedMsgs();
+    const msgs = buildCachedMsgs(lm);
     const sysStable = buildSystem(false);
     // システムは[キャッシュされる本体]+[LINEモード中だけの文体指示(キャッシュ外)]の2ブロック。
     // 後ろに足すだけなので、LINEモードを切り替えてもキャッシュは壊れない。
@@ -3876,7 +3876,7 @@ function chatDayStr(ts){   // その発言が「どの日の会話か」(午前4
   if(d.getHours() < DIARY_DATE_SWITCH_HOUR) d.setDate(d.getDate()-1);
   return (d.getMonth()+1)+"月"+d.getDate()+"日("+["日","月","火","水","木","金","土"][d.getDay()]+")";
 }
-function buildCachedMsgs(){
+function buildCachedMsgs(lineOn){
   // 日付が変わる境目に「（※ここから◯月◯日の会話）」の印を入れる。
   // 過去の印は不変なのでキャッシュは壊れない。律くんの日付感覚のズレ防止。
   let prevDay = "";
@@ -3912,6 +3912,10 @@ function buildCachedMsgs(){
     note += "\n\n# さきが❤️を付けた返答（抜粋）\n"
       + recentLikes.map(x=>"・「"+x.excerpt+"」").join("\n")
       + "\n" + LIKE_IMMEDIATE_RULE;
+  }
+  // 📱 LINEモード中だけ、返事を書く直前の“いちばん近い場所”にも短く念押し（本体側の指示は残したまま二重にして届きやすく）
+  if(lineOn){
+    note += "\n\n（※今はLINEモード：地の文や情景描写・【律の内心】は書かず、セリフ本文だけを短く1〜4行で。絵文字は控えめに、使っても1個まで。）";
   }
   lb.unshift({type:"text", text: note});
   arr[last].content = lb;
