@@ -356,6 +356,7 @@
   /* 💕 ハートの雨(だいすきボタン・API不使用の完全無料のお楽しみ) */
   #heart-rain{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
   .hr-heart{position:fixed;top:-48px;will-change:transform;animation:hrFall linear forwards}
+  .hr-heart svg{display:block;filter:drop-shadow(0 2px 3px rgba(233,119,149,.30))}
   @keyframes hrFall{
     0%{transform:translateY(0) rotate(-8deg)}
     100%{transform:translateY(115vh) rotate(14deg)}
@@ -4227,13 +4228,15 @@ $("thread-search").addEventListener("input", e=>{ threadQuery = e.target.value.t
 function heartRain(){
   let ov = $("heart-rain");
   if(!ov){ ov = document.createElement("div"); ov.id = "heart-rain"; document.body.appendChild(ov); }
-  const emo = ["❤️","💕","💗","💖","💓"];
+  // 絵文字でなく、アプリの雰囲気に合わせた手描き風ハート(SVG)。色はパステルピンク5色からランダム
+  const cols = ["#f19db4","#ee8aa6","#f6b8c8","#e97795","#f9cdd8"];
   for(let i=0;i<24;i++){
     const h = document.createElement("span");
     h.className = "hr-heart";
-    h.textContent = emo[Math.floor(Math.random()*emo.length)];
+    const size = Math.round(12+Math.random()*18);              // 大きさはランダム
+    const col = cols[Math.floor(Math.random()*cols.length)];
+    h.innerHTML = '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'" fill="'+col+'" opacity="'+(0.75+Math.random()*0.25).toFixed(2)+'"><path d="M12 19.6C5.6 15.6 4 11.9 4 9.3 4 7 5.9 5.6 8 5.6c1.4 0 2.7.7 4 2.2 1.3-1.5 2.6-2.2 4-2.2 2.1 0 4 1.4 4 3.7 0 2.6-1.6 6.3-8 10.3Z"/></svg>';
     h.style.left = (Math.random()*94)+"vw";                    // 横の位置はランダム
-    h.style.fontSize = (14+Math.random()*20)+"px";             // 大きさもランダム
     h.style.animationDuration = (2.4+Math.random()*2.2)+"s";   // 落ちる速さもランダム
     h.style.animationDelay = (Math.random()*0.9)+"s";          // 少しずつ時間差で降る
     h.addEventListener("animationend", ()=> h.remove());       // 落ちきったら消える(たまりっぱなし防止)
