@@ -2301,7 +2301,7 @@ function ragOpen(){
   return new Promise((resolve)=>{
     if(ragDB){ resolve(ragDB); return; }
     try{
-      const req = indexedDB.open("ritsu-rag", 1);
+      const req = indexedDB.open("ritsu-rag", 2);   // v2: あゆみ用の棚を増築(既存の気づきの棚は無傷)
       req.onupgradeneeded = (e)=>{
         const db = e.target.result;
         if(!db.objectStoreNames.contains("insights")){
@@ -2309,9 +2309,15 @@ function ragOpen(){
           os.createIndex("ts","ts",{unique:false});
           os.createIndex("label","label",{unique:false});
         }
+        // 🗂️ 長期記憶(あゆみRAG)の棚。1件={id,text,kind:"day"/"week",label(表示用の日付),ts,vec,model,dim}
+        if(!db.objectStoreNames.contains("ayumi")){
+          const oa = db.createObjectStore("ayumi", {keyPath:"id"});
+          oa.createIndex("ts","ts",{unique:false});
+        }
       };
       req.onsuccess = ()=>{ ragDB = req.result; resolve(ragDB); };
       req.onerror = ()=>resolve(null);
+      req.onblocked = ()=>resolve(null);   // 別タブが古い倉庫を開きっぱなしのとき、待たずにあきらめる(会話を止めない)
     }catch(e){ resolve(null); }
   });
 }
@@ -2354,6 +2360,51 @@ async function ragClear(){                       // 全消し(お掃除用。呼
     try{
       const tx = db.transaction("insights","readwrite");
       tx.objectStore("insights").clear();
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>resolve(false);
+    }catch(e){ resolve(false); }
+  });
+}
+/* 🗂️ 長期記憶(あゆみRAG)の棚用の道具。気づき用と同じ作り(失敗は静かにfalse/[]でチャット継続) */
+async function ragAyAdd(rec){                    // あゆみ1件しまう(同じidなら上書き)
+  const db = await ragOpen(); if(!db) return false;
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("ayumi","readwrite");
+      tx.objectStore("ayumi").put(rec);
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>resolve(false);
+    }catch(e){ resolve(false); }
+  });
+}
+async function ragAyAll(){                       // あゆみぜんぶ取り出す(検索・ベクトル付与用)
+  const db = await ragOpen(); if(!db) return [];
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("ayumi","readonly");
+      const rq = tx.objectStore("ayumi").getAll();
+      rq.onsuccess = ()=>resolve(rq.result||[]);
+      rq.onerror = ()=>resolve([]);
+    }catch(e){ resolve([]); }
+  });
+}
+async function ragAyDelete(id){                  // あゆみ1件消す
+  const db = await ragOpen(); if(!db) return false;
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("ayumi","readwrite");
+      tx.objectStore("ayumi").delete(id);
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>resolve(false);
+    }catch(e){ resolve(false); }
+  });
+}
+async function ragAyClear(){                     // あゆみ全消し(バックアップ復元用)
+  const db = await ragOpen(); if(!db) return false;
+  return new Promise((resolve)=>{
+    try{
+      const tx = db.transaction("ayumi","readwrite");
+      tx.objectStore("ayumi").clear();
       tx.oncomplete = ()=>resolve(true);
       tx.onerror = ()=>resolve(false);
     }catch(e){ resolve(false); }
