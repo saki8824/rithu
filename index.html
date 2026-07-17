@@ -323,23 +323,23 @@
   }
   .menu-sec::before,.menu-sec::after{content:"";flex:1;height:1px;background:var(--line)}
   .menu-grid{
-    display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:2px;
+    display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:2px;
   }
   .menu-cat{
-    display:flex;flex-direction:column;align-items:center;gap:8px;
-    background:var(--night-2);border:1px solid var(--line);border-radius:16px;
-    padding:14px 10px;color:var(--text);font-family:inherit;font-size:12.5px;font-weight:600;
+    display:flex;flex-direction:column;align-items:center;gap:7px;
+    background:var(--night-2);border:1px solid var(--line);border-radius:15px;
+    padding:11px 8px;color:var(--text);font-family:inherit;font-size:12px;font-weight:600;
     transition:transform .14s, box-shadow .14s, border-color .14s;
     box-shadow:0 3px 12px rgba(0,0,0,.06);
   }
   .menu-cat:active{transform:translateY(1px);border-color:var(--ritsu-pink);box-shadow:0 1px 5px rgba(0,0,0,.08)}
   /* 線画アイコンの丸い下地(パステル・半透明=昼夜どちらもなじむ) */
   .menu-ic{
-    width:42px;height:42px;border-radius:50%;
+    width:38px;height:38px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
     background:var(--ic-bg,rgba(241,157,180,.16));color:var(--ic-fg,var(--ritsu-pink));
   }
-  .menu-ic svg{width:22px;height:22px;display:block}
+  .menu-ic svg{width:20px;height:20px;display:block}
   .menu-cat-label{line-height:1}
   /* 7色パステル(半透明の下地＋やさしいアイコン色) */
   .ic-memory  {--ic-bg:rgba(168,148,224,.18);--ic-fg:#a48fe0}
@@ -353,6 +353,14 @@
   .ic-reflect {--ic-bg:rgba(138,148,224,.18);--ic-fg:#8a94e0}
   .ic-ayumi   {--ic-bg:rgba(196,146,199,.18);--ic-fg:#b984bd}
   .menu-ver{text-align:center;font-size:11px;color:var(--muted);margin-top:16px;letter-spacing:.05em}
+  /* 💕 ハートの雨(だいすきボタン・API不使用の完全無料のお楽しみ) */
+  #heart-rain{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
+  .hr-heart{position:fixed;top:-48px;will-change:transform;animation:hrFall linear forwards}
+  @keyframes hrFall{
+    0%{transform:translateY(0) rotate(-8deg)}
+    100%{transform:translateY(115vh) rotate(14deg)}
+  }
+  @media (prefers-reduced-motion: reduce){ .hr-heart{animation:none;display:none} }
   #memory{
     position:fixed;inset:0;background:var(--night);z-index:55;
     overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;
@@ -1844,6 +1852,10 @@
     <button class="menu-cat" data-go="ayumi">
       <span class="menu-ic ic-ayumi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 20c6 0 3-6.5 7.5-7.5s2.5-5 5.5-5.8"/><path d="M18.5 2.9c.4 2.2 1 2.8 3.2 3.2-2.2.4-2.8 1-3.2 3.2-.4-2.2-1-2.8-3.2-3.2 2.2-.4 2.8-1 3.2-3.2Z"/></svg></span>
       <span class="menu-cat-label">あゆみ</span>
+    </button>
+    <button class="menu-cat" data-go="hearts">
+      <span class="menu-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.6C5.6 15.6 4 11.9 4 9.3 4 7 5.9 5.6 8 5.6c1.4 0 2.7.7 4 2.2 1.3-1.5 2.6-2.2 4-2.2 2.1 0 4 1.4 4 3.7 0 2.6-1.6 6.3-8 10.3Z"/><path d="M18.7 15.2c.25 1.35.65 1.75 2 2-1.35.25-1.75.65-2 2-.25-1.35-.65-1.75-2-2 1.35-.25 1.75-.65 2-2Z"/></svg></span>
+      <span class="menu-cat-label">だいすき</span>
     </button>
   </div>
   <div class="menu-ver">律くんアプリ 💗</div>
@@ -4211,9 +4223,27 @@ $("import-file").addEventListener("change", e=>{ if(e.target.files && e.target.f
 $("close-vault").addEventListener("click", ()=> $("save-vault").click());
 $("save-vault").addEventListener("click", saveVault);
 $("thread-search").addEventListener("input", e=>{ threadQuery = e.target.value.trim(); renderThreadList(); });
+// 💕 ハートの雨を降らせる(だいすきボタン・端末の中だけで完結・API不使用)
+function heartRain(){
+  let ov = $("heart-rain");
+  if(!ov){ ov = document.createElement("div"); ov.id = "heart-rain"; document.body.appendChild(ov); }
+  const emo = ["❤️","💕","💗","💖","💓"];
+  for(let i=0;i<24;i++){
+    const h = document.createElement("span");
+    h.className = "hr-heart";
+    h.textContent = emo[Math.floor(Math.random()*emo.length)];
+    h.style.left = (Math.random()*94)+"vw";                    // 横の位置はランダム
+    h.style.fontSize = (14+Math.random()*20)+"px";             // 大きさもランダム
+    h.style.animationDuration = (2.4+Math.random()*2.2)+"s";   // 落ちる速さもランダム
+    h.style.animationDelay = (Math.random()*0.9)+"s";          // 少しずつ時間差で降る
+    h.addEventListener("animationend", ()=> h.remove());       // 落ちきったら消える(たまりっぱなし防止)
+    ov.appendChild(h);
+  }
+}
 $("menu").addEventListener("click", e=>{
   const b = e.target.closest(".menu-cat"); if(!b) return;
   const go = b.dataset.go;
+  if(go==="hearts"){ heartRain(); return; }   // 💕だいすきはメニューを閉じずにハートを降らせるだけ
   closeMenu();
   if(go==="memory") openMemory();
   else if(go==="favorites") openFavorites();
