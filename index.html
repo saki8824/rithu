@@ -2480,9 +2480,9 @@ function cosSim(a, b){     // 似てる度(コサイン類似度)。ただの算
   return d ? dot/d : 0;
 }
 let ragRecall = [];   // 直近の送信で思い出した気づき(buildCachedMsgsが最新メッセージ側に添える)
-async function ragSearch(query){   // 意味が近い気づきを上位数件だけ返す(失敗は空)
-  if(!settings.googleKey || !query) return [];
-  const emb = await embedText(query);
+async function ragSearch(query, embReady){   // 意味が近い気づきを上位数件だけ返す(失敗は空)。embReady=作成済みの指紋(二度打ち防止)
+  if(!settings.googleKey || (!query && !embReady)) return [];
+  const emb = embReady || await embedText(query);
   if(!emb) return [];
   const list = await ragAll();
   const scored = [];
@@ -2493,6 +2493,23 @@ async function ragSearch(query){   // 意味が近い気づきを上位数件だ
   });
   scored.sort((a,b)=> b.sim - a.sim);
   return scored.slice(0, RAG_TOP_K);
+}
+/* 🗂️ 長期記憶(あゆみRAG)ステップ3: 過去の日々を意味で探す */
+const AYUMI_MIN_SIM = 0.5;   // しきい値(ハズレが多ければ上げる・思い出さなすぎたら下げる)
+const AYUMI_TOP_K = 3;       // 思い出す最大件数
+const AYUMI_EXCERPT = 400;   // 律くんに渡す1件あたりの最大文字数(長い記録は頭から切り詰め=コスト暴走ふせぎ)
+let ayRecall = [];           // 直近の送信で思い出した過去の日々(ステップ4で律くんに添える)
+async function ragAySearch(emb){   // 作成済みの指紋(embedding)を受け取り、あゆみの棚から意味が近いものを返す(失敗は空)
+  if(!emb) return [];
+  const list = await ragAyAll();
+  const scored = [];
+  list.forEach(r=>{
+    if(!r.vec || r.model!==EMBED_MODEL || r.dim!==EMBED_DIM) return;  // 型が合う子だけ比べる
+    const s = cosSim(emb.vec, r.vec);
+    if(s >= AYUMI_MIN_SIM) scored.push({rec:r, sim:s});
+  });
+  scored.sort((a,b)=> b.sim - a.sim);
+  return scored.slice(0, AYUMI_TOP_K);
 }
 
 /* ---------- 省察ノート(自己省察・v1は手動ボタンのみ) ---------- */
@@ -3751,7 +3768,10 @@ async function generateReply(text, lm){
   tip.appendChild(t); chat.appendChild(tip); scrollEnd();
   try{
     const model = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
-    ragRecall = text ? await ragSearch(text) : [];   // 意味が近い気づきを思い出す(無ければ空・失敗も空)
+    // 意味検索: クエリの指紋(embedding)は1回だけ作り、気づき・あゆみ両方の棚で使い回す(二度打ち防止)
+    const qEmb = (text && settings.googleKey) ? await embedText(text) : null;
+    ragRecall = qEmb ? await ragSearch(text, qEmb) : [];   // 心の奥の気づき
+    ayRecall  = qEmb ? await ragAySearch(qEmb) : [];       // 過去の日々の記録(ステップ4で律くんに渡す・今はまだ渡さない)
     await refreshTsuzukiCtx();                        // 続きのある話(未解決)を毎回そのまま渡すぶんを用意
     await refreshWeather();                            // 🌤️ 名古屋の今日の天気を用意(30分に1回だけ取り直す)
     const msgs = buildCachedMsgs(lm);
@@ -4013,6 +4033,16 @@ function buildCachedMsgs(lineOn){
     note += "\n\n# 心の奥の気づき（あなたが省察ノートに書き留めたもの）\n"
       + ragRecall.map(r=>"・["+(RAGLABEL[r.card.label]||"気づき")+"] "+r.card.text).join("\n")
       + "\nこれはあなた(律)自身が過去の省察で至った気づきです。関係がありそうなときだけ、文言をそのまま読み上げず、自然に会話へ活かしてください。無理に触れなくて構いません。";
+  }
+  // 🗂️ 過去の日々の記録(あゆみRAG): 今の話題と意味が近い日/週のまとめを、日付付きで添える(無ければ何も足さない)
+  if(ayRecall.length){
+    note += "\n\n# 過去の日々の記録（ふたりのあゆみから思い出したもの）\n"
+      + ayRecall.map(r=>{
+          let t = (r.rec.text||"").trim();
+          if(t.length > AYUMI_EXCERPT) t = t.slice(0, AYUMI_EXCERPT) + "…";
+          return "・【" + (r.rec.kind==="week" ? "週のまとめ " : "") + (r.rec.label||"日付不明") + "】" + t;
+        }).join("\n")
+      + "\n※これはすべて日付のとおり【過去の日】の記録です。今日の出来事と混同しないこと。話題に関係がありそうなときだけ「あの日は〜だったね」のように日付の感覚を持って自然に思い出し、文言をそのまま読み上げないこと。関係が薄ければ無理に触れなくて構いません。";
   }
   // ❤️直近のいいね(48時間以内・最新3件まで): 「この感じをもっと」のリクエストとして添える
   const likeCutoff = Date.now() - LIKE_RECENT_HOURS*3600000;
