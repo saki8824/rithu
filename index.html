@@ -2452,19 +2452,31 @@ async function ragAyStore(e){   // あゆみ1件を棚へ(embed失敗時はvec:n
   }catch(err){}
 }
 let ayBackfillBusy = false;
-async function ragAyBackfill(){   // 今あるあゆみ全部へ、裏で静かにベクトルを付ける(棚に無い子・型ちがいの子だけ)
+async function ragAyBackfill(){   // 裏で静かにベクトルを付ける(棚に無い子・ベクトル無し/型ちがいの子だけ)
   if(ayBackfillBusy || !settings.googleKey) return;
   ayBackfillBusy = true;
   try{
     const have = {};
     (await ragAyAll()).forEach(r=>{ have[r.id] = r; });
+    let ok = true;
+    // ① 今のあゆみ一覧にいる子: 棚に無ければ入れる・ベクトルが無ければ付ける
     for(const e of (ayumi.entries||[])){
       const r = have[e.id];
       if(r && r.vec && r.model===EMBED_MODEL && r.dim===EMBED_DIM) continue;
       const emb = await embedText(e.text);
-      if(!emb) break;             // 失敗したら今回はここまで(また次の機会に)
-      await ragAyAdd({ id:e.id, text:e.text, kind:e.kind, label:e.label||"", ts:e.ts||Date.now(),
-        vec:emb.vec, model:emb.model, dim:emb.dim });
+      if(!emb){ ok = false; break; }   // 失敗したら今回はここまで(また次の機会に)
+      const rec = { id:e.id, text:e.text, kind:e.kind, label:e.label||"", ts:e.ts||Date.now(),
+        vec:emb.vec, model:emb.model, dim:emb.dim };
+      await ragAyAdd(rec); have[e.id] = rec;   // haveも更新(下の②で二度打ちしない)
+    }
+    // ② 棚にしかいない子(週に圧縮済みの昔の日まとめ・バックアップ復元直後など): ベクトルが無ければ付ける
+    if(ok) for(const id in have){
+      const r = have[id];
+      if(r.vec && r.model===EMBED_MODEL && r.dim===EMBED_DIM) continue;
+      const emb = await embedText(r.text);
+      if(!emb) break;
+      r.vec = emb.vec; r.model = emb.model; r.dim = emb.dim;
+      await ragAyAdd(r);
     }
   }catch(err){}
   ayBackfillBusy = false;
@@ -2987,6 +2999,11 @@ async function exportBackup(){
     out.insights = list.map(c=>({id:c.id, text:c.text, label:c.label, ts:c.ts}));
   }catch(e){}
   try{
+    // 🗂️ 長期記憶の棚(あゆみRAG)も「文章+種類+日付」だけ同梱(ベクトルは復元後に自動で作り直る)
+    const ay = await ragAyAll();
+    out.ayumiVault = ay.map(r=>({id:r.id, text:r.text, kind:r.kind, label:r.label, ts:r.ts}));
+  }catch(e){}
+  try{
     out.threadsBig = await thAll();   // 大倉庫のチャット本文もまるごと同梱
   }catch(e){}
   const blob = new Blob([JSON.stringify(out)], {type:"application/json"});
@@ -3032,6 +3049,13 @@ function importBackup(file){
         await ragClear();
         for(const c of obj.insights){
           if(c && c.text) await ragAdd({id:c.id||uid(), text:c.text, label:c.label||"", ts:c.ts||Date.now(), vec:null, model:"", dim:0});
+        }
+      }
+      if(Array.isArray(obj.ayumiVault)){
+        // 🗂️ 長期記憶の棚入りバックアップ → 棚を置き換え。ベクトルは空で戻す(あゆみ画面を開くと自動で作り直る)
+        await ragAyClear();
+        for(const v of obj.ayumiVault){
+          if(v && v.text) await ragAyAdd({id:v.id||uid(), text:v.text, kind:v.kind||"day", label:v.label||"", ts:v.ts||Date.now(), vec:null, model:"", dim:0});
         }
       }
       if(Array.isArray(obj.threadsBig)){
@@ -3195,9 +3219,17 @@ function loadSynopsis(){ try{ const d=store.get("ritsu-synopsis"); if(d){ const 
 function saveSynopsis(){ store.set("ritsu-synopsis", JSON.stringify(synopsis)); }
 function loadAyumi(){ try{ const d=store.get("ritsu-ayumi"); if(d){ const o=JSON.parse(d); ayumi={entries:(o.entries||[])}; } }catch(e){ ayumi={entries:[]}; } }
 function saveAyumi(){ store.set("ritsu-ayumi", JSON.stringify(ayumi)); }
-// 律くんが持ち歩く「ふたりのあゆみ」(週まとめ+直近の日ごと。長すぎたら古い日から省く)
+// 律くんが持ち歩く「ふたりのあゆみ」。
+// 長期記憶RAG(ステップ5)から: 常時持つのは「直近」だけ=日ごとの記録ぜんぶ(最大7日で週に圧縮)+新しい週まとめ数個。
+// それより古い週は棚(あゆみRAG検索)から話題に応じて思い出す→律くんの毎回の荷物が軽くなる。
+const AYUMI_CARRY_WEEKS = 2;   // 常時持ち歩く週まとめの数(増やすと荷物が重く・減らすと軽く)
 function ayumiContext(){
   let es = (ayumi.entries||[]).slice();
+  if(settings.googleKey){   // 検索(棚)が使えるときだけ古い週を外す。キーが無ければ従来どおり全部持つ(忘れ事故ふせぎ)
+    const weeks = es.filter(e=>e.kind==="week");
+    const keepW = weeks.slice(-AYUMI_CARRY_WEEKS);
+    es = es.filter(e=> e.kind!=="week" || keepW.indexOf(e)>=0);
+  }
   const text = ()=> es.map(e=>"【"+e.label+"】"+e.text).join("\n");
   while(es.length > 3 && text().length > 2200) es.shift();
   return es.length ? text() : "";
