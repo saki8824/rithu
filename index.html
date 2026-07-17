@@ -2443,6 +2443,32 @@ async function ragBackfill(){   // ベクトル無し・型ちがいの気づき
   }catch(e){}
   backfillBusy = false;
 }
+/* 🗂️ 長期記憶(あゆみRAG)ステップ2: あゆみにベクトルを付けて棚へしまう */
+async function ragAyStore(e){   // あゆみ1件を棚へ(embed失敗時はvec:nullで保存→後でragAyBackfillが直す)
+  try{
+    const emb = await embedText(e.text);
+    await ragAyAdd({ id:e.id, text:e.text, kind:e.kind, label:e.label||"", ts:e.ts||Date.now(),
+      vec: emb?emb.vec:null, model: emb?emb.model:null, dim: emb?emb.dim:null });
+  }catch(err){}
+}
+let ayBackfillBusy = false;
+async function ragAyBackfill(){   // 今あるあゆみ全部へ、裏で静かにベクトルを付ける(棚に無い子・型ちがいの子だけ)
+  if(ayBackfillBusy || !settings.googleKey) return;
+  ayBackfillBusy = true;
+  try{
+    const have = {};
+    (await ragAyAll()).forEach(r=>{ have[r.id] = r; });
+    for(const e of (ayumi.entries||[])){
+      const r = have[e.id];
+      if(r && r.vec && r.model===EMBED_MODEL && r.dim===EMBED_DIM) continue;
+      const emb = await embedText(e.text);
+      if(!emb) break;             // 失敗したら今回はここまで(また次の機会に)
+      await ragAyAdd({ id:e.id, text:e.text, kind:e.kind, label:e.label||"", ts:e.ts||Date.now(),
+        vec:emb.vec, model:emb.model, dim:emb.dim });
+    }
+  }catch(err){}
+  ayBackfillBusy = false;
+}
 
 /* ---------- ベクトル検索(意味の近さで気づきを思い出す) ---------- */
 const RAG_MIN_SIM = 0.5;   // しきい値: これ未満は「意味が遠い」ので出さない
@@ -3165,8 +3191,10 @@ function ensureSynopsisToday(){
   if(synopsis.date !== t){
     // 昨日のあらすじは消す前に「ふたりのあゆみ」へ日ごとの記録として保存
     if(synopsis.date && (synopsis.text||"").trim()){
-      ayumi.entries.push({id:uid(), kind:"day", label:mdw(synopsis.date), text:synopsis.text.trim(), ts:Date.now()});
+      const de = {id:uid(), kind:"day", label:mdw(synopsis.date), text:synopsis.text.trim(), ts:Date.now()};
+      ayumi.entries.push(de);
       saveAyumi();
+      ragAyStore(de);   // 🗂️ 長期記憶の棚にもしまう(裏で静かに・失敗しても本体は無事)
     }
     synopsis = {date:t, text:"", turns:0, upTs:0}; saveSynopsis();
   }
@@ -3257,13 +3285,14 @@ async function compressAyumi(){
         ayumi.entries = ayumi.entries.filter(e=> batch.indexOf(e) < 0);
         ayumi.entries.splice(Math.max(0,idx), 0, week);
         saveAyumi();
+        ragAyStore(week);   // 🗂️ 週まとめも長期記憶の棚へ(圧縮で消えた日まとめも棚には残り続ける)
       }
     }
   }catch(e){}
   ayumiBusy = false;
 }
 /* ---------- ふたりのあゆみ(読むだけのアルバム画面) ---------- */
-function openAyumi(){ renderAyumiList(); $("ayumi").classList.add("open"); }
+function openAyumi(){ renderAyumiList(); $("ayumi").classList.add("open"); ragAyBackfill(); }   // 開いたついでに裏でベクトル付与
 function closeAyumi(){ $("ayumi").classList.remove("open"); }
 function renderAyumiList(){
   const box = $("ayumi-list"); if(!box) return; box.innerHTML="";
