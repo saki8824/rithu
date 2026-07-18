@@ -472,6 +472,13 @@
   /* 🧵 続きのある話: 解決/未解決ボタン と 解決済みのグレー表示 */
   .reflect-status{align-self:flex-start;width:auto;padding:6px 12px;margin-top:6px;font-size:12px}
   .mem-card.resolved{opacity:.5}
+  /* 💭 省察ノートの一覧をスリムに: 閉じているときは「ラベル+日付」の1行だけ。タップで全文が開く */
+  .reflect-card{padding:8px 12px;gap:8px}
+  .reflect-card .mem-card-top{flex-wrap:nowrap}
+  .reflect-card .mem-card-tag{font-size:11px;padding:2px 8px;flex:0 0 auto}
+  .reflect-card .mem-card-date{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .reflect-card .mem-card-btn{font-size:14px;padding:2px 4px}
+  .reflect-card .fav-preview{display:none}   /* 折りたたみ時のプレビューを隠す=スリム化のキモ */
   /* 記憶の編集ポップアップ */
   #mem-edit{
     position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
@@ -2609,7 +2616,7 @@ async function renderReflectList(){
   }
   list.sort((a,b)=>(b.ts||0)-(a.ts||0));   // 新しい順
   list.forEach(card=>{
-    const wrap = el("div","mem-card fav-card");   // お気に入りと同じ折りたたみ式
+    const wrap = el("div","mem-card fav-card reflect-card");   // お気に入りと同じ折りたたみ式＋省察用のスリム表示
     if(card.label==="tsuzuki" && card.status==="resolved") wrap.classList.add("resolved");   // 解決済みはグレー
     const top = el("div","mem-card-top");
     const arrow = el("span","fav-arrow","▸");
