@@ -557,8 +557,15 @@
   #home.px.t-dusk #home-bg{background:#ae713d}
   #home.px.t-night #home-bg{background:#422c1d}
   /* ちびキャラ: 画像は1枚に2ポーズ入り→CSSの窓で1ポーズだけ見せる(ファイルは切らない) */
-  .pxchar{position:absolute;overflow:hidden}
+  /* --flip: 右へ歩くときだけ -1(左右反転)。素材はどちらも「左向き」なので、右向きは反転で作る */
+  .pxchar{position:absolute;overflow:hidden;transform:scaleX(var(--flip,1));
+    transition:left 0s linear, bottom 0s linear;}
+  .pxchar.flip{--flip:-1}
   .pxchar img{position:absolute;max-width:none;height:auto}
+  /* 🚶 歩いてるとき(.walk)は、同じ画像の「横向き」の位置に窓をずらす */
+  #px-ritsu.walk img{left:-155%}
+  /* さきの横向きは正面より6px細いので、窓の中央に寄せる(反転したとき位置がズレないように) */
+  #px-saki.walk img{left:-183.10%;top:-165.98%}
   /* 立ち位置の下限: 「律くんと話す」ボタン(下の余白24px+ボタン約51px)より上に来るように。
      env()を使うので、ホームバーのある機種でボタンが上がっても2人も一緒に上がる=どの機種でも重ならない */
   #home-px{--px-floor: calc(env(safe-area-inset-bottom,0px) + 104px);}
@@ -3013,7 +3020,50 @@ function renderHome(){
     box.appendChild(line);
   }
 }
-function openHome(){ applyHomeScene(); renderHome(); $("home").classList.add("open"); updateReflectRescueNotice(); }
+/* 🚶 ドット絵の2人がのんびり歩く(見た目だけ・APIもデータも使わない完全無料のお楽しみ) */
+const PX_WALK = {
+  speed: 7,                      // 1秒に進む横幅の%(小さいほどゆっくり)
+  pauseMin: 3000, pauseMax: 9000, // 立ち止まっている時間(ミリ秒)
+  stepMin: 8, stepMax: 42         // 1回に歩く距離(横幅の%)
+};
+let pxWalkersOn = false;
+function pxStartWalkers(){
+  if(pxWalkersOn) return;
+  if(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;  // 動きが苦手な設定なら歩かせない
+  pxWalkersOn = true;
+  pxWalk("px-ritsu", 2, 80, 18, 60.4);   // 律くん(右のほうからスタート)
+  pxWalk("px-saki",  2, 82, 18, 19.6);   // さき(左のほうからスタート)
+}
+// 1人ぶんの「歩く→止まる」をずっとくり返す。minL/maxLは歩ける左右の範囲(%)、depthは奥行きのゆらぎ(px)
+function pxWalk(id, minL, maxL, depth, startL){
+  const c = $(id); if(!c) return;
+  let left = startL;
+  c.style.left = left + "%";
+  function idle(){                        // 立ち止まる: 正面を向いて、少しぼんやりする
+    c.classList.remove("walk");
+    c.classList.remove("flip");
+    setTimeout(step, PX_WALK.pauseMin + Math.random()*(PX_WALK.pauseMax - PX_WALK.pauseMin));
+  }
+  function step(){
+    const home = $("home");
+    if(!home || !home.classList.contains("open")){ setTimeout(step, 4000); return; }   // ホームを見ていないときは休む
+    const dist = PX_WALK.stepMin + Math.random()*(PX_WALK.stepMax - PX_WALK.stepMin);
+    let target = left + (Math.random()<0.5 ? -dist : dist);
+    if(target < minL) target = minL + Math.random()*8;      // 壁にぶつかったら向きを変える
+    if(target > maxL) target = maxL - Math.random()*8;
+    const d = Math.abs(target - left);
+    const dur = Math.max(0.8, d / PX_WALK.speed);           // 距離に応じた時間=いつも同じゆっくりな速さ
+    c.classList.toggle("flip", target > left);              // 右へ行くときだけ反転
+    c.classList.add("walk");                               // 横向きポーズに
+    c.style.transitionDuration = dur + "s";
+    c.style.left = target + "%";
+    c.style.bottom = "calc(var(--px-floor) + " + Math.round(Math.random()*depth) + "px)";  // 奥行きも少しだけ変える
+    left = target;
+    setTimeout(idle, dur*1000 + 60);
+  }
+  idle();
+}
+function openHome(){ applyHomeScene(); renderHome(); $("home").classList.add("open"); updateReflectRescueNotice(); pxStartWalkers(); }
 function closeHome(){ $("home").classList.remove("open"); }
 
 /* ---------- 記憶ノート ---------- */
