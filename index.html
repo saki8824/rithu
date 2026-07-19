@@ -562,6 +562,16 @@
     transition:left 0s linear, bottom 0s linear;}
   .pxchar.flip{--flip:-1}
   .pxchar img{position:absolute;max-width:none;height:auto}
+  /* 💗 2人がぶつかったときだけ出るドット絵ハート(ふわっと浮かんで消える) */
+  .px-heart{position:absolute;width:20px;pointer-events:none;z-index:2;
+    animation:pxHeart 1.6s ease-out forwards}
+  .px-heart svg{display:block;width:100%;height:auto}
+  @keyframes pxHeart{
+    0%{opacity:0;transform:translate(-50%,0) scale(.5)}
+    18%{opacity:1;transform:translate(-50%,-7px) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-36px) scale(1)}
+  }
+  @media (prefers-reduced-motion:reduce){.px-heart{display:none}}
   /* 🚶 歩いてるとき(.walk)は、同じ画像の「横向き」の位置に窓をずらす */
   #px-ritsu.walk img{left:-155%}
   /* さきの横向きは正面より6px細いので、窓の中央に寄せる(反転したとき位置がズレないように) */
@@ -3033,6 +3043,41 @@ function pxStartWalkers(){
   pxWalkersOn = true;
   pxWalk("px-ritsu", 2, 80, 18, 60.4);   // 律くん(右のほうからスタート)
   pxWalk("px-saki",  2, 82, 18, 19.6);   // さき(左のほうからスタート)
+  setInterval(pxCheckMeet, 400);         // 💗 ぶつかったかを見張る
+}
+/* 💗 2人がぶつかった「瞬間」だけハートを出す(重なっている間ずっとは出さない) */
+let pxWasMeeting = false, pxHeartAt = 0;
+function pxCheckMeet(){
+  const home = $("home");
+  if(!home || !home.classList.contains("open") || !home.classList.contains("px")) return;
+  const r = $("px-ritsu"), s = $("px-saki"); if(!r || !s) return;
+  const rb = r.getBoundingClientRect(), sb = s.getBoundingClientRect();
+  if(!rb.width || !sb.width) return;
+  const overlap = Math.min(rb.right, sb.right) - Math.max(rb.left, sb.left);   // 横の重なりぐあい
+  const meeting = overlap > 6;
+  const now = Date.now();
+  if(meeting && !pxWasMeeting && now - pxHeartAt > 4000){    // 出会った瞬間+出しすぎ防止
+    pxHeartAt = now;
+    pxHeart((Math.max(rb.left, sb.left) + Math.min(rb.right, sb.right)) / 2, Math.min(rb.top, sb.top));
+  }
+  pxWasMeeting = meeting;
+}
+// 指定の場所(画面座標)にドット絵ハートを1個ぽんと出す。落ちきったら自分で消える
+function pxHeart(cx, cy){
+  const box = $("home-px"); if(!box) return;
+  const bb = box.getBoundingClientRect();
+  const h = document.createElement("div");
+  h.className = "px-heart";
+  h.innerHTML = '<svg viewBox="0 0 7 6" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" fill="#ff6b8a">'
+    + '<rect x="1" y="0" width="2" height="1"/><rect x="4" y="0" width="2" height="1"/>'
+    + '<rect x="0" y="1" width="7" height="2"/>'
+    + '<rect x="1" y="3" width="5" height="1"/>'
+    + '<rect x="2" y="4" width="3" height="1"/>'
+    + '<rect x="3" y="5" width="1" height="1"/></svg>';
+  h.style.left = (cx - bb.left) + "px";
+  h.style.top  = (cy - bb.top - 12) + "px";     // 2人の頭より少し上から
+  h.addEventListener("animationend", ()=> h.remove());
+  box.appendChild(h);
 }
 // 1人ぶんの「歩く→止まる」をずっとくり返す。minL/maxLは歩ける左右の範囲(%)、depthは奥行きのゆらぎ(px)
 function pxWalk(id, minL, maxL, depth, startL){
