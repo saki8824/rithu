@@ -562,6 +562,18 @@
     transition:left 0s linear, bottom 0s linear;}
   .pxchar.flip{--flip:-1}
   .pxchar img{position:absolute;max-width:none;height:auto}
+  /* 🦘 タップされたら、ちょこんと2回ジャンプ。
+     ※必ず scaleX(var(--flip,1)) を入れること=これが無いと、跳ねた瞬間に向きが元に戻ってしまう */
+  .pxchar.jump{animation:pxJump .9s ease-in-out}
+  @keyframes pxJump{
+    0%  {transform:scaleX(var(--flip,1)) translateY(0)}
+    22% {transform:scaleX(var(--flip,1)) translateY(-13px)}
+    44% {transform:scaleX(var(--flip,1)) translateY(0)}
+    64% {transform:scaleX(var(--flip,1)) translateY(-7px)}
+    100%{transform:scaleX(var(--flip,1)) translateY(0)}
+  }
+  .pxchar{cursor:pointer}
+  @media (prefers-reduced-motion:reduce){.pxchar.jump{animation:none}}
   /* 💗 2人がぶつかったときだけ出るドット絵ハート(ふわっと浮かんで消える) */
   .px-heart{position:absolute;width:20px;pointer-events:none;z-index:2;
     animation:pxHeart 1.6s ease-out forwards}
@@ -701,7 +713,11 @@
   #home-illus .tstar:nth-of-type(5){animation-delay:-.8s;animation-duration:3.1s}
   #home-illus .tstar:nth-of-type(6){animation-delay:-2s;animation-duration:2.3s}
   @media (prefers-reduced-motion:reduce){#home-illus *{animation:none !important}}
-  #home-inner{position:relative;z-index:1;display:flex;flex-direction:column;gap:15px;height:100%}
+  /* 透明な部分はタップをすり抜けさせて、下にいるドット絵の2人を触れるようにする。
+     お知らせとボタンだけタップを受け取り、余白(home-spacer)は例外ですり抜けたまま */
+  #home-inner{position:relative;z-index:1;display:flex;flex-direction:column;gap:15px;height:100%;pointer-events:none}
+  #home-inner > *{pointer-events:auto}
+  #home-inner > .home-spacer{pointer-events:none}
   /* 背景なしの1行お知らせ(白文字+影で写真の上でも読める) */
   .home-line{
     font-size:13.5px;font-weight:600;color:#fff;letter-spacing:.02em;line-height:1.5;
@@ -3044,6 +3060,22 @@ function pxStartWalkers(){
   pxWalk("px-ritsu", 2, 80, 18, 60.4);   // 律くん(右のほうからスタート)
   pxWalk("px-saki",  2, 82, 18, 19.6);   // さき(左のほうからスタート)
   setInterval(pxCheckMeet, 400);         // 💗 ぶつかったかを見張る
+  pxTapSetup();                          // 🦘 タップで跳ねるようにする
+}
+/* 🦘 キャラをタップしたら、ちょこんと跳ねる(歩くのは止めない・見た目だけのリアクション) */
+function pxTapSetup(){
+  ["px-ritsu","px-saki"].forEach(function(id){
+    const c = $(id); if(!c || c.dataset.tap) return;
+    c.dataset.tap = "1";                                        // 二重登録ふせぎ
+    c.addEventListener("click", function(){
+      if(c.classList.contains("jump")) return;                  // 跳ねてる最中の連打は無視
+      c.classList.add("jump");
+      // 保険: アニメの終了合図が来ない場合(動きを減らす設定など)でも必ず印を外す。
+      // これが無いと印が付きっぱなしになり、二度とジャンプできなくなる
+      setTimeout(function(){ c.classList.remove("jump"); }, 1000);
+    });
+    c.addEventListener("animationend", function(){ c.classList.remove("jump"); });
+  });
 }
 /* 💗 2人がぶつかった「瞬間」だけハートを出す(重なっている間ずっとは出さない) */
 let pxWasMeeting = false, pxHeartAt = 0;
