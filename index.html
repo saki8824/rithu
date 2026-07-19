@@ -559,11 +559,14 @@
   /* ちびキャラ: 画像は1枚に2ポーズ入り→CSSの窓で1ポーズだけ見せる(ファイルは切らない) */
   .pxchar{position:absolute;overflow:hidden}
   .pxchar img{position:absolute;max-width:none;height:auto}
+  /* 立ち位置の下限: 「律くんと話す」ボタン(下の余白24px+ボタン約51px)より上に来るように。
+     env()を使うので、ホームバーのある機種でボタンが上がっても2人も一緒に上がる=どの機種でも重ならない */
+  #home-px{--px-floor: calc(env(safe-area-inset-bottom,0px) + 104px);}
   /* 律くん(正面=x17-96,y125-251/元213x320): 表示は部屋の高さの20% */
-  #px-ritsu{width:16.80%;height:20.0%;left:60.4%;bottom:6.25%}
+  #px-ritsu{width:16.80%;height:20.0%;left:60.4%;bottom:calc(var(--px-floor) + 8px)}
   #px-ritsu img{width:266.25%;left:-21.25%;top:-98.43%}
-  /* さき(正面=x21-91,y160-256): 同じ倍率なので身長差(律くんの約76%)はそのまま */
-  #px-saki{width:14.91%;height:15.28%;left:19.6%;bottom:4.69%}
+  /* さき(正面=x21-91,y160-256): 同じ倍率なので身長差(律くんの約76%)はそのまま。少し手前に立つ */
+  #px-saki{width:14.91%;height:15.28%;left:19.6%;bottom:var(--px-floor)}
   #px-saki img{width:300%;left:-29.58%;top:-164.95%}
   /* 🎨 写真の上の小物レイヤー(座標は写真ピクセルと1:1) */
   #home-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
