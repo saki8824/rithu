@@ -565,6 +565,17 @@
   @keyframes pxMote{0%{opacity:0;transform:translateY(0)}30%{opacity:.7}100%{opacity:0;transform:translateY(-26px)}}
   @keyframes pxTwinkle{0%,100%{opacity:.15}50%{opacity:1}}
   @keyframes pxLamp{0%,100%{opacity:.22}50%{opacity:.62}}
+  /* 🌷🐚🍁⛄ 棚の季節小物: その季節の1セットだけ出す */
+  #home-px-fx .pxshf{display:none}
+  #home.px.s-spring #home-px-fx .pxshf-spring{display:block}
+  #home.px.s-summer #home-px-fx .pxshf-summer{display:block}
+  #home.px.s-autumn #home-px-fx .pxshf-autumn{display:block}
+  #home.px.s-winter #home-px-fx .pxshf-winter{display:block}
+  /* 🕯️ キャンドルの火は夕方・夜だけ灯って、ゆらゆらする */
+  #home-px-fx .pxflame{display:none}
+  #home.px.t-dusk #home-px-fx .pxflame,
+  #home.px.t-night #home-px-fx .pxflame{display:block;animation:pxFlame 1.5s ease-in-out infinite}
+  @keyframes pxFlame{0%,100%{opacity:.7}50%{opacity:1}}
   @media (prefers-reduced-motion:reduce){#home-px-fx *{animation:none !important}}
   #home.px #home-px{display:block}
   #home.px #home-photo-wrap{display:none}   /* 写真と小物レイヤーはドット絵中はお休み(コードは残置) */
@@ -1218,28 +1229,28 @@
       <img id="home-px-room" alt="">
       <!-- ✨ ドット絵のアニメ層(部屋と同じ240x320の座標。2人より後ろ・タップはすり抜ける) -->
       <svg id="home-px-fx" viewBox="0 0 240 320" preserveAspectRatio="xMidYMid slice" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
-        <!-- 🍵 マグ2つの湯気(いつも) -->
+        <!-- 🍵 マグ2つの湯気(いつも)。マグ天面=y182・左マグ中心x150/右マグ中心x182(夕方画像で実測) -->
         <g class="fx fx-steam" fill="#ffffff">
-          <rect class="stp" x="161" y="185" width="2" height="2"/>
-          <rect class="stp" x="164" y="186" width="2" height="2" style="animation-delay:-1.2s"/>
-          <rect class="stp" x="162" y="182" width="2" height="2" style="animation-delay:-2.4s"/>
-          <rect class="stp" x="194" y="185" width="2" height="2" style="animation-delay:-.6s"/>
-          <rect class="stp" x="197" y="186" width="2" height="2" style="animation-delay:-1.8s"/>
-          <rect class="stp" x="195" y="182" width="2" height="2" style="animation-delay:-3s"/>
+          <rect class="stp" x="149" y="179" width="2" height="2"/>
+          <rect class="stp" x="152" y="180" width="2" height="2" style="animation-delay:-1.2s"/>
+          <rect class="stp" x="150" y="175" width="2" height="2" style="animation-delay:-2.4s"/>
+          <rect class="stp" x="181" y="179" width="2" height="2" style="animation-delay:-.6s"/>
+          <rect class="stp" x="184" y="180" width="2" height="2" style="animation-delay:-1.8s"/>
+          <rect class="stp" x="182" y="175" width="2" height="2" style="animation-delay:-3s"/>
         </g>
-        <!-- 💡 ランプのゆらぎ(夕方・夜だけ) -->
+        <!-- 💡 ランプのゆらぎ(夕方・夜だけ)。ランプの傘=x25-43,y156-179 → 中心(34,167) -->
         <g class="fx fx-lamp" fill="#ffdca0">
-          <g class="lmp"><rect x="22" y="172" width="24" height="16"/><rect x="27" y="167" width="14" height="26"/></g>
-          <g class="lmp" style="animation-delay:-1.4s"><rect x="26" y="174" width="16" height="12"/><rect x="30" y="170" width="8" height="20"/></g>
+          <g class="lmp"><rect x="22" y="159" width="24" height="16"/><rect x="27" y="154" width="14" height="26"/></g>
+          <g class="lmp" style="animation-delay:-1.4s"><rect x="26" y="161" width="16" height="12"/><rect x="30" y="157" width="8" height="20"/></g>
         </g>
-        <!-- ✨ 昼の光のつぶ(昼だけ・窓から差す光の中) -->
+        <!-- ✨ 昼の光のつぶ(昼だけ)。床の陽だまり=x50-122,y170-205 の中を舞う -->
         <g class="fx fx-mote" fill="#fff6d8">
-          <rect class="mtp" x="62" y="216" width="2" height="2"/>
-          <rect class="mtp" x="78" y="200" width="2" height="2" style="animation-delay:-1.6s"/>
-          <rect class="mtp" x="95" y="226" width="2" height="2" style="animation-delay:-3.1s"/>
-          <rect class="mtp" x="110" y="192" width="2" height="2" style="animation-delay:-2.2s"/>
-          <rect class="mtp" x="124" y="210" width="2" height="2" style="animation-delay:-4.3s"/>
-          <rect class="mtp" x="70" y="236" width="2" height="2" style="animation-delay:-0.8s"/>
+          <rect class="mtp" x="60" y="200" width="2" height="2"/>
+          <rect class="mtp" x="76" y="188" width="2" height="2" style="animation-delay:-1.6s"/>
+          <rect class="mtp" x="92" y="202" width="2" height="2" style="animation-delay:-3.1s"/>
+          <rect class="mtp" x="106" y="180" width="2" height="2" style="animation-delay:-2.2s"/>
+          <rect class="mtp" x="116" y="194" width="2" height="2" style="animation-delay:-4.3s"/>
+          <rect class="mtp" x="68" y="206" width="2" height="2" style="animation-delay:-0.8s"/>
         </g>
         <!-- 🌟 夜の窓の星(夜だけ・窓ガラスの空の部分) -->
         <g class="fx fx-star" fill="#ffffff">
@@ -1253,6 +1264,56 @@
           <rect class="stw" x="66" y="95" width="1" height="1" style="animation-delay:-1.1s"/>
           <rect class="stw" x="31" y="88" width="1" height="1" style="animation-delay:-3.2s;animation-duration:2.4s"/>
           <rect class="stw" x="70" y="36" width="1" height="1" style="animation-delay:-.9s;animation-duration:3.6s"/>
+        </g>
+
+        <!-- 🌷🐚🍁⛄ 棚の季節小物。棚板の上面=y70・使える幅=x156〜227(夕方画像で実測)。
+             3つを x162 / x184 / x206 あたりに並べる。季節ごとに1セットだけ表示 -->
+        <!-- 🌷 春: チューリップ一輪挿し・写真フレーム・つぼみの小枝 -->
+        <g class="pxshf pxshf-spring">
+          <g fill="#dce8f0"><rect x="166" y="63" width="6" height="7"/></g>
+          <g fill="#6b9e5a"><rect x="168" y="57" width="1" height="6"/><rect x="169" y="59" width="2" height="1"/></g>
+          <g fill="#f08aa8"><rect x="166" y="53" width="5" height="4"/><rect x="166" y="52" width="1" height="1"/><rect x="168" y="52" width="1" height="1"/><rect x="170" y="52" width="1" height="1"/></g>
+          <g fill="#b07a45"><rect x="185" y="58" width="12" height="12"/></g>
+          <g fill="#f3e7d0"><rect x="187" y="60" width="8" height="8"/></g>
+          <g fill="#f08aa8"><rect x="190" y="63" width="2" height="2"/></g>
+          <g fill="#c08050"><rect x="210" y="64" width="6" height="6"/></g>
+          <g fill="#8a6a4a"><rect x="212" y="56" width="1" height="8"/></g>
+          <g fill="#f6c0d0"><rect x="211" y="57" width="1" height="1"/><rect x="213" y="59" width="1" height="1"/><rect x="211" y="61" width="1" height="1"/></g>
+        </g>
+        <!-- 🐚 夏: 貝がらの小びん・ミニ観葉・青ガラス -->
+        <g class="pxshf pxshf-summer">
+          <g fill="#cfe8ee"><rect x="165" y="60" width="8" height="10"/></g>
+          <g fill="#d8b080"><rect x="167" y="57" width="4" height="3"/></g>
+          <g fill="#f5d7c0"><rect x="167" y="65" width="4" height="3"/></g>
+          <g fill="#c08050"><rect x="187" y="63" width="8" height="7"/></g>
+          <g fill="#5fa05a"><rect x="186" y="57" width="3" height="3"/><rect x="190" y="55" width="3" height="4"/><rect x="194" y="58" width="3" height="3"/><rect x="189" y="59" width="4" height="4"/></g>
+          <g fill="#7fc4d8"><rect x="209" y="61" width="8" height="9"/></g>
+          <g fill="#c8ecf4"><rect x="210" y="62" width="2" height="4"/></g>
+        </g>
+        <!-- 🍁 秋: 本2冊・どんぐりのびん・紅葉の枝 -->
+        <g class="pxshf pxshf-autumn">
+          <g fill="#a85a4a"><rect x="163" y="62" width="12" height="4"/></g>
+          <g fill="#7a8a4a"><rect x="164" y="66" width="12" height="4"/></g>
+          <g fill="#f0e0c0"><rect x="173" y="63" width="1" height="2"/><rect x="174" y="67" width="1" height="2"/></g>
+          <g fill="#e0e8ea"><rect x="186" y="61" width="9" height="9"/></g>
+          <g fill="#b08040"><rect x="186" y="59" width="9" height="2"/></g>
+          <g fill="#8a5a30"><rect x="188" y="65" width="2" height="2"/><rect x="191" y="66" width="2" height="2"/><rect x="189" y="67" width="2" height="2"/></g>
+          <g fill="#9a7a5a"><rect x="210" y="63" width="6" height="7"/></g>
+          <g fill="#7a5a3a"><rect x="212" y="56" width="1" height="7"/></g>
+          <g fill="#e07030"><rect x="209" y="55" width="2" height="2"/></g>
+          <g fill="#d05020"><rect x="214" y="57" width="2" height="2"/></g>
+          <g fill="#f09040"><rect x="211" y="53" width="2" height="2"/></g>
+        </g>
+        <!-- ⛄ 冬: キャンドル(火は夕方・夜だけ)・松ぼっくり・雪だるま -->
+        <g class="pxshf pxshf-winter">
+          <g fill="#b09070"><rect x="165" y="66" width="8" height="4"/></g>
+          <g fill="#f4ece0"><rect x="167" y="58" width="4" height="8"/></g>
+          <g class="pxflame" fill="#ffc040"><rect x="168" y="55" width="2" height="3"/><rect x="168" y="54" width="1" height="1"/></g>
+          <g fill="#8a6040"><rect x="188" y="61" width="5" height="9"/></g>
+          <g fill="#a07850"><rect x="187" y="63" width="7" height="1"/><rect x="187" y="66" width="7" height="1"/></g>
+          <g fill="#f0f4f8"><rect x="209" y="64" width="8" height="6"/><rect x="211" y="58" width="5" height="6"/></g>
+          <g fill="#3a3a3a"><rect x="212" y="60" width="1" height="1"/><rect x="214" y="60" width="1" height="1"/></g>
+          <g fill="#e08030"><rect x="213" y="61" width="1" height="1"/></g>
         </g>
       </svg>
       <div class="pxchar" id="px-ritsu"><img src="chibi-ritsu.png" alt="律"></div>
