@@ -469,6 +469,10 @@
   .mem-card-btn{background:transparent;border:none;font-size:15px;padding:3px 5px;border-radius:8px;line-height:1;opacity:.85}
   .mem-card-btn:active{background:var(--night);opacity:1}
   .mem-card-text{font-size:14px;line-height:1.6;color:var(--text);white-space:pre-wrap;word-break:break-word}
+  /* 📌 ピン留め: 固定カードは背景うす紫+ピンくっきり / 通常カードはピンうすく */
+  .mem-card.pinned{background:rgba(168,148,224,.10);border-color:rgba(168,148,224,.45)}
+  .mem-pin{opacity:.3;filter:grayscale(1)}
+  .mem-pin.on{opacity:1;filter:none}
   /* 🧵 続きのある話: 解決/未解決ボタン と 解決済みのグレー表示 */
   .reflect-status{align-self:flex-start;width:auto;padding:6px 12px;margin-top:6px;font-size:12px}
   .mem-card.resolved{opacity:.5}
@@ -590,6 +594,29 @@
   #home.px.ev-tsukimi #home-px-fx .pxdango{display:block}
   #home.px.ev-tsukimi.t-night #home-px-fx .pxmoon{display:block}
   #home.px.ev-tsukimi.t-night #home-px-fx .pxdango{transform:translateY(6px)}
+  /* 🎃 ハロウィン(10/15〜31): かぼちゃランタンをテーブル左に。夜はテーブルが下がるので下げる。顔は夕方・夜にゆらめく */
+  #home-px-fx .pxpumpkin{display:none}
+  #home.px.ev-halloween #home-px-fx .pxpumpkin{display:block}
+  #home.px.ev-halloween.t-night #home-px-fx .pxpumpkin{transform:translateY(6px)}
+  #home.px.ev-halloween.t-dusk #home-px-fx .pxpk-glow,
+  #home.px.ev-halloween.t-night #home-px-fx .pxpk-glow{animation:pxFlame 1.6s ease-in-out infinite}
+  /* 🎄 クリスマス(12/1〜25): ツリー+プレゼントを窓ぎわの床に。夜は床が下がるので下げる。飾りは夕方夜にチカチカ */
+  #home-px-fx .pxxmas{display:none}
+  #home.px.ev-xmas #home-px-fx .pxxmas{display:block}
+  #home.px.ev-xmas.t-night #home-px-fx .pxxmas{transform:translateY(6px)}
+  #home.px.ev-xmas.t-dusk #home-px-fx .pxxmas-light rect,
+  #home.px.ev-xmas.t-night #home-px-fx .pxxmas-light rect{animation:pxTwinkle 2.6s ease-in-out infinite}
+  /* 🍡🎂 テーブルに乗るおやつ系(鏡餅/恵方巻/チョコ/クッキー/ケーキ)。行事ごとに1つ表示。夜はテーブルが下がるので.pxtableをまとめて下げる */
+  #home-px-fx .pxmochi,#home-px-fx .pxehomaki,#home-px-fx .pxchoco,#home-px-fx .pxcookie,#home-px-fx .pxcake,#home-px-fx .pxcakebd{display:none}
+  #home.px.t-night #home-px-fx .pxtable{transform:translateY(6px)}
+  #home.px.ev-newyear #home-px-fx .pxmochi{display:block}
+  #home.px.ev-setsubun #home-px-fx .pxehomaki{display:block}
+  #home.px.ev-valentine #home-px-fx .pxchoco{display:block}
+  #home.px.ev-whiteday #home-px-fx .pxcookie{display:block}
+  #home.px.ev-cake #home-px-fx .pxcake{display:block}
+  #home.px.ev-cakedx #home-px-fx .pxcakebd,
+  #home.px.ev-bday #home-px-fx .pxcakebd{display:block}
+  #home-px-fx .pxcake-flame{animation:pxFlame 1.4s ease-in-out infinite}
   @media (prefers-reduced-motion:reduce){#home-px-fx *{animation:none !important}}
   #home.px #home-px{display:block}
   #home.px #home-photo-wrap{display:none}   /* 写真と小物レイヤーはドット絵中はお休み(コードは残置) */
@@ -1351,6 +1378,88 @@
           <g fill="#caa877"><rect x="129" y="198" width="16" height="3"/></g>
           <g fill="#a8895f"><rect x="129" y="201" width="16" height="1"/></g>
           <g fill="#f5efe0"><rect x="131" y="194" width="4" height="4"/><rect x="135" y="194" width="4" height="4"/><rect x="139" y="194" width="4" height="4"/><rect x="133" y="190" width="4" height="4"/><rect x="137" y="190" width="4" height="4"/></g>
+        </g>
+        <!-- 🎃 ハロウィンのかぼちゃランタン(10/15〜31)。テーブル左・夜は下げる。顔は光る -->
+        <g class="pxpumpkin">
+          <g fill="#6f7d3f"><rect x="134" y="185" width="3" height="3"/></g>
+          <g fill="#ec7a1e">
+            <rect x="132" y="188" width="6" height="1"/><rect x="130" y="189" width="10" height="1"/><rect x="128" y="190" width="14" height="1"/><rect x="127" y="191" width="16" height="5"/><rect x="128" y="196" width="14" height="2"/><rect x="129" y="198" width="12" height="1"/><rect x="131" y="199" width="8" height="1"/>
+          </g>
+          <g fill="#cf6614"><rect x="130" y="190" width="1" height="8"/><rect x="135" y="189" width="1" height="10"/><rect x="139" y="190" width="1" height="8"/></g>
+          <g class="pxpk-glow" fill="#ffce4a">
+            <rect x="130" y="191" width="3" height="1"/><rect x="131" y="192" width="1" height="1"/>
+            <rect x="138" y="191" width="3" height="1"/><rect x="139" y="192" width="1" height="1"/>
+            <rect x="134" y="193" width="2" height="1"/>
+            <rect x="130" y="195" width="1" height="1"/><rect x="131" y="196" width="2" height="1"/><rect x="133" y="195" width="1" height="1"/><rect x="134" y="196" width="2" height="1"/><rect x="136" y="195" width="1" height="1"/><rect x="137" y="196" width="2" height="1"/><rect x="139" y="195" width="1" height="1"/>
+          </g>
+        </g>
+        <!-- 🎄 クリスマスのツリー+プレゼント(12/1〜25)。窓ぎわの床・夜は下げる。飾りは夕方夜にチカチカ光る -->
+        <g class="pxxmas">
+          <g fill="#ffd24a"><rect x="95" y="150" width="2" height="2"/><rect x="94" y="152" width="4" height="2"/><rect x="95" y="154" width="2" height="2"/></g>
+          <g fill="#2f7d3f">
+            <rect x="95" y="156" width="2" height="2"/><rect x="94" y="158" width="4" height="2"/><rect x="93" y="160" width="6" height="2"/><rect x="92" y="162" width="8" height="2"/><rect x="91" y="164" width="10" height="2"/><rect x="90" y="166" width="12" height="2"/><rect x="89" y="168" width="14" height="2"/><rect x="88" y="170" width="16" height="2"/><rect x="87" y="172" width="18" height="2"/><rect x="86" y="174" width="20" height="2"/><rect x="85" y="176" width="22" height="2"/><rect x="84" y="178" width="24" height="2"/><rect x="83" y="180" width="26" height="2"/><rect x="83" y="182" width="26" height="2"/><rect x="82" y="184" width="28" height="2"/><rect x="82" y="186" width="28" height="2"/>
+          </g>
+          <g fill="#256a34"><rect x="86" y="180" width="8" height="1"/><rect x="98" y="176" width="6" height="1"/><rect x="90" y="186" width="12" height="1"/></g>
+          <g fill="#6b4a2a"><rect x="93" y="188" width="6" height="10"/></g>
+          <g class="pxxmas-light">
+            <rect x="98" y="164" width="2" height="2" fill="#e0403a"/><rect x="88" y="172" width="2" height="2" fill="#ffd24a" style="animation-delay:-.7s"/><rect x="100" y="178" width="2" height="2" fill="#4a90d0" style="animation-delay:-1.3s"/><rect x="91" y="168" width="2" height="2" fill="#4a90d0" style="animation-delay:-1.9s"/><rect x="103" y="182" width="2" height="2" fill="#e0403a" style="animation-delay:-.4s"/><rect x="95" y="174" width="2" height="2" fill="#ffd24a" style="animation-delay:-2.2s"/><rect x="86" y="183" width="2" height="2" fill="#e0403a" style="animation-delay:-1.1s"/><rect x="104" y="185" width="2" height="2" fill="#ffd24a" style="animation-delay:-1.6s"/>
+          </g>
+          <g fill="#cc3b3b"><rect x="83" y="196" width="9" height="7"/></g>
+          <g fill="#ffd24a"><rect x="87" y="196" width="1" height="7"/><rect x="83" y="199" width="9" height="1"/></g>
+          <g fill="#3f7fbf"><rect x="100" y="198" width="8" height="5"/></g>
+          <g fill="#f0e6c0"><rect x="103" y="198" width="1" height="5"/><rect x="100" y="200" width="8" height="1"/></g>
+        </g>
+        <!-- 🎍 お正月の鏡餅(1/1〜7)。テーブル左・夜は下げる(.pxtable) -->
+        <g class="pxtable pxmochi">
+          <g fill="#caa06a"><rect x="123" y="198" width="12" height="2"/></g>
+          <g fill="#a8804a"><rect x="123" y="200" width="12" height="1"/></g>
+          <g fill="#f4efe6"><rect x="124" y="193" width="10" height="5"/></g>
+          <g fill="#e6ded0"><rect x="124" y="197" width="10" height="1"/></g>
+          <g fill="#f4efe6"><rect x="126" y="189" width="6" height="4"/></g>
+          <g fill="#e6ded0"><rect x="126" y="192" width="6" height="1"/></g>
+          <g fill="#e8862a"><rect x="127" y="186" width="4" height="3"/></g>
+          <g fill="#5a8a3a"><rect x="129" y="185" width="2" height="1"/></g>
+        </g>
+        <!-- 👹 節分の恵方巻+豆(2/1〜3)。テーブル左 -->
+        <g class="pxtable pxehomaki">
+          <g fill="#cdbf9a"><rect x="121" y="198" width="16" height="2"/></g>
+          <g fill="#2c332a"><rect x="123" y="193" width="13" height="5"/></g>
+          <g fill="#f2ecdc"><rect x="123" y="193" width="3" height="5"/></g>
+          <g fill="#c0502e"><rect x="124" y="195" width="1" height="1"/></g>
+          <g fill="#5a9a4a"><rect x="124" y="196" width="1" height="1"/></g>
+          <g fill="#d8b45a"><rect x="128" y="199" width="1" height="1"/><rect x="132" y="199" width="1" height="1"/></g>
+        </g>
+        <!-- 🍫 バレンタインのチョコ箱(2/7〜14)。テーブル左 -->
+        <g class="pxtable pxchoco">
+          <g fill="#b83454"><rect x="123" y="192" width="13" height="8"/></g>
+          <g fill="#9a2a46"><rect x="123" y="195" width="13" height="1"/></g>
+          <g fill="#f0d267"><rect x="128" y="192" width="2" height="8"/><rect x="123" y="196" width="13" height="1"/></g>
+          <g fill="#ffd7e2"><rect x="127" y="189" width="4" height="2"/><rect x="128" y="188" width="2" height="1"/></g>
+        </g>
+        <!-- 🍪 ホワイトデーのクッキー皿(3/7〜14)。テーブル左 -->
+        <g class="pxtable pxcookie">
+          <g fill="#e8e0d2"><rect x="121" y="197" width="16" height="3"/></g>
+          <g fill="#cfa365"><rect x="123" y="193" width="4" height="4"/><rect x="128" y="194" width="4" height="4"/><rect x="132" y="193" width="4" height="4"/></g>
+          <g fill="#5a3a1c"><rect x="124" y="194" width="1" height="1"/><rect x="130" y="195" width="1" height="1"/><rect x="133" y="194" width="1" height="1"/><rect x="125" y="196" width="1" height="1"/></g>
+        </g>
+        <!-- 🎂 月々のケーキ(毎月14日)。テーブル右寄り・色はJSの月替わり(--hm-cakeA/B) -->
+        <g class="pxtable pxcake">
+          <g fill="#d8d0c8"><rect x="135" y="199" width="15" height="1"/></g>
+          <g style="fill:var(--hm-cakeA,#f6c6d8)"><rect x="136" y="194" width="13" height="5"/></g>
+          <g style="fill:var(--hm-cakeB,#ffffff)"><rect x="136" y="192" width="13" height="2"/><rect x="136" y="198" width="13" height="1"/></g>
+          <g fill="#d83048"><rect x="142" y="190" width="2" height="2"/></g>
+        </g>
+        <!-- 🎂 お誕生日/デラックスのケーキ(誕生日・4/14)。ろうそくの火はゆらめく -->
+        <g class="pxtable pxcakebd">
+          <g fill="#d8d0c8"><rect x="135" y="199" width="15" height="1"/></g>
+          <g fill="#f6ead8"><rect x="136" y="193" width="13" height="6"/></g>
+          <g fill="#ffffff"><rect x="136" y="191" width="13" height="2"/></g>
+          <g fill="#e88aa8"><rect x="136" y="196" width="13" height="1"/></g>
+          <g fill="#d83048"><rect x="138" y="189" width="2" height="2"/><rect x="145" y="189" width="2" height="2"/></g>
+          <g fill="#6fb0e0"><rect x="139" y="186" width="1" height="4"/></g>
+          <g fill="#e0a0c0"><rect x="142" y="185" width="1" height="5"/></g>
+          <g fill="#a0d080"><rect x="145" y="186" width="1" height="4"/></g>
+          <g class="pxcake-flame" fill="#ffc94a"><rect x="139" y="184" width="1" height="2"/><rect x="142" y="183" width="1" height="2"/><rect x="145" y="184" width="1" height="2"/></g>
         </g>
       </svg>
       <div class="pxchar" id="px-ritsu"><img src="chibi-ritsu.png" alt="律"></div>
@@ -2376,6 +2485,11 @@ if(!Array.isArray(settings.mem)){
   store.set("ritsu-settings", JSON.stringify(settings));
 }
 if(!Array.isArray(settings.mem)) settings.mem = [];
+// 📌 記憶カードにピン留め(pinned)と埋め込み(embedding)を用意。既存カードは全部ピン留め=今までと同じ動き。勝手にRAG側へ移さない
+settings.mem.forEach(c=>{
+  if(typeof c.pinned==="undefined") c.pinned = true;
+  if(typeof c.embedding==="undefined") c.embedding = null;
+});
 
 /* ---------- threads (チャットの保管・切替) ---------- */
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -2780,6 +2894,7 @@ function cosSim(a, b){     // 似てる度(コサイン類似度)。ただの算
   return d ? dot/d : 0;
 }
 let ragRecall = [];   // 直近の送信で思い出した気づき(buildCachedMsgsが最新メッセージ側に添える)
+let memRecall = [];   // 直近の送信で思い出した記憶カード(通常カード・RAG)。ragRecallと同じ流儀で最新メッセージ側に添える
 async function ragSearch(query, embReady){   // 意味が近い気づきを上位数件だけ返す(失敗は空)。embReady=作成済みの指紋(二度打ち防止)
   if(!settings.googleKey || (!query && !embReady)) return [];
   const emb = embReady || await embedText(query);
@@ -3314,23 +3429,43 @@ function openMemory(){
 }
 function closeMemory(){ $("memory").classList.remove("open"); }
 
+async function embedMemCard(card){   // カード本文のベクトル(RAG用)を作って保存。失敗したら固定あつかいに戻す(忘れ防止)
+  const emb = await embedText(card.text);
+  if(emb){ card.embedding = emb; saveMem(); return true; }
+  card.embedding = null; card.pinned = true; saveMem(); return false;
+}
+async function toggleMemPin(card){   // 📌固定⇔通常を切り替える。通常(RAG)に変えたらベクトルを作る(まだ無ければ)
+  card.pinned = !card.pinned;
+  saveMem();
+  renderMemList();
+  if(!card.pinned && !(card.embedding && card.embedding.vec)){
+    const ok = await embedMemCard(card);
+    renderMemList();   // 失敗ならpinned:trueに戻ってるので見た目も戻す
+    if(!ok) alert("⚠️ このカードのベクトル(RAG用)を作れなかったよ。設定のGoogle APIキーやネットを確認してね。\n当面このカードは『📌固定』としてそのまま律くんに伝え続けるね(忘れ防止)。");
+  }
+}
 function renderMemList(){
   const box = $("mem-list"); if(!box) return; box.innerHTML="";
   if(!Array.isArray(settings.mem)) settings.mem = [];
   let list = settings.mem.slice();
   if(memFilter!=="all") list = list.filter(c=> (c.cat||"other")===memFilter);
   list.reverse(); // 新しい順
+  list.sort((a,b)=> (b.pinned?1:0) - (a.pinned?1:0)); // 📌固定を上にまとめる(同じ組の中では新しい順のまま)
   if(!list.length){
     box.appendChild(el("div","cal-empty", memFilter==="all" ? "まだ記憶はないよ。「＋追加」か、律くんとの会話で増えるよ📝" : "このカテゴリの記憶はないよ"));
     return;
   }
   list.forEach(card=>{
-    const wrap = el("div","mem-card");
+    const wrap = el("div","mem-card"+(card.pinned?" pinned":""));
     const top = el("div","mem-card-top");
     top.appendChild(el("span","mem-card-tag", CATLABEL[card.cat]||"その他"));
     if(card.source==="ai") top.appendChild(el("span","mem-card-src","🤖"));
     if(card.ts) top.appendChild(el("span","mem-card-date", fmtMemDate(card.ts)));
     const acts = el("div","mem-card-acts");
+    const pin = el("button","mem-card-btn mem-pin"+(card.pinned?" on":""),"📌");
+    pin.title = card.pinned ? "固定中：いつも律くんに伝えるよ。タップで通常に" : "通常：関係する時だけ伝えるよ。タップで固定に";
+    pin.addEventListener("click", ()=> toggleMemPin(card));
+    acts.appendChild(pin);
     const edit = el("button","mem-card-btn","✏️"); edit.addEventListener("click", ()=> openMemEdit(card));
     const del = el("button","mem-card-btn","🗑"); del.addEventListener("click", ()=>{ if(confirm("この記憶を削除する?戻せないよ")){ settings.mem = settings.mem.filter(c=>c.id!==card.id); saveMem(); renderMemList(); } });
     acts.appendChild(edit); acts.appendChild(del);
@@ -3351,18 +3486,24 @@ function openMemEdit(card){
   setTimeout(()=>{ try{ $("mem-edit-text").focus(); }catch(e){} }, 60);
 }
 function closeMemEdit(){ $("mem-edit").classList.remove("open"); }
-function saveMemEdit(){
+async function saveMemEdit(){
   const t = $("mem-edit-text").value.trim();
   if(!t){ closeMemEdit(); return; }
   if(!Array.isArray(settings.mem)) settings.mem = [];
+  let editedCard = null, textChanged = false;
   if(memEditId){
     const c = settings.mem.find(x=>x.id===memEditId);
-    if(c){ c.text = t; c.cat = memEditCat; }
+    if(c){ textChanged = (c.text !== t); c.text = t; c.cat = memEditCat; if(textChanged) c.embedding = null; editedCard = c; }
   } else {
-    settings.mem.push({id:uid(), text:t, cat:memEditCat, ts:Date.now(), source:"user"});
+    settings.mem.push({id:uid(), text:t, cat:memEditCat, ts:Date.now(), source:"user", pinned:true, embedding:null});
   }
   saveMem(); closeMemEdit(); renderMemList();
   if(!$("memory").classList.contains("open")){ try{ chat.appendChild(el("div","sysnote","🧠 記憶に追加したよ")); scrollEnd(); }catch(e){} }
+  if(editedCard && textChanged && !editedCard.pinned){   // 通常カードの本文を変えた → ベクトルを作り直す(裏で)
+    const ok = await embedMemCard(editedCard);
+    renderMemList();
+    if(!ok) alert("⚠️ 編集したカードのベクトルを作り直せなかったよ。当面『📌固定』としてそのまま伝えるね。設定のGoogle APIキーを確認してね。");
+  }
 }
 // セリフの「🧠記憶に追加」から呼ぶ：本文を入れた状態で編集ポップアップを開く
 function addMessageToMemory(text){
@@ -4265,6 +4406,7 @@ async function generateReply(text, lm){
     // 意味検索: クエリの指紋(embedding)は1回だけ作り、気づき・あゆみ両方の棚で使い回す(二度打ち防止)
     const qEmb = (text && settings.googleKey) ? await embedText(text) : null;
     ragRecall = qEmb ? await ragSearch(text, qEmb) : [];   // 心の奥の気づき
+    memRecall = qEmb ? memRagSearch(qEmb) : [];            // 記憶カード(通常カード)のRAG
     ayRecall  = qEmb ? await ragAySearch(qEmb) : [];       // 過去の日々の記録(ステップ4で律くんに渡す・今はまだ渡さない)
     await refreshTsuzukiCtx();                        // 続きのある話(未解決)を毎回そのまま渡すぶんを用意
     await refreshWeather();                            // 🌤️ 名古屋の今日の天気を用意(30分に1回だけ取り直す)
@@ -4528,6 +4670,11 @@ function buildCachedMsgs(lineOn){
       + ragRecall.map(r=>"・["+(RAGLABEL[r.card.label]||"気づき")+"] "+r.card.text).join("\n")
       + "\nこれはあなた(律)自身が過去の省察で至った気づきです。関係がありそうなときだけ、文言をそのまま読み上げず、自然に会話へ活かしてください。無理に触れなくて構いません。";
   }
+  if(memRecall.length){
+    note += "\n\n# これまでの記憶（今の話に関係しそうなもの）\n"
+      + memRecall.map(r=>"・【記憶カード】"+r.card.text).join("\n")
+      + "\nこれはさきについての記憶です。関係がありそうなときだけ自然に会話へ活かし、文言をそのまま読み上げないでください。無理に触れなくて構いません。";
+  }
   // 🗂️ 過去の日々の記録(あゆみRAG): 今の話題と意味が近い日/週のまとめを、日付付きで添える(無ければ何も足さない)
   if(ayRecall.length){
     note += "\n\n# 過去の日々の記録（ふたりのあゆみから思い出したもの）\n"
@@ -4565,16 +4712,31 @@ function HEADERS(){ return {
   "anthropic-dangerous-direct-browser-access":"true"
 }; }
 const MEMCATS = [["profile","プロフィール"],["likes","好み"],["knowledge","知識"],["other","その他"]];
+function memPinnedEff(c){ return !!c.pinned || !(c.embedding && c.embedding.vec); }  // 📌固定 or ベクトル無し(RAGに載せられない)は「常時注入」あつかい=忘れ防止
+function memRagSearch(qEmb){   // 通常カード(ピンオフ&ベクトル有り)から、今の話に意味が近い上位を返す。省察RAGと同じcosSim・同じしきい値を再利用
+  try{
+    if(!qEmb || !qEmb.vec || !Array.isArray(settings.mem)) return [];
+    const scored = [];
+    settings.mem.forEach(c=>{
+      if(memPinnedEff(c)) return;                              // 固定/ベクトル無しはRAG対象外(=システム側で常時注入)
+      if(!c.embedding || c.embedding.dim!==qEmb.dim) return;    // 次元ちがいは比べない
+      const sim = cosSim(qEmb.vec, c.embedding.vec);
+      if(sim >= RAG_MIN_SIM) scored.push({card:c, sim});
+    });
+    scored.sort((a,b)=> b.sim - a.sim);
+    return scored.slice(0, RAG_TOP_K);
+  }catch(e){ return []; }
+}
 function memText(){
   if(!Array.isArray(settings.mem) || !settings.mem.length) return "";
   const parts=[];
   MEMCATS.forEach(([k,label])=>{
-    const items = settings.mem.filter(c=> (c.cat||"other")===k);
+    const items = settings.mem.filter(c=> (c.cat||"other")===k && memPinnedEff(c));   // 📌固定(＋ベクトル無し)だけ常時注入。通常カードはRAG側へ
     if(items.length) parts.push("【"+label+"】\n" + items.map(c=>"・"+c.text).join("\n"));
   });
   // 万一カテゴリ外があれば その他扱いで拾う
   const known = MEMCATS.map(c=>c[0]);
-  const orphans = settings.mem.filter(c=> known.indexOf(c.cat||"other")<0);
+  const orphans = settings.mem.filter(c=> known.indexOf(c.cat||"other")<0 && memPinnedEff(c));
   if(orphans.length) parts.push("【その他】\n" + orphans.map(c=>"・"+c.text).join("\n"));
   return parts.join("\n\n");
 }
@@ -4749,7 +4911,7 @@ function extractMemories(text){
   let remembered = false;
   const cleaned = text.replace(/<remember>([\s\S]*?)<\/remember>/g, (_, note)=>{
     note = note.trim();
-    if(note){ if(!Array.isArray(settings.mem)) settings.mem=[]; settings.mem.push({id:uid(), text:note, cat:"other", ts:Date.now(), source:"ai"}); remembered = true; }
+    if(note){ if(!Array.isArray(settings.mem)) settings.mem=[]; settings.mem.push({id:uid(), text:note, cat:"other", ts:Date.now(), source:"ai", pinned:true, embedding:null}); remembered = true; }
     return "";
   }).replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
   if(remembered) store.set("ritsu-settings", JSON.stringify(settings));
