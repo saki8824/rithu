@@ -617,6 +617,24 @@
   #home.px.ev-cakedx #home-px-fx .pxcakebd,
   #home.px.ev-bday #home-px-fx .pxcakebd{display:block}
   #home-px-fx .pxcake-flame{animation:pxFlame 1.4s ease-in-out infinite}
+  /* ☀️初日の出(お正月・昼・窓) / 💠紫陽花(6月・床) / 🎋七夕(7/1〜7・床) / 🎀誕生日ガーランド(壁) */
+  #home-px-fx .pxhinode,#home-px-fx .pxajisai,#home-px-fx .pxtanabata,#home-px-fx .pxgarland{display:none}
+  #home.px.ev-newyear.t-day #home-px-fx .pxhinode{display:block}
+  #home.px.ev-ajisai #home-px-fx .pxajisai{display:block}
+  #home.px.ev-tanabata #home-px-fx .pxtanabata{display:block}
+  #home.px.ev-bday #home-px-fx .pxgarland{display:block}
+  #home.px.t-night #home-px-fx .pxfloor{transform:translateY(6px)}          /* 窓ぎわ床の飾りは夜まとめて下げる */
+  #home.px.ev-bday.t-night #home-px-fx .pxgarland{transform:translateY(7px)} /* 壁のガーランドも夜は少し下げる */
+  /* 🌸桜(4/1〜15) ⛄雪(冬) 🎈風船(誕生日): 舞う/ふわふわアニメ */
+  #home-px-fx .pxsakura,#home-px-fx .pxsnow,#home-px-fx .pxballoon{display:none}
+  #home.px.ev-sakura #home-px-fx .pxsakura{display:block}
+  #home.px.s-winter #home-px-fx .pxsnow{display:block}
+  #home.px.ev-bday #home-px-fx .pxballoon{display:block}
+  #home-px-fx .pxsakura rect,#home-px-fx .pxsnow rect{animation:pxFall 7s linear infinite}
+  #home-px-fx .pxballoon > g{transform-box:fill-box;transform-origin:center;animation:pxBob 3s ease-in-out infinite}
+  @keyframes pxFall{0%{transform:translate(0,-16px);opacity:0}10%{opacity:.9}90%{opacity:.9}100%{transform:translate(-12px,338px);opacity:0}}
+  @keyframes pxBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+  @media (prefers-reduced-motion:reduce){#home-px-fx .pxsakura,#home-px-fx .pxsnow,#home-px-fx .pxballoon{display:none !important}}
   @media (prefers-reduced-motion:reduce){#home-px-fx *{animation:none !important}}
   #home.px #home-px{display:block}
   #home.px #home-photo-wrap{display:none}   /* 写真と小物レイヤーはドット絵中はお休み(コードは残置) */
@@ -1460,6 +1478,92 @@
           <g fill="#e0a0c0"><rect x="142" y="185" width="1" height="5"/></g>
           <g fill="#a0d080"><rect x="145" y="186" width="1" height="4"/></g>
           <g class="pxcake-flame" fill="#ffc94a"><rect x="139" y="184" width="1" height="2"/><rect x="142" y="183" width="1" height="2"/><rect x="145" y="184" width="1" height="2"/></g>
+        </g>
+        <!-- ☀️ 初日の出(お正月の昼だけ)。窓の空に昇る朝日 -->
+        <g class="pxhinode">
+          <g fill="#ffdf6a"><rect x="39" y="79" width="2" height="4"/><rect x="39" y="97" width="2" height="3"/><rect x="26" y="89" width="4" height="2"/><rect x="50" y="89" width="4" height="2"/><rect x="30" y="81" width="2" height="2"/><rect x="48" y="81" width="2" height="2"/><rect x="30" y="97" width="2" height="2"/><rect x="48" y="97" width="2" height="2"/></g>
+          <g fill="#ffcf3a"><rect x="38" y="84" width="4" height="1"/><rect x="36" y="85" width="8" height="1"/><rect x="35" y="86" width="10" height="1"/><rect x="34" y="87" width="12" height="6"/><rect x="35" y="93" width="10" height="1"/><rect x="36" y="94" width="8" height="1"/><rect x="38" y="95" width="4" height="1"/></g>
+          <g fill="#fff2c0"><rect x="37" y="88" width="6" height="4"/></g>
+        </g>
+        <!-- 💠 紫陽花(6月・窓ぎわの床)。夜は下げる(pxfloor) -->
+        <g class="pxfloor pxajisai">
+          <g fill="#a8674a"><rect x="91" y="197" width="12" height="7"/></g>
+          <g fill="#c07a56"><rect x="90" y="196" width="14" height="1"/></g>
+          <g fill="#8a5038"><rect x="91" y="203" width="12" height="1"/></g>
+          <g fill="#4a8a4a"><rect x="85" y="190" width="7" height="3"/><rect x="103" y="191" width="7" height="3"/><rect x="93" y="193" width="8" height="3"/></g>
+          <g fill="#7fa8e0"><rect x="88" y="185" width="3" height="3"/><rect x="99" y="184" width="3" height="3"/><rect x="94" y="188" width="3" height="3"/><rect x="104" y="188" width="3" height="3"/><rect x="92" y="180" width="3" height="3"/></g>
+          <g fill="#b08ad0"><rect x="91" y="185" width="3" height="3"/><rect x="96" y="182" width="3" height="3"/><rect x="101" y="187" width="3" height="3"/><rect x="88" y="188" width="3" height="3"/><rect x="99" y="180" width="3" height="3"/></g>
+          <g fill="#e6a4c6"><rect x="95" y="185" width="3" height="3"/><rect x="90" y="182" width="3" height="3"/><rect x="102" y="184" width="3" height="3"/><rect x="87" y="185" width="3" height="3"/><rect x="97" y="178" width="3" height="3"/></g>
+        </g>
+        <!-- 🎋 七夕(7/1〜7・窓ぎわの床)。笹と短冊。夜は下げる(pxfloor) -->
+        <g class="pxfloor pxtanabata">
+          <g fill="#8a6a4a"><rect x="91" y="198" width="10" height="6"/></g>
+          <g fill="#6a4e34"><rect x="91" y="198" width="10" height="1"/></g>
+          <g fill="#5a9a4a"><rect x="95" y="140" width="2" height="58"/></g>
+          <g fill="#3a7a34"><rect x="94" y="152" width="4" height="1"/><rect x="94" y="166" width="4" height="1"/><rect x="94" y="180" width="4" height="1"/></g>
+          <g fill="#4a8a3a"><rect x="86" y="146" width="9" height="2"/><rect x="97" y="151" width="9" height="2"/><rect x="85" y="160" width="10" height="2"/><rect x="97" y="170" width="9" height="2"/><rect x="88" y="176" width="7" height="2"/></g>
+          <g fill="#e05050"><rect x="89" y="157" width="2" height="5"/></g>
+          <g fill="#f0d24a"><rect x="101" y="153" width="2" height="5"/></g>
+          <g fill="#5a9ae0"><rect x="87" y="171" width="2" height="5"/></g>
+          <g fill="#6ac06a"><rect x="103" y="167" width="2" height="5"/></g>
+          <g fill="#e090c0"><rect x="92" y="165" width="2" height="5"/></g>
+          <g fill="#f0d24a"><rect x="99" y="176" width="2" height="5"/></g>
+          <g fill="#e05050"><rect x="90" y="184" width="2" height="5"/></g>
+        </g>
+        <!-- 🎀 お誕生日のガーランド(誕生日・壁)。夜は少し下げる -->
+        <g class="pxgarland">
+          <g fill="#7a5a3a"><rect x="150" y="86" width="74" height="1"/></g>
+          <g fill="#e05a5a"><rect x="152" y="87" width="8" height="1"/><rect x="153" y="88" width="6" height="1"/><rect x="154" y="89" width="4" height="1"/><rect x="155" y="90" width="2" height="1"/></g>
+          <g fill="#f0c84a"><rect x="162" y="87" width="8" height="1"/><rect x="163" y="88" width="6" height="1"/><rect x="164" y="89" width="4" height="1"/><rect x="165" y="90" width="2" height="1"/></g>
+          <g fill="#5aa0e0"><rect x="172" y="87" width="8" height="1"/><rect x="173" y="88" width="6" height="1"/><rect x="174" y="89" width="4" height="1"/><rect x="175" y="90" width="2" height="1"/></g>
+          <g fill="#6ac06a"><rect x="182" y="87" width="8" height="1"/><rect x="183" y="88" width="6" height="1"/><rect x="184" y="89" width="4" height="1"/><rect x="185" y="90" width="2" height="1"/></g>
+          <g fill="#e08ac0"><rect x="192" y="87" width="8" height="1"/><rect x="193" y="88" width="6" height="1"/><rect x="194" y="89" width="4" height="1"/><rect x="195" y="90" width="2" height="1"/></g>
+          <g fill="#e05a5a"><rect x="202" y="87" width="8" height="1"/><rect x="203" y="88" width="6" height="1"/><rect x="204" y="89" width="4" height="1"/><rect x="205" y="90" width="2" height="1"/></g>
+          <g fill="#f0c84a"><rect x="212" y="87" width="8" height="1"/><rect x="213" y="88" width="6" height="1"/><rect x="214" y="89" width="4" height="1"/><rect x="215" y="90" width="2" height="1"/></g>
+        </g>
+        <!-- 🌸 桜が舞う(4/1〜15) -->
+        <g class="pxsakura">
+          <rect x="20"  y="0" width="2" height="2" fill="#f4b8d4" style="animation-duration:7s;animation-delay:0s"/>
+          <rect x="48"  y="0" width="2" height="2" fill="#f0a0c4" style="animation-duration:8s;animation-delay:-2s"/>
+          <rect x="64"  y="0" width="2" height="2" fill="#f4b8d4" style="animation-duration:7.8s;animation-delay:-5.5s"/>
+          <rect x="76"  y="0" width="2" height="2" fill="#f4b8d4" style="animation-duration:6.5s;animation-delay:-4s"/>
+          <rect x="104" y="0" width="2" height="2" fill="#f0a0c4" style="animation-duration:7.5s;animation-delay:-1s"/>
+          <rect x="132" y="0" width="2" height="2" fill="#f4b8d4" style="animation-duration:9s;animation-delay:-5s"/>
+          <rect x="160" y="0" width="2" height="2" fill="#f0a0c4" style="animation-duration:6s;animation-delay:-3s"/>
+          <rect x="188" y="0" width="2" height="2" fill="#f4b8d4" style="animation-duration:8.5s;animation-delay:-6s"/>
+          <rect x="210" y="0" width="2" height="2" fill="#f0a0c4" style="animation-duration:7s;animation-delay:-2.5s"/>
+        </g>
+        <!-- ⛄ 雪(冬) -->
+        <g class="pxsnow" fill="#ffffff">
+          <rect x="15"  y="0" width="2" height="2" style="animation-duration:9s;animation-delay:0s"/>
+          <rect x="30"  y="0" width="1" height="1" style="animation-duration:8s;animation-delay:-8s"/>
+          <rect x="40"  y="0" width="1" height="1" style="animation-duration:11s;animation-delay:-3s"/>
+          <rect x="62"  y="0" width="2" height="2" style="animation-duration:8s;animation-delay:-5s"/>
+          <rect x="88"  y="0" width="1" height="1" style="animation-duration:10s;animation-delay:-1s"/>
+          <rect x="112" y="0" width="2" height="2" style="animation-duration:9.5s;animation-delay:-6s"/>
+          <rect x="138" y="0" width="1" height="1" style="animation-duration:8.5s;animation-delay:-2s"/>
+          <rect x="160" y="0" width="2" height="2" style="animation-duration:11s;animation-delay:-4s"/>
+          <rect x="175" y="0" width="2" height="2" style="animation-duration:10.5s;animation-delay:-3.5s"/>
+          <rect x="184" y="0" width="1" height="1" style="animation-duration:9s;animation-delay:-7s"/>
+          <rect x="206" y="0" width="2" height="2" style="animation-duration:10s;animation-delay:-1.5s"/>
+        </g>
+        <!-- 🎈 風船がふわふわ(誕生日) -->
+        <g class="pxballoon">
+          <g style="animation-delay:0s">
+            <g fill="#e05a5a"><rect x="114" y="42" width="4" height="1"/><rect x="113" y="43" width="6" height="1"/><rect x="112" y="44" width="8" height="5"/><rect x="113" y="49" width="6" height="1"/><rect x="114" y="50" width="4" height="1"/><rect x="115" y="51" width="2" height="1"/></g>
+            <g fill="#ffd0d8"><rect x="114" y="45" width="1" height="2"/></g>
+            <g fill="#b0a878"><rect x="116" y="52" width="1" height="11"/></g>
+          </g>
+          <g style="animation-delay:-1s">
+            <g fill="#5aa0e0"><rect x="144" y="47" width="4" height="1"/><rect x="143" y="48" width="6" height="1"/><rect x="142" y="49" width="8" height="5"/><rect x="143" y="54" width="6" height="1"/><rect x="144" y="55" width="4" height="1"/><rect x="145" y="56" width="2" height="1"/></g>
+            <g fill="#c0e0f8"><rect x="144" y="50" width="1" height="2"/></g>
+            <g fill="#b0a878"><rect x="146" y="57" width="1" height="11"/></g>
+          </g>
+          <g style="animation-delay:-2s">
+            <g fill="#f0c84a"><rect x="176" y="40" width="4" height="1"/><rect x="175" y="41" width="6" height="1"/><rect x="174" y="42" width="8" height="5"/><rect x="175" y="47" width="6" height="1"/><rect x="176" y="48" width="4" height="1"/><rect x="177" y="49" width="2" height="1"/></g>
+            <g fill="#fff0b0"><rect x="176" y="43" width="1" height="2"/></g>
+            <g fill="#b0a878"><rect x="178" y="50" width="1" height="11"/></g>
+          </g>
         </g>
       </svg>
       <div class="pxchar" id="px-ritsu"><img src="chibi-ritsu.png" alt="律"></div>
