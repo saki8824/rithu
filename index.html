@@ -169,6 +169,11 @@
   .msg-atts{display:flex;flex-wrap:wrap;gap:6px}
   .msg-atts img{max-width:182px;max-height:210px;border-radius:13px;display:block}
   .msg-atts .file{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:7px 11px;background:var(--night-2)}
+  /* 🗑 送信画像の削除(画像データだけ消す・発言は残す) */
+  .msg-att-img{position:relative;display:inline-block}
+  .msg-att-del{position:absolute;top:5px;right:5px;width:26px;height:26px;border:none;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:13px;line-height:1;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .msg-att-del:active{background:rgba(0,0,0,.82)}
+  .msg-att-gone{font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:13px;padding:10px 14px;background:var(--night-2)}
   /* ---------- profile ---------- */
   .bubble-row{display:flex;align-items:flex-end;gap:8px}
   .u-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:1.5px solid var(--saki-blue)}
@@ -411,6 +416,18 @@
   .memopad-day{font-size:12px;color:var(--muted);font-weight:600;margin-top:4px}
   #memopad-list{display:flex;flex-direction:column;gap:8px}
   .memopad-row .mem-card-text{flex:1;min-width:0}
+  /* 📸 画像の整理画面(まとめて削除) */
+  #imgclean{position:fixed;inset:0;background:var(--night);z-index:60;overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 40px;display:none;flex-direction:column;gap:12px}
+  #imgclean.open{display:flex}
+  .imgclean-summary{font-size:13px;color:var(--text);background:var(--night-2);border:1px solid var(--line);border-radius:12px;padding:11px 13px;white-space:pre-wrap}
+  .imgclean-tools{display:flex;flex-wrap:wrap;gap:7px}
+  #imgclean-list{display:flex;flex-direction:column;gap:8px}
+  .imgc-row{display:flex;align-items:center;gap:10px;background:var(--night-2);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+  .imgc-row.sel{border-color:var(--ritsu-pink)}
+  .imgc-row input[type=checkbox]{width:20px;height:20px;flex:0 0 auto}
+  .imgc-thumb{width:46px;height:46px;object-fit:cover;border-radius:8px;flex:0 0 auto}
+  .imgc-meta{font-size:12px;color:var(--muted);min-width:0}
+  .imgc-meta b{display:block;color:var(--text);font-size:12.5px;font-weight:600}
   /* 📦 アーカイブ画面（お気に入り・あらすじと同じつくり） */
   #archive{
     position:fixed;inset:0;background:var(--night);z-index:55;
@@ -2104,6 +2121,9 @@
         <button class="btn ghost" id="measure-storage">📊 いま測る</button>
         <button class="btn ghost" id="clean-old-threads">🧹 旧コピーを掃除</button>
       </div>
+      <div class="backup-row" style="margin-top:7px">
+        <button class="btn ghost" id="open-imgclean">📸 画像の整理</button>
+      </div>
       <div class="hint" style="margin-top:7px">🧹は、大倉庫への引っ越しが確認できたチャットの「古い置き場所」だけを空にするよ(中身は大倉庫に残る)。押す前に📤バックアップしてあると安心。</div>
     </div>
 
@@ -2430,6 +2450,24 @@
     <button class="btn primary" id="memopad-add-btn">＋追加</button>
   </div>
   <div id="memopad-list"></div>
+</div>
+
+<!-- ===== 画像の整理 ===== -->
+<div id="imgclean">
+  <div class="set-head">
+    <h2>画像の整理</h2>
+    <button class="set-close" id="close-imgclean" aria-label="閉じる">×</button>
+  </div>
+  <div class="hint">チャットに送った画像だけを消して、容量を空けられるよ📸 消しても会話や「写真を送った」ことは残るよ😊 いちど消すと元に戻せないから、大事な写真は消さないでね。</div>
+  <div class="imgclean-summary" id="imgclean-summary"></div>
+  <div class="imgclean-tools">
+    <button class="btn ghost" data-before="7">7日より前を選択</button>
+    <button class="btn ghost" data-before="30">30日より前を選択</button>
+    <button class="btn ghost" data-before="0">ぜんぶ選択</button>
+    <button class="btn ghost" id="imgclean-clear">選択を解除</button>
+  </div>
+  <button class="btn primary" id="imgclean-del">🗑 選んだ画像を削除</button>
+  <div id="imgclean-list"></div>
 </div>
 
 <!-- ===== アーカイブ ===== -->
@@ -3806,10 +3844,18 @@ async function measureStorage(){
   items.slice(0,8).forEach(it=> lines.push("・"+storageKeyName(it[0])+" … "+fmtBytes(it[1])));
   try{
     const ths = await thAll();
-    let tb=0; ths.forEach(o=>{ try{ tb += JSON.stringify(o).length*2; }catch(e){} });
+    let tb=0, imgBytes=0, imgN=0;
+    ths.forEach(o=>{
+      try{ tb += JSON.stringify(o).length*2; }catch(e){}
+      (o.history||[]).forEach(m=>{ (m.atts||[]).forEach(a=>{ if(a && a.kind==="image" && a.data && !a.deleted){ imgN++; imgBytes += a.data.length*2; } }); });
+    });
     const ins = await ragAll();
     lines.push("");
     lines.push("【大倉庫(チャット・気づき用)】 チャット"+ths.length+"件 約"+fmtBytes(tb)+" ・ 気づき"+ins.length+"件");
+    if(imgN){
+      const pct = tb>0 ? Math.min(100, Math.round(imgBytes/tb*100)) : 0;
+      lines.push("　└ 📸うち画像 "+imgN+"枚 約"+fmtBytes(imgBytes)+"（チャットの約"+pct+"%）→ 減らすなら「📸画像の整理」から");
+    }
     if(navigator.storage && navigator.storage.estimate){
       const est = await navigator.storage.estimate();
       if(est && est.quota) lines.push("大倉庫の上限のめやす: 約"+fmtBytes(est.quota)+"(じゅうぶん広い)");
@@ -4258,6 +4304,77 @@ function renderMemopad(){
 }
 function openMemopad(){ renderMemopad(); $("memopad").classList.add("open"); }
 function closeMemopad(){ $("memopad").classList.remove("open"); }
+/* ---------- 📸 画像の整理(まとめて削除・全チャット横断) ---------- */
+let imgcleanImgs = [];
+let imgcleanSel = new Set();
+async function collectSentImages(){   // 全チャット(アーカイブ含む)から、生きてる画像を集める
+  persistHistory();                   // 今開いてるチャットを先に大倉庫へ同期(メモリが正)→indexが確実に一致
+  const all = await thAll();
+  const imgs = [];
+  all.forEach(th=>{
+    (th.history||[]).forEach((m, mi)=>{
+      (m.atts||[]).forEach((a, ai)=>{
+        if(a && a.kind==="image" && a.data && !a.deleted){
+          imgs.push({tid:th.id, mi, ai, ts:m.ts||0, size:Math.floor(a.data.length*0.75), data:a.data, media:a.media_type||"image/jpeg"});
+        }
+      });
+    });
+  });
+  imgs.sort((a,b)=> (b.ts||0)-(a.ts||0));
+  return imgs;
+}
+async function deleteImagesByRefs(refs){   // 画像データだけ消す。今開いてるチャットはメモリ側を、他はIndexedDBを直接
+  const byThread = {};
+  refs.forEach(r=>{ (byThread[r.tid]=byThread[r.tid]||[]).push(r); });
+  for(const tid of Object.keys(byThread)){
+    if(tid === currentId){
+      byThread[tid].forEach(r=>{ const m=history[r.mi]; if(m&&m.atts&&m.atts[r.ai]){ m.atts[r.ai].data=null; m.atts[r.ai].deleted=true; } });
+      persistHistory();
+    } else {
+      const th = await thLoad(tid);
+      if(th && Array.isArray(th.history)){
+        byThread[tid].forEach(r=>{ const m=th.history[r.mi]; if(m&&m.atts&&m.atts[r.ai]){ m.atts[r.ai].data=null; m.atts[r.ai].deleted=true; } });
+        await thSave(tid, th);
+      }
+    }
+  }
+  renderAll();   // 今開いてるチャットの表示も更新(消した画像がプレースホルダーに)
+}
+function imgcleanBytes(list){ return list.reduce((s,x)=>s+x.size,0); }
+function renderImgClean(){
+  const box = $("imgclean-list"); if(!box) return; box.innerHTML="";
+  const selList = imgcleanImgs.filter((x,i)=> imgcleanSel.has(i));
+  const sum = $("imgclean-summary");
+  if(sum) sum.textContent = "画像 ぜんぶで "+imgcleanImgs.length+"枚 ・ "+fmtBytes(imgcleanBytes(imgcleanImgs))
+    + "\n選択中 "+selList.length+"枚 ・ "+fmtBytes(imgcleanBytes(selList));
+  if(!imgcleanImgs.length){ box.appendChild(el("div","cal-empty","消せる画像はないよ📸 スッキリしてる✨")); return; }
+  imgcleanImgs.forEach((x, i)=>{
+    const row = el("div","imgc-row"+(imgcleanSel.has(i)?" sel":""));
+    const cb = el("input"); cb.type="checkbox"; cb.checked = imgcleanSel.has(i);
+    cb.addEventListener("change", ()=>{ if(cb.checked) imgcleanSel.add(i); else imgcleanSel.delete(i); renderImgClean(); });
+    const im = el("img","imgc-thumb"); im.src = "data:"+x.media+";base64,"+x.data;
+    const meta = el("div","imgc-meta");
+    meta.appendChild(el("b", fmtMemDate(x.ts)));
+    meta.appendChild(document.createTextNode(fmtBytes(x.size)));
+    row.appendChild(cb); row.appendChild(im); row.appendChild(meta);
+    box.appendChild(row);
+  });
+}
+async function openImgClean(){ imgcleanImgs = await collectSentImages(); imgcleanSel = new Set(); $("imgclean").classList.add("open"); renderImgClean(); }
+function closeImgClean(){ $("imgclean").classList.remove("open"); }
+function imgcleanSelectBefore(days){   // 「◯日より前」を選択(0=ぜんぶ)
+  imgcleanSel = new Set();
+  const cutoff = days>0 ? (Date.now() - days*86400000) : Infinity;
+  imgcleanImgs.forEach((x,i)=>{ if(days===0 || (x.ts||0) < cutoff) imgcleanSel.add(i); });
+  renderImgClean();
+}
+async function imgcleanDeleteSelected(){
+  const refs = imgcleanImgs.filter((x,i)=> imgcleanSel.has(i));
+  if(!refs.length){ alert("削除する画像を選んでね😊"); return; }
+  if(!confirm("選んだ "+refs.length+"枚（合計 "+fmtBytes(imgcleanBytes(refs))+"）を削除する?\n（会話や「写真を送った」ことは残るよ😊 画像データだけ消えるよ・元には戻せないよ）")) return;
+  await deleteImagesByRefs(refs);
+  imgcleanImgs = await collectSentImages(); imgcleanSel = new Set(); renderImgClean();
+}
 function closeSynopsis(){ $("synopsis").classList.remove("open"); }
 function renderSynopsis(){
   ensureSynopsisToday();
@@ -4586,6 +4703,13 @@ function attachActions(wrap, bub, text, role, m){
     bar.classList.toggle("open", !open);
   });
 }
+function deleteImageAtt(m, a){   // 🗑 画像データだけ消す。発言・会話・「写真を送った事実」は残す
+  if(!a || a.deleted) return;
+  if(!confirm("この画像を削除する？\n（会話や「写真を送った」ことは残るよ😊 画像データだけ消えて容量が減るよ）")) return;
+  a.data = null; a.deleted = true;
+  persistHistory();
+  renderAll();
+}
 function renderMsg(m, idx){
   if(idx===undefined) idx = history.indexOf(m);
   const wrap = el("div", "msg " + (m.role==="user" ? "saki" : "ritsu") + (m.line ? " line" : ""));
@@ -4599,7 +4723,17 @@ function renderMsg(m, idx){
   if(m.atts && m.atts.length){
     const ab = el("div","msg-atts");
     m.atts.forEach(a=>{
-      if(a.kind==="image" && a.data){ const im=el("img"); im.src="data:"+a.media_type+";base64,"+a.data; ab.appendChild(im); }
+      if(a.deleted){ ab.appendChild(el("div","msg-att-gone","🖼️ 写真（削除済み）")); }
+      else if(a.kind==="image" && a.data){
+        const box = el("div","msg-att-img");
+        const im=el("img"); im.src="data:"+a.media_type+";base64,"+a.data; box.appendChild(im);
+        if(!isCurrentArchived()){
+          const del = el("button","msg-att-del","🗑"); del.title="この画像を削除";
+          del.addEventListener("click", ()=> deleteImageAtt(m, a));
+          box.appendChild(del);
+        }
+        ab.appendChild(box);
+      }
       else { ab.appendChild(el("div","file","📄 "+(a.name||(a.kind==="image"?"画像":"ファイル")))); }
     });
     wrap.appendChild(ab);
@@ -4836,16 +4970,19 @@ function autoGrow(){ input.style.height="auto"; input.style.height=Math.min(inpu
 input.addEventListener("input", autoGrow);
 
 /* ---------- attachments ---------- */
+/* 🪶 送信画像の軽量化の目安(まとめてここで調整できる)。律くんが内容を認識できる十分な大きさ＆軽さ */
+const IMG_MAX_LONG_PX = 1024;    // 長辺の上限px。これを超えた画像は自動で縮小する
+const IMG_JPEG_QUALITY = 0.82;   // 保存/送信時のJPEG品質(0〜1)。0.8前後で見た目ほぼそのまま＆軽い
 function readImage(file){
   return new Promise(resolve=>{
     const img = new Image(), url = URL.createObjectURL(file);
     img.onload = ()=>{
       URL.revokeObjectURL(url);
-      const max = 1024; let w = img.width, h = img.height;
+      const max = IMG_MAX_LONG_PX; let w = img.width, h = img.height;
       if(w>max || h>max){ const r = Math.min(max/w, max/h); w = Math.round(w*r); h = Math.round(h*r); }
       const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
       cv.getContext("2d").drawImage(img, 0, 0, w, h);
-      const data = cv.toDataURL("image/jpeg", 0.82).split(",")[1];
+      const data = cv.toDataURL("image/jpeg", IMG_JPEG_QUALITY).split(",")[1];
       resolve({kind:"image", media_type:"image/jpeg", data, name:file.name});
     };
     img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(null); };
@@ -5275,6 +5412,11 @@ $("close-chatsearch").addEventListener("click", closeChatSearch);
 $("chatsearch-input").addEventListener("input", e=> renderChatSearch(e.target.value));
 $("close-synopsis").addEventListener("click", closeSynopsis);
 $("close-memopad").addEventListener("click", closeMemopad);
+$("open-imgclean").addEventListener("click", openImgClean);
+$("close-imgclean").addEventListener("click", closeImgClean);
+$("imgclean-del").addEventListener("click", imgcleanDeleteSelected);
+$("imgclean-clear").addEventListener("click", ()=>{ imgcleanSel=new Set(); renderImgClean(); });
+document.querySelectorAll("#imgclean [data-before]").forEach(b=> b.addEventListener("click", ()=> imgcleanSelectBefore(parseInt(b.dataset.before,10))));
 $("memopad-add-btn").addEventListener("click", ()=>{
   const inp = $("memopad-input");
   const t = (inp.value||"").trim(); if(!t) return;
