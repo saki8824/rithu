@@ -3577,13 +3577,29 @@ function openMemory(){
   document.querySelectorAll("#mem-filters .mem-chip").forEach(c=> c.classList.toggle("on", c.dataset.cat==="all"));
   renderMemList();
   $("memory").classList.add("open");
+  memBackfill();   // 🔁 開いたついでに、通常化に失敗して📌固定に戻ったカードを裏でそっと通常に戻す
 }
 function closeMemory(){ $("memory").classList.remove("open"); }
 
-async function embedMemCard(card){   // カード本文のベクトル(RAG用)を作って保存。失敗したら固定あつかいに戻す(忘れ防止)
+async function embedMemCard(card){   // カード本文のベクトル(RAG用)を作って保存。失敗したら固定あつかいに戻す(忘れ防止)＋wantRagで「本当は通常にしたい」印を残す
   const emb = await embedText(card.text);
-  if(emb){ card.embedding = emb; saveMem(); return true; }
-  card.embedding = null; card.pinned = true; saveMem(); return false;
+  if(emb){ card.embedding = emb; card.wantRag = false; saveMem(); return true; }
+  card.embedding = null; card.pinned = true; card.wantRag = true; saveMem(); return false;
+}
+let memBackfillBusy = false;
+async function memBackfill(){   // 🔁 通常化に失敗して📌固定に戻ったカード(wantRag)に、裏でそっとベクトルを付け直して通常(RAG)に戻す。手動で固定したカードには触らない
+  if(memBackfillBusy || !settings.googleKey || !Array.isArray(settings.mem)) return;
+  memBackfillBusy = true;
+  try{
+    for(const c of settings.mem){
+      if(!c.wantRag) continue;                                  // 「通常にしたかったのに失敗した」印のカードだけ(手動固定・既存カードは触らない)
+      if(c.embedding && c.embedding.vec){ c.wantRag = false; saveMem(); continue; }  // もうベクトルがあるなら印を消すだけ
+      const emb = await embedText(c.text);
+      if(!emb) break;                                           // まだ作れない(ネット/キー)なら今回はここまで=また次の機会に
+      c.embedding = emb; c.pinned = false; c.wantRag = false; saveMem();   // 成功→通常(RAG)カードに戻す
+    }
+  }catch(e){}
+  memBackfillBusy = false;
 }
 async function toggleMemPin(card){   // 📌固定⇔通常を切り替える。通常(RAG)に変えたらベクトルを作る(まだ無ければ)
   card.pinned = !card.pinned;
