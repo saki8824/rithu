@@ -4873,6 +4873,16 @@ function refreshReadMarks(){
   }
 }
 function scrollEnd(){ chat.scrollTop = chat.scrollHeight; }
+/* 📜 自動スクロール制御: ユーザーが上へスクロールしてる間は、勝手に下へ引き戻さない(下端付近にいる時だけ追従) */
+let stickBottom = true;
+chat.addEventListener("scroll", ()=>{ stickBottom = (chat.scrollHeight - chat.scrollTop - chat.clientHeight) < 60; });
+/* ⏸️ 生成中の停止ボタン(送信ボタンを流用): 生成中は⏹に変わり、押すとそこまでで確定 */
+let streamStopping = false, streamReader = null;
+function setSendStop(on){
+  if(on){ send.dataset.stop="1"; send.textContent="⏹"; send.title="生成を停止"; send.disabled=false; }
+  else  { send.dataset.stop="";  send.textContent="↑"; send.title="";           send.disabled=false; }
+}
+function stopStreaming(){ streamStopping = true; try{ if(streamReader) streamReader.cancel(); }catch(e){} }
 function showError(t){ chat.appendChild(el("div","err",t)); scrollEnd(); }
 
 /* ---------- send ---------- */
@@ -4904,8 +4914,29 @@ async function sendMessage(){
   await generateReply(text, lm);
 }
 // 律くんの返事を作って履歴に足す(通常の送信・編集後の送り直し で共用)
+// 📥 返信が届いたあとの共通後処理(記憶抽出・予定・IndexedDB保存・省察/メモ帳・コスト表示)。ストリーム完了時と一括フォールバックの両方から呼ぶ=1か所にまとめて整合性を保つ
+function finalizeReply(textOut, thinking, usage, lm){
+  const mem = extractMemories(textOut || "");
+  const sch = extractSchedule(mem.text);
+  const m = {role:"assistant", text: sch.text || "……", thinking: thinking||null, ts:Date.now(), usage: usage||null, line: lm};
+  history.push(m); renderMsg(m); refreshReadMarks(); refreshEditButtons(); scrollEnd(); persistHistory();
+  if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
+  if(sch.added.length){ chat.appendChild(el("div","sysnote","📅 予定を追加したよ: "+sch.added.join(" / "))); scrollEnd(); }
+  maybeGenerateSynopsis();
+  return m;
+}
+// 🔄 ストリーミングが使えない時のフォールバック(従来どおり一括で受け取る)。body以外は同じ=キャッシュ設定も維持
+async function nonStreamReply(body, lm){
+  const b = Object.assign({}, body); delete b.stream;
+  const res = await fetch("https://api.anthropic.com/v1/messages",{ method:"POST", headers: HEADERS(), body: JSON.stringify(b) });
+  const data = await res.json();
+  if(data.error){ showError("APIエラー: " + (data.error.message||data.error.type)); return; }
+  let thinking="", textOut="";
+  (data.content||[]).forEach(bl=>{ if(bl.type==="thinking") thinking += bl.thinking||""; if(bl.type==="text") textOut += bl.text||""; });
+  finalizeReply(textOut, thinking, data.usage||null, lm);
+}
 async function generateReply(text, lm){
-  busy=true; send.disabled=true;
+  busy=true; setSendStop(true); stickBottom=true;
   const tip = el("div","msg ritsu");
   const t = el("div","bubble typing"); t.appendChild(el("i"));t.appendChild(el("i"));t.appendChild(el("i"));
   tip.appendChild(t); chat.appendChild(tip); scrollEnd();
@@ -4933,34 +4964,64 @@ async function generateReply(text, lm){
     if(settings.think) body.thinking = {type:"enabled", budget_tokens:Number(settings.budget)};
     else body.temperature = Math.max(0, Math.min(1, Number(settings.temp)));
 
+    body.stream = true;   // 📡 ストリーミング(文字を少しずつ受け取る)。system/messages/キャッシュ設定は上のまま=一切変えない
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
       headers: HEADERS(),
       body: JSON.stringify(body)
     });
-    const data = await res.json();
-    tip.remove();
-
-    if(data.error){ showError("APIエラー: " + (data.error.message||data.error.type)); }
-    else{
-      let thinking="", textOut="";
-      (data.content||[]).forEach(b=>{
-        if(b.type==="thinking") thinking += b.thinking||"";
-        if(b.type==="text") textOut += b.text||"";
-      });
-      const mem = extractMemories(textOut);
-      const sch = extractSchedule(mem.text);
-      const m = {role:"assistant", text: sch.text || "……", thinking: thinking||null, ts:Date.now(), usage: data.usage||null, line: lm};
-      history.push(m); renderMsg(m); refreshReadMarks(); refreshEditButtons(); scrollEnd(); persistHistory();
-      if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
-      if(sch.added.length){ chat.appendChild(el("div","sysnote","📅 予定を追加したよ: "+sch.added.join(" / "))); scrollEnd(); }
-      maybeGenerateSynopsis();
+    if(!res.ok){
+      tip.remove();
+      let msg = "APIエラー (" + res.status + ")";
+      try{ const ed = await res.json(); if(ed && ed.error) msg = "APIエラー: " + (ed.error.message||ed.error.type); }catch(e){}
+      showError(msg);
+    } else if(!res.body || typeof res.body.getReader !== "function"){
+      tip.remove();
+      await nonStreamReply(body, lm);   // 🔄 この環境はストリーミング非対応 → 従来の一括表示へ
+    } else {
+      // 📡 SSE(Server-Sent Events)を読みながら、仮ふきだしに文字を追記していく
+      const reader = res.body.getReader(); const decoder = new TextDecoder();
+      streamReader = reader; streamStopping = false;
+      let buf="", textOut="", thinking="", usage=null, streamBubble=null, streamErr=null;
+      const ensureBubble = ()=>{ if(!streamBubble){ if(t.parentNode) t.remove(); streamBubble = el("div","bubble"); tip.appendChild(streamBubble); } };
+      while(true){
+        const { done, value } = await reader.read();
+        if(done || streamStopping) break;   // ⏸️ 停止ボタンでも抜ける
+        buf += decoder.decode(value, {stream:true});
+        let idx;
+        while((idx = buf.indexOf("\n\n")) >= 0){   // SSEは空行(\n\n)でイベント区切り
+          const evt = buf.slice(0, idx); buf = buf.slice(idx+2);
+          let dataStr = "";
+          evt.split("\n").forEach(ln=>{ if(ln.indexOf("data:")===0) dataStr += ln.slice(5).trim(); });
+          if(!dataStr) continue;
+          let d; try{ d = JSON.parse(dataStr); }catch(e){ continue; }
+          if(d.type==="message_start"){ if(d.message && d.message.usage) usage = Object.assign({}, d.message.usage); }
+          else if(d.type==="content_block_delta"){
+            const dl = d.delta || {};
+            if(dl.type==="text_delta"){ textOut += dl.text||""; ensureBubble(); streamBubble.textContent = textOut; if(stickBottom) scrollEnd(); }   // 📜 手動スクロール中は追従しない
+            else if(dl.type==="thinking_delta"){ thinking += dl.thinking||""; }
+          }
+          else if(d.type==="message_delta"){ if(d.usage) usage = Object.assign(usage||{}, d.usage); }   // 出力トークン数はここで届く
+          else if(d.type==="error"){ streamErr = d.error; }
+        }
+      }
+      streamReader = null;
+      tip.remove();   // 仮ふきだしを消して、いつもの完成版ふきだし(時刻・コスト・編集ボタン付き)に置き換える
+      if(streamStopping){
+        if(textOut.trim()) finalizeReply(textOut, thinking, usage, lm);   // ⏸️ 停止: そこまで受信したぶんを1件として確定保存(何も来てなければ何もしない)
+        streamStopping = false;
+      } else if(streamErr && !textOut.trim()){
+        showError("APIエラー: " + (streamErr.message || streamErr.type || "通信エラー"));
+      } else {
+        finalizeReply(textOut, thinking, usage, lm);   // ✅ 全部届いてから後処理をまとめて実行
+        if(streamErr) showError("⚠️ 途中でエラーが出たけど、届いたぶんは残したよ");
+      }
     }
   }catch(e){
     tip.remove();
     showError("通信に失敗したよ: " + e.message);
   }
-  busy=false; send.disabled=false;
+  busy=false; setSendStop(false);
   scheduleProactive();
 }
 // ✏️ 自分の最新メッセージを編集→律くんが返事し直す(最新の1件だけ・送り直し方式)
@@ -5044,7 +5105,7 @@ async function sendProactive(){
   scheduleProactive();
 }
 
-send.addEventListener("click", sendMessage);
+send.addEventListener("click", ()=>{ if(busy) stopStreaming(); else sendMessage(); });   // 生成中は「停止」、ふだんは「送信」
 $("line-toggle").addEventListener("click", toggleLineMode);
 applyLineToggle();   // 起動時、覚えているLINEモードの状態にボタンを合わせる
 input.addEventListener("keydown", e=>{
