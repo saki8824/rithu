@@ -3300,7 +3300,7 @@ async function doReflection(dayKey, base){
   try{
     const mainModel = settings.model==="custom" ? (settings.customModel||"").trim() : settings.model;
     const model = (settings.reflectModel && settings.reflectModel!=="same") ? settings.reflectModel : mainModel;
-    const sys = buildSystem(false)
+    const sys = buildSystem(false, true)   // ★2つめのtrue=省察用: 今日のあらすじ・メモ帳は渡さず、今日の会話そのものだけで振り返る
       + "\n\n# 今からの作業（自己省察）\nこれは会話の返事ではありません。上のあなた(律)の設定・記憶と、これから渡す" + dLabel + "の会話を読み、律として" + dLabel + "一日を静かに振り返って、心の中で気づいたこと・考えたこと・確信したことを書き留めてください。"
       + "\n【大事なルール】"
       + "\n・出来事の要約や事実のメモの列挙ではなく、さきの言動の奥にある意味や気持ちをあなたなりに考えて、そこから至った気づき・解釈・確信を、一人称の内面の言葉で綴ること（例:「…なんだと確信した」「…なのかもしれない」）。"
@@ -4231,7 +4231,7 @@ async function generateMemopad(){
       ? settings.synopsisModel
       : (settings.model==="custom" ? (settings.customModel||"").trim() : settings.model);
     const existing = memopadItems(today).map(x=>"・"+x.text).join("\n");
-    const sys = "あなたは会話の記録係です。さきと律の会話から『後で間違えると困る具体的な事実』だけを抜き出してメモにします。固有名詞・人間関係・予定の詳細・好み・数値を優先。感情の流れや雰囲気・あいさつは含めない(それは別の担当)。1件は30字程度までに短く(例:「明日の飲み相手=大学からの同期」「サングラスはレイバン愛用」)。1行1件、行頭に・を付けた箇条書きだけを出力。【既にあるメモ】と同じ内容・言い換えは出さない。新しく足すべき事実が無ければ「なし」とだけ出力。";
+    const sys = "あなたは会話の記録係です。さきと律の会話から『後で間違えると困る具体的な事実』だけを抜き出してメモにします。固有名詞・人間関係・予定の詳細・好み・数値を優先。感情の流れや雰囲気・あいさつは含めない(それは別の担当)。行動や出来事は必ず過去形で書くこと(「〜している」「〜する」ではなく「〜した」「〜を食べた」)。これはすでに起きたことの記録なので、進行中のようには書かない。1件は30字程度までに短く(例:「昼にパスタを食べた」「サングラスはレイバン愛用」「明日の飲み相手=大学からの同期」)。1行1件、行頭に・を付けた箇条書きだけを出力。【既にあるメモ】と同じ内容・言い換えは出さない。新しく足すべき事実が無ければ「なし」とだけ出力。";
     const usr = "【既にあるメモ】\n" + (existing || "(まだ無い)") + "\n\n【新しい会話】\n" + recent + "\n\n新しく足すメモ:";
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers:HEADERS(),
@@ -4242,9 +4242,14 @@ async function generateMemopad(){
       let out=""; (data.content||[]).forEach(b=>{ if(b.type==="text") out += b.text||""; });
       out = out.trim();
       if(out && out!=="なし"){
+        const now = new Date();
+        const hhmm = String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
         out.split(/\r?\n/).forEach(line=>{
           const t = line.replace(/^[・\-\*・•\s]+/,"").trim();
-          if(t && t!=="なし") memopadAdd(today, t);   // memopadAdd側でも重複は弾く(二重ガード)
+          if(t && t!=="なし"){
+            const withTime = /^\d{1,2}:\d{2}/.test(t) ? t : (hhmm + " " + t);   // 先頭に記録時刻(HH:MM)。既に時刻付きならそのまま
+            memopadAdd(today, withTime);   // memopadAdd側でも重複は弾く(二重ガード)
+          }
         });
       }
       if(lastTs){ memopad.upTs = lastTs; saveMemopad(); }   // 成功したときだけ「ここまで読んだ」を進める(失敗時は次回また読む)
@@ -4606,7 +4611,7 @@ function extractSchedule(text){
 function loadDiary(){ try{ const d=store.get("ritsu-diary"); diary = d ? (JSON.parse(d)||[]) : []; }catch(e){ diary=[]; } }
 function saveDiary(){ store.set("ritsu-diary", JSON.stringify(diary)); }
 function fmtDiaryDate(ts){ const d=new Date(ts); const wd=["日","月","火","水","木","金","土"][d.getDay()]; return (d.getMonth()+1)+"月"+d.getDate()+"日("+wd+") "+fmtTime(ts); }
-const DIARY_DATE_SWITCH_HOUR = 4;   // ★午前この時刻までに書いた日記は「前日」の日記として扱う(ここを変えれば切替時刻を調整できる)
+const DIARY_DATE_SWITCH_HOUR = 5;   // ★1日の区切り=午前5時。午前5時より前の出来事は「前日」として扱う(日記・省察・あらすじ・メモ帳・会話の日付ぜんぶ共通。ここを変えれば切替時刻を調整できる)
 function diaryDayStr(){             // 新しく書く日記に付ける「日記としての日付」(YYYY-MM-DD)
   const now = new Date();
   const d = new Date(now);
@@ -5412,7 +5417,10 @@ function cycleContext(){
   else if(day >= len - 3) phase = "生理前";           // 次回予定日の4日前から
   return "さきの周期: " + day + "日目(" + phase + ")";
 }
-function buildSystem(withTime){
+// forReflect=true(省察のときだけ)は「今日のあらすじ」「今日のメモ帳」を渡さない。
+// 省察は今日の会話そのものを全部読むので要約はいらず、むしろ「もうメモに書いた=省察では書かなくていい」と
+// 誤解させて日中の出来事が抜け落ちる原因になっていたため。ふだんのチャットは今までどおり(引数なし=false)。
+function buildSystem(withTime, forReflect){
   withTime = withTime!==false;
   let s = settings.system || "";
   const prof = [];
@@ -5463,21 +5471,21 @@ function buildSystem(withTime){
       pastParts.join("\n\n") +
       "\n\n【過去の記録ここまで】";
   }
-  if(settings.synopsis){
+  if(settings.synopsis && !forReflect){   // 省察のときは渡さない(会話そのものを読むので要約は不要)
     const syn = synopsisContext();
     if(syn){
       s += (s ? "\n\n" : "") + "# 今日のあらすじ（今日ここまでの会話の流れ）\nこれは今日の二人の会話を自動でまとめたあらすじです。今日の出来事や話の流れとして自然に覚えていて、会話の続きに活かしてください。あらすじの文言をそのまま読み上げる必要はありません。\n★重要: ここに書かれていることは、たとえ今のやりとり（直近の会話）に出てこなくても、すべて『今日』起きたことです。決して『昨日』や過去の出来事として扱わないこと。要約なので過去形で書かれていても、それは今日のことです。\n\n" + syn;
     }
   }
   // 📝 今日のメモ帳(中間記憶): 今日の全行+昨日の持ち越し1日分を箇条書きのまま渡す。2日以上前は渡さない(データ自体は残る)
-  {
+  if(!forReflect){   // 省察のときは渡さない(「もうメモに書いた」と思って日中の出来事を振り返らなくなるため)
     const mToday = memopadItems(todaySynopStr());
     const mYest = memopadItems(memopadYesterdayStr());
     if(mToday.length || mYest.length){
       let mp = "";
       if(mToday.length) mp += "【今日のメモ】\n" + mToday.map(x=>"・"+x.text).join("\n");
       if(mYest.length) mp += (mp ? "\n\n" : "") + "【昨日のメモ】\n" + mYest.map(x=>"・"+x.text).join("\n");
-      s += (s ? "\n\n" : "") + "# 今日のメモ帳（具体的な事実の控え）\nこれは今日(と昨日)の会話に出た具体的な事実の箇条書きです。\n★重要: このメモは最新の事実の控えです。あらすじ・過去の記録・古い記憶と食い違うときは、このメモの方を優先してください。細部(名前・人間関係・予定・好み・数値)に触れるときは、ここを確認して正確に。メモの文言をそのまま読み上げる必要はありません。\n\n" + mp;
+      s += (s ? "\n\n" : "") + "# 【今日すでに起きたことの記録(すべて過去の出来事。現在の場面ではない)】\n各行の先頭は、その出来事が記録されたおおよその時刻(HH:MM)です。細部(名前・人間関係・予定・好み・数値)に触れるときは、ここを確認して正確に。メモの文言をそのまま読み上げる必要はありません。\n\n" + mp + "\n\nこれは記録であり、現在進行中の出来事ではない。ここに書かれた行動を今しているかのように描写しないこと。現在の場面はユーザーの発言と現在時刻から判断すること。";
     }
   }
   // 🧵 続きのある話(未解決): 検索とは別に毎回そのまま渡す。過去の記録の枠の外。
