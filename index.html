@@ -2253,16 +2253,18 @@
     <div class="field">
       <label>モデル</label>
       <select id="set-model">
-        <option value="claude-opus-4-8">Opus 4.8</option>
-        <option value="claude-sonnet-4-6">Sonnet 4.6</option>
-        <option value="claude-fable-5">Fable 5</option>
+        <option value="claude-opus-4-6">Opus 4.6 ⭐お気に入り（$5/$25）</option>
+        <option value="claude-opus-5">Opus 5（新しい・お試し中）（$5/$25）</option>
+        <option value="claude-opus-4-8">Opus 4.8（$5/$25）</option>
+        <option value="claude-sonnet-5">Sonnet 5（安い・$3/$15）</option>
+        <option value="claude-sonnet-4-6">Sonnet 4.6（$3/$15）</option>
         <option value="custom">その他(下に入力)</option>
       </select>
     </div>
     <div class="field">
       <label>カスタムモデル名</label>
-      <input type="text" id="set-model-custom" placeholder="claude-opus-4-6-…">
-      <div class="hint">「その他」を選ぶとここのモデル名が使われるよ。正確なIDはAnthropicのModels overviewで確認してね。</div>
+      <input type="text" id="set-model-custom" placeholder="claude-…（新しいモデルのID）">
+      <div class="hint">上の一覧にないモデル（新しく出たモデルなど）を使いたいときだけ、「その他」を選んでここにIDを書いてね。正確なIDはAnthropicのModels overviewで確認できるよ。</div>
     </div>
     <div class="toggle-row">
       <span>思考プロセス(extended thinking)</span>
@@ -4160,6 +4162,14 @@ function memopadAutoDonePast(){   // 今日より前の日にある予定・依�
     (memopad.days[ds] || []).forEach(it=>{
       if(memopadIsDone(it.text)) return;
       if(!MEMOPAD_PLAN_WORDS.test(it.text)) return;
+      // 「明日」「明後日」と書いてあるメモは、その日が来るまで済にしない(メモを書いた日から数える)
+      const rel = /(明後日|あさって)/.test(it.text) ? 2 : (/(明日|あした)/.test(it.text) ? 1 : 0);
+      if(rel){
+        const dd = new Date(Number(ds.slice(0,4)), Number(ds.slice(5,7))-1, Number(ds.slice(8,10)));
+        dd.setDate(dd.getDate() + rel);
+        const target = dd.getFullYear()+"-"+String(dd.getMonth()+1).padStart(2,"0")+"-"+String(dd.getDate()).padStart(2,"0");
+        if(target >= today) return;   // 予定の日は今日、またはこれから=まだ終わっていない
+      }
       const md = it.text.match(/(\d{1,2})月(\d{1,2})日/);   // 「◯月◯日」の日付が書いてある行は、その日を見て判断する
       if(md){
         const t0 = new Date(Number(today.slice(0,4)), Number(today.slice(5,7))-1, Number(today.slice(8,10)));
@@ -4265,7 +4275,7 @@ async function generateMemopad(){
       : (settings.model==="custom" ? (settings.customModel||"").trim() : settings.model);
     const openItems = memopadItems(today).filter(x=>!memopadIsDone(x.text));   // ✅ まだ済んでいないメモだけ番号を振って渡す(番号で「これ終わったよ」と返してもらう)
     const existing = openItems.map((x,i)=>(i+1)+". "+x.text).join("\n");
-    const sys = "あなたは会話の記録係です。さきと律の会話から『後で間違えると困る具体的な事実』だけを抜き出してメモにします。固有名詞・人間関係・予定の詳細・好み・数値を優先。感情の流れや雰囲気・あいさつは含めない(それは別の担当)。行動や出来事は必ず過去形で書くこと(「〜している」「〜する」ではなく「〜した」「〜を食べた」)。これはすでに起きたことの記録なので、進行中のようには書かない。1件は30字程度までに短く(例:「昼にパスタを食べた」「サングラスはレイバン愛用」「明日の飲み相手=大学からの同期」)。1行1件、行頭に・を付けた箇条書きだけを出力。【既にあるメモ】と同じ内容・言い換えは出さない。新しく足すべき事実が無ければ「なし」とだけ出力。\n\nもう一つ仕事があります。【既にあるメモ】は番号付きです。この会話の中で、はっきり解決・完了した項目(=知りたかったことが答えてもらえた/頼んだ用が済んだ/その予定が終わった)があれば、出力のいちばん最後の行に「【済】1,3」のように番号だけを書いてください。判断は日付ではなく会話の中身で行い、まだ続きそうなもの・迷ったものは挙げないこと。該当が無ければその行は書かないこと。";
+    const sys = "あなたは会話の記録係です。さきと律の会話から『その日かぎりの出来事』だけを抜き出して、その日のメモにします。\n\n【メモにするもの】その日かぎりの出来事・予定・行動・一時的な状況。たとえば食事、移動、天気、体調、その日の予定や約束、その日にした頼みごとや決めごと。固有名詞・時刻・数値は言い換えずそのまま正確に残す。\n\n【メモにしないもの】\n・人物の性格、関係性、恒常的な習慣など、日をまたいで変わらない情報(これは別の担当=『記憶カード』が持つのでメモには書かない。例:「サングラスはレイバン愛用」「妹は看護師」「朝はコーヒー派」「怒ると黙るタイプ」)\n・会話の再現に不要な些末な情報(あいさつ、相づち、雰囲気、感情の流れ)\n\n行動や出来事は必ず過去形で書くこと(「〜している」「〜する」ではなく「〜した」「〜を食べた」)。これはすでに起きたことの記録なので、進行中のようには書かない。ただし、これから起きる予定は「19時から会場で待ち合わせ」のように予定として書いてよい。1件は30字程度までに短く(例:「昼にパスタを食べた」「夜ごはんはイタリアンに決めた」「明日15時に病院へ行く予定」)。1行1件、行頭に・を付けた箇条書きだけを出力。【既にあるメモ】と同じ内容・言い換えは出さない。新しく足すべき事実が無ければ「なし」とだけ出力。\n\nもう一つ仕事があります。【既にあるメモ】は番号付きです。この会話の中で、はっきり解決・完了した項目(=知りたかったことが答えてもらえた/頼んだ用が済んだ/その予定が終わった)があれば、出力のいちばん最後の行に「【済】1,3」のように番号だけを書いてください。判断は日付ではなく会話の中身で行い、まだ続きそうなもの・迷ったものは挙げないこと。該当が無ければその行は書かないこと。";
     const usr = "【既にあるメモ】\n" + (existing || "(まだ無い)") + "\n\n【新しい会話】\n" + recent + "\n\n新しく足すメモ:";
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers:HEADERS(),
@@ -5009,8 +5019,32 @@ async function generateReply(text, lm){
       system: sysBlocks.length ? sysBlocks : undefined,
       messages: msgs
     };
-    if(settings.think) body.thinking = {type:"enabled", budget_tokens:Number(settings.budget)};
-    else body.temperature = Math.max(0, Math.min(1, Number(settings.temp)));
+    // 🆕 新しい世代のモデル(Opus 4.7/4.8/5・Sonnet 5・Fable 5など)は
+    //    「思考の予算(budget_tokens)」と「温度(temperature)」を受け付けない(送るとエラー)。
+    //    そこで、この2つの書き方だけモデルごとに切り替える。
+    //    ★Opus 4.6 などのときは下の else に入り、今までと完全に同じ内容を送る(動作は不変)。
+    const mLower = String(model).toLowerCase();
+    const newGenModel = /opus-(4-7|4-8|5)|sonnet-5|fable-5|mythos-5/.test(mLower);
+    const alwaysThinkModel = /fable-5|mythos-5/.test(mLower);   // 思考を切れないモデル(オフ指定を送るとエラー)
+    if(newGenModel){
+      if(alwaysThinkModel){
+        // 思考は常にオン。オフにはできないので「オフ指定」は送らない(送るとエラー)
+        if(settings.think) body.thinking = {type:"adaptive", display:"summarized"};
+        body.max_tokens = Math.max(16000, Number(settings.budget)+4096);   // 必ず考えるので余地を広めに
+      }else if(settings.think){
+        // 予算方式は廃止 → adaptive(律くんが自分で考える量を決める)。summarized で思考の要約を受け取れる
+        body.thinking = {type:"adaptive", display:"summarized"};
+        body.max_tokens = Math.max(16000, Number(settings.budget)+4096);   // 考える余地を広めに(狭いと返事が途中で切れる)
+      }else{
+        // ★何も書かないと勝手に思考オンになるので、はっきり「オフ」と伝える(料金が増えない)
+        body.thinking = {type:"disabled"};
+      }
+      // 温度は送らない(この世代では受け付けない)
+    }else if(settings.think){
+      body.thinking = {type:"enabled", budget_tokens:Number(settings.budget)};
+    }else{
+      body.temperature = Math.max(0, Math.min(1, Number(settings.temp)));
+    }
 
     body.stream = true;   // 📡 ストリーミング(文字を少しずつ受け取る)。system/messages/キャッシュ設定は上のまま=一切変えない
     const res = await fetch("https://api.anthropic.com/v1/messages",{
