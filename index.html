@@ -4141,6 +4141,38 @@ function memopadAdd(dateStr, text){   // 1行たす(同じ日の同じ文は追�
   memopad.days[dateStr].push({id:uid(), text:t, ts:Date.now()});
   saveMemopad(); return true;
 }
+/* ✅ メモの「(済)」印: 終わった用件は消さずに文末へ "(済)" を付けて残す(律くんに「もう済んだ」と伝えるため) */
+function memopadIsDone(text){ return /[（(]済[)）]\s*$/.test((text||"").trim()); }
+function memopadMarkDone(dateStr, id){
+  const arr = (memopad.days && memopad.days[dateStr]) || [];
+  const it = arr.filter(x=>x.id===id)[0];
+  if(!it || memopadIsDone(it.text)) return false;
+  it.text = it.text.trim() + "(済)";
+  saveMemopad(); return true;
+}
+// 予定・依頼らしい言葉。これが入っている行だけ「日付が過ぎたら自動(済)」の対象にする(ずっと変わらないメモを間違って済にしないため)
+const MEMOPAD_PLAN_WORDS = /(予定|約束|待ち合わせ|集合|出発|到着|向かう|行く|会う|届く|送る|買う|聞く|教えて|確認|明日|明後日|今夜|今晩|夕方|今日|\d{1,2}時|\d{1,2}月\d{1,2}日)/;
+function memopadAutoDonePast(){   // 今日より前の日にある予定・依頼のメモへ(済)を付ける(日付が過ぎたものはもう終わっているはず)
+  const today = todaySynopStr();
+  let changed = false;
+  Object.keys(memopad.days || {}).forEach(ds=>{
+    if(ds >= today) return;   // 今日のメモは触らない(まだ進行中かもしれない)
+    (memopad.days[ds] || []).forEach(it=>{
+      if(memopadIsDone(it.text)) return;
+      if(!MEMOPAD_PLAN_WORDS.test(it.text)) return;
+      const md = it.text.match(/(\d{1,2})月(\d{1,2})日/);   // 「◯月◯日」の日付が書いてある行は、その日を見て判断する
+      if(md){
+        const t0 = new Date(Number(today.slice(0,4)), Number(today.slice(5,7))-1, Number(today.slice(8,10)));
+        const cand = new Date(t0.getFullYear(), Number(md[1])-1, Number(md[2]));
+        const diffDays = (cand - t0) / 86400000;
+        // まだ来ていない日(0以上)はもちろん、半年以上前の日付も「来年のこと」とみなして済にしない(12月に見る「1月5日」など)
+        if(diffDays >= 0 || diffDays < -180) return;
+      }
+      it.text = it.text.trim() + "(済)"; changed = true;
+    });
+  });
+  if(changed) saveMemopad();
+}
 function saveAyumi(){ store.set("ritsu-ayumi", JSON.stringify(ayumi)); }
 // 律くんが持ち歩く「ふたりのあゆみ」。
 // 長期記憶RAG(ステップ5)から: 常時持つのは「直近」だけ=日ごとの記録ぜんぶ(最大7日で週に圧縮)+新しい週まとめ数個。
@@ -4213,6 +4245,7 @@ async function generateSynopsis(){
 let memopadBusy = false;
 async function generateMemopad(){
   if(memopadBusy || !settings.key) return;
+  memopadAutoDonePast();   // ✅ まず「日付が過ぎた予定」を自動で(済)にしておく
   const today = todaySynopStr();
   const day0 = new Date();
   if(day0.getHours() < DIARY_DATE_SWITCH_HOUR) day0.setDate(day0.getDate()-1);
@@ -4230,8 +4263,9 @@ async function generateMemopad(){
     const model = (settings.synopsisModel && settings.synopsisModel!=="same")
       ? settings.synopsisModel
       : (settings.model==="custom" ? (settings.customModel||"").trim() : settings.model);
-    const existing = memopadItems(today).map(x=>"・"+x.text).join("\n");
-    const sys = "あなたは会話の記録係です。さきと律の会話から『後で間違えると困る具体的な事実』だけを抜き出してメモにします。固有名詞・人間関係・予定の詳細・好み・数値を優先。感情の流れや雰囲気・あいさつは含めない(それは別の担当)。行動や出来事は必ず過去形で書くこと(「〜している」「〜する」ではなく「〜した」「〜を食べた」)。これはすでに起きたことの記録なので、進行中のようには書かない。1件は30字程度までに短く(例:「昼にパスタを食べた」「サングラスはレイバン愛用」「明日の飲み相手=大学からの同期」)。1行1件、行頭に・を付けた箇条書きだけを出力。【既にあるメモ】と同じ内容・言い換えは出さない。新しく足すべき事実が無ければ「なし」とだけ出力。";
+    const openItems = memopadItems(today).filter(x=>!memopadIsDone(x.text));   // ✅ まだ済んでいないメモだけ番号を振って渡す(番号で「これ終わったよ」と返してもらう)
+    const existing = openItems.map((x,i)=>(i+1)+". "+x.text).join("\n");
+    const sys = "あなたは会話の記録係です。さきと律の会話から『後で間違えると困る具体的な事実』だけを抜き出してメモにします。固有名詞・人間関係・予定の詳細・好み・数値を優先。感情の流れや雰囲気・あいさつは含めない(それは別の担当)。行動や出来事は必ず過去形で書くこと(「〜している」「〜する」ではなく「〜した」「〜を食べた」)。これはすでに起きたことの記録なので、進行中のようには書かない。1件は30字程度までに短く(例:「昼にパスタを食べた」「サングラスはレイバン愛用」「明日の飲み相手=大学からの同期」)。1行1件、行頭に・を付けた箇条書きだけを出力。【既にあるメモ】と同じ内容・言い換えは出さない。新しく足すべき事実が無ければ「なし」とだけ出力。\n\nもう一つ仕事があります。【既にあるメモ】は番号付きです。この会話の中で、はっきり解決・完了した項目(=知りたかったことが答えてもらえた/頼んだ用が済んだ/その予定が終わった)があれば、出力のいちばん最後の行に「【済】1,3」のように番号だけを書いてください。判断は日付ではなく会話の中身で行い、まだ続きそうなもの・迷ったものは挙げないこと。該当が無ければその行は書かないこと。";
     const usr = "【既にあるメモ】\n" + (existing || "(まだ無い)") + "\n\n【新しい会話】\n" + recent + "\n\n新しく足すメモ:";
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers:HEADERS(),
@@ -4241,6 +4275,15 @@ async function generateMemopad(){
     if(!data.error){
       let out=""; (data.content||[]).forEach(b=>{ if(b.type==="text") out += b.text||""; });
       out = out.trim();
+      const doneM = out.match(/【済】\s*([0-9０-９,，、\s]+)/);   // ✅ 解決した番号の行を先に取り出して本文から外す(箇条書きの解析に混ざらないように)
+      if(doneM){
+        out = out.replace(doneM[0], "").trim();
+        doneM[1].split(/[,，、\s]+/).forEach(numStr=>{
+          const half = numStr.replace(/[０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+          const n = parseInt(half, 10);
+          if(n >= 1 && n <= openItems.length) memopadMarkDone(today, openItems[n-1].id);
+        });
+      }
       if(out && out!=="なし"){
         const now = new Date();
         const hhmm = String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
@@ -4391,7 +4434,7 @@ function renderMemopad(){
   });
   if(!any) box.appendChild(el("div","cal-empty","まだメモはないよ。律くんと話すと自動でたまるよ📝 上の欄から自分で足すこともできるよ"));
 }
-function openMemopad(){ renderMemopad(); $("memopad").classList.add("open"); }
+function openMemopad(){ try{ memopadAutoDonePast(); }catch(e){} renderMemopad(); $("memopad").classList.add("open"); }
 function closeMemopad(){ $("memopad").classList.remove("open"); }
 /* ---------- 📸 画像の整理(まとめて削除・全チャット横断) ---------- */
 let imgcleanImgs = [];
@@ -5485,7 +5528,7 @@ function buildSystem(withTime, forReflect){
       let mp = "";
       if(mToday.length) mp += "【今日のメモ】\n" + mToday.map(x=>"・"+x.text).join("\n");
       if(mYest.length) mp += (mp ? "\n\n" : "") + "【昨日のメモ】\n" + mYest.map(x=>"・"+x.text).join("\n");
-      s += (s ? "\n\n" : "") + "# 【今日すでに起きたことの記録(すべて過去の出来事。現在の場面ではない)】\n各行の先頭は、その出来事が記録されたおおよその時刻(HH:MM)です。細部(名前・人間関係・予定・好み・数値)に触れるときは、ここを確認して正確に。メモの文言をそのまま読み上げる必要はありません。\n\n" + mp + "\n\nこれは記録であり、現在進行中の出来事ではない。ここに書かれた行動を今しているかのように描写しないこと。現在の場面はユーザーの発言と現在時刻から判断すること。";
+      s += (s ? "\n\n" : "") + "# 【今日すでに起きたことの記録(すべて過去の出来事。現在の場面ではない)】\n各行の先頭は、その出来事が記録されたおおよその時刻(HH:MM)です。細部(名前・人間関係・予定・好み・数値)に触れるときは、ここを確認して正確に。メモの文言をそのまま読み上げる必要はありません。\n\n" + mp + "\n\nこれは記録であり、現在進行中の出来事ではない。ここに書かれた行動を今しているかのように描写しないこと。現在の場面はユーザーの発言と現在時刻から判断すること。\n(済)が付いた項目は完了した用件である。再度要求したり蒸し返したりしないこと。";
     }
   }
   // 🧵 続きのある話(未解決): 検索とは別に毎回そのまま渡す。過去の記録の枠の外。
@@ -5819,6 +5862,7 @@ loadLikeTrend();
 loadSynopsis();
 loadAyumi();
 loadMemopad();
+try{ memopadAutoDonePast(); }catch(e){}   // ✅ 起動のときに「日付が過ぎた予定」のメモへ(済)を付ける
 ensureSynopsisToday();
 (async ()=>{
   await loadThreads();      // 大倉庫から読み込み(旧箱からの自動お引っ越し込み)
