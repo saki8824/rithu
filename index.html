@@ -4143,6 +4143,8 @@ function memopadAdd(dateStr, text){   // 1行たす(同じ日の同じ文は追�
   memopad.days[dateStr].push({id:uid(), text:t, ts:Date.now()});
   saveMemopad(); return true;
 }
+/* 🕐 メモの行頭に付ける時刻(HH:MM)。「抽出した時刻」ではなく「発言があった時刻」から作る */
+function memopadHHMM(ts){ const d = new Date(ts || Date.now()); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
 /* ✅ メモの「(済)」印: 終わった用件は消さずに文末へ "(済)" を付けて残す(律くんに「もう済んだ」と伝えるため) */
 function memopadIsDone(text){ return /[（(]済[)）]\s*$/.test((text||"").trim()); }
 function memopadMarkDone(dateStr, id){
@@ -4154,30 +4156,68 @@ function memopadMarkDone(dateStr, id){
 }
 // 予定・依頼らしい言葉。これが入っている行だけ「日付が過ぎたら自動(済)」の対象にする(ずっと変わらないメモを間違って済にしないため)
 const MEMOPAD_PLAN_WORDS = /(予定|約束|待ち合わせ|集合|出発|到着|向かう|行く|会う|届く|送る|買う|聞く|教えて|確認|明日|明後日|今夜|今晩|夕方|今日|\d{1,2}時|\d{1,2}月\d{1,2}日)/;
-function memopadAutoDonePast(){   // 今日より前の日にある予定・依頼のメモへ(済)を付ける(日付が過ぎたものはもう終わっているはず)
+// 日付が計算できない、ぼんやりした未来の言葉。これだけの行は「時間切れ」が来るまで(済)にしない
+const MEMOPAD_VAGUE_FUTURE = /(今度|そのうち|近いうち|いつか|後日|落ち着いたら|その時|そのとき)/;
+const MEMOPAD_DONE_AFTER_DAYS = 60;   // ⏳時間切れ。ぼんやり未来のメモも、書いた日からこの日数がたてば(済)にする(永久に未済で残らないように)
+function memopadDateOf(ds){ return new Date(Number(ds.slice(0,4)), Number(ds.slice(5,7))-1, Number(ds.slice(8,10))); }   // "YYYY-MM-DD"→日付
+function memopadAddDays(d, n){ const x = new Date(d.getTime()); x.setDate(x.getDate()+n); return x; }
+/* メモの文から「その予定はいつのことか」を読み取る。d0=メモを書いた日 / t0=今日。
+   戻り値 "date"=はっきりした日がまだ来ていない(ぜったいに(済)にしない) / "vague"=ぼんやり未来(時間切れまで待つ) / ""=もう過ぎている */
+function memopadFutureKind(text, d0, t0){
+  const cands = [];
+  // ①「明日」「明後日」= メモを書いた日から数える
+  if(/(明後日|あさって)/.test(text)) cands.push(memopadAddDays(d0,2));
+  else if(/(明日|あした)/.test(text)) cands.push(memopadAddDays(d0,1));
+  // ②「来週」「再来週」= その週の終わりで安全側に見る
+  if(/再来週/.test(text)) cands.push(memopadAddDays(d0,20));
+  else if(/来週/.test(text)) cands.push(memopadAddDays(d0,13));
+  // ③「来月」「再来月」「来年」= その月・その年の最後の日で安全側に見る
+  if(/再来月/.test(text)) cands.push(new Date(d0.getFullYear(), d0.getMonth()+3, 0));
+  else if(/来月/.test(text)) cands.push(new Date(d0.getFullYear(), d0.getMonth()+2, 0));
+  if(/再来年/.test(text)) cands.push(new Date(d0.getFullYear()+2, 11, 31));
+  else if(/来年/.test(text)) cands.push(new Date(d0.getFullYear()+1, 11, 31));
+  // ④「7月20日」「7/20」= 書いてある日付。半年以上前なら「来年のこと」とみなす(12月に見る「1月5日」など)
+  const md = text.match(/(\d{1,2})月(\d{1,2})日/) || text.match(/(?:^|[^\d\/:])(\d{1,2})\/(\d{1,2})(?![\d\/])/);
+  if(md){
+    let c = new Date(t0.getFullYear(), Number(md[1])-1, Number(md[2]));
+    if((c - t0)/86400000 < -180) c = new Date(t0.getFullYear()+1, Number(md[1])-1, Number(md[2]));
+    cands.push(c);
+  }else{
+    // ⑤「20日に」= 月ぬきの日にち。メモを書いた日から見て、次に来るその日
+    const dm = text.match(/(?:^|[^\d:])(\d{1,2})日(?!間|後|以|中|目|ぶり)/);
+    if(dm){
+      const day = Number(dm[1]);
+      let c = new Date(d0.getFullYear(), d0.getMonth(), day);
+      if(c < d0) c = new Date(d0.getFullYear(), d0.getMonth()+1, day);
+      cands.push(c);
+    }
+  }
+  // ⑥「土曜」「週末」= メモを書いた日の次に来るその曜日(「来週の土曜」なら+7)
+  const wd = text.match(/([日月火水木金土])曜/);
+  const wantDow = wd ? "日月火水木金土".indexOf(wd[1]) : (/週末/.test(text) ? 6 : -1);
+  if(wantDow >= 0){
+    let n = (wantDow - d0.getDay() + 7) % 7; if(n === 0) n = 7;
+    if(/再来週/.test(text)) n += 14; else if(/来週/.test(text)) n += 7;
+    cands.push(memopadAddDays(d0, n));
+  }
+  if(cands.some(c => c >= t0)) return "date";        // まだ来ていない日がある = 未来の予定
+  if(MEMOPAD_VAGUE_FUTURE.test(text)) return "vague";
+  return "";
+}
+function memopadAutoDonePast(){   // 今日より前の日にある予定・依頼のメモへ(済)を付ける(ただし、まだ来ていない予定には付けない)
   const today = todaySynopStr();
+  const t0 = memopadDateOf(today);
   let changed = false;
   Object.keys(memopad.days || {}).forEach(ds=>{
     if(ds >= today) return;   // 今日のメモは触らない(まだ進行中かもしれない)
+    const d0 = memopadDateOf(ds);
+    const ageDays = Math.round((t0 - d0) / 86400000);   // メモを書いた日から何日たったか
     (memopad.days[ds] || []).forEach(it=>{
       if(memopadIsDone(it.text)) return;
       if(!MEMOPAD_PLAN_WORDS.test(it.text)) return;
-      // 「明日」「明後日」と書いてあるメモは、その日が来るまで済にしない(メモを書いた日から数える)
-      const rel = /(明後日|あさって)/.test(it.text) ? 2 : (/(明日|あした)/.test(it.text) ? 1 : 0);
-      if(rel){
-        const dd = new Date(Number(ds.slice(0,4)), Number(ds.slice(5,7))-1, Number(ds.slice(8,10)));
-        dd.setDate(dd.getDate() + rel);
-        const target = dd.getFullYear()+"-"+String(dd.getMonth()+1).padStart(2,"0")+"-"+String(dd.getDate()).padStart(2,"0");
-        if(target >= today) return;   // 予定の日は今日、またはこれから=まだ終わっていない
-      }
-      const md = it.text.match(/(\d{1,2})月(\d{1,2})日/);   // 「◯月◯日」の日付が書いてある行は、その日を見て判断する
-      if(md){
-        const t0 = new Date(Number(today.slice(0,4)), Number(today.slice(5,7))-1, Number(today.slice(8,10)));
-        const cand = new Date(t0.getFullYear(), Number(md[1])-1, Number(md[2]));
-        const diffDays = (cand - t0) / 86400000;
-        // まだ来ていない日(0以上)はもちろん、半年以上前の日付も「来年のこと」とみなして済にしない(12月に見る「1月5日」など)
-        if(diffDays >= 0 || diffDays < -180) return;
-      }
+      const kind = memopadFutureKind(it.text, d0, t0);
+      if(kind === "date") return;                                        // はっきり未来の日付 = ぜったいに(済)にしない
+      if(kind === "vague" && ageDays < MEMOPAD_DONE_AFTER_DAYS) return;   // ぼんやり未来 = 時間切れまで待つ
       it.text = it.text.trim() + "(済)"; changed = true;
     });
   });
@@ -4264,8 +4304,9 @@ async function generateMemopad(){
   let batch = history.filter(m=>(m.ts||0) > fromTs);
   if(batch.length > 60) batch = batch.slice(-60);   // コスト上限(あらすじと同じ)
   const lastTs = batch.length ? (batch[batch.length-1].ts||Date.now()) : 0;
+  const firstTs = batch.length ? (batch[0].ts||Date.now()) : Date.now();   // 🕐 この区間の最初の発言時刻(律くんが時刻を書かなかったときの保険)
   const recent = batch
-    .map(m=>(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : "")))
+    .map(m=>"["+memopadHHMM(m.ts)+"] "+(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : "")))
     .join("\n").trim();
   if(!recent) return;
   memopadBusy = true;
@@ -4275,7 +4316,7 @@ async function generateMemopad(){
       : (settings.model==="custom" ? (settings.customModel||"").trim() : settings.model);
     const openItems = memopadItems(today).filter(x=>!memopadIsDone(x.text));   // ✅ まだ済んでいないメモだけ番号を振って渡す(番号で「これ終わったよ」と返してもらう)
     const existing = openItems.map((x,i)=>(i+1)+". "+x.text).join("\n");
-    const sys = "あなたは会話の記録係です。さきと律の会話から『その日かぎりの出来事』だけを抜き出して、その日のメモにします。\n\n【メモにするもの】その日かぎりの出来事・予定・行動・一時的な状況。たとえば食事、移動、天気、体調、その日の予定や約束、その日にした頼みごとや決めごと。固有名詞・時刻・数値は言い換えずそのまま正確に残す。\n\n【メモにしないもの】\n・人物の性格、関係性、恒常的な習慣など、日をまたいで変わらない情報(これは別の担当=『記憶カード』が持つのでメモには書かない。例:「サングラスはレイバン愛用」「妹は看護師」「朝はコーヒー派」「怒ると黙るタイプ」)\n・会話の再現に不要な些末な情報(あいさつ、相づち、雰囲気、感情の流れ)\n\n行動や出来事は必ず過去形で書くこと(「〜している」「〜する」ではなく「〜した」「〜を食べた」)。これはすでに起きたことの記録なので、進行中のようには書かない。ただし、これから起きる予定は「19時から会場で待ち合わせ」のように予定として書いてよい。1件は30字程度までに短く(例:「昼にパスタを食べた」「夜ごはんはイタリアンに決めた」「明日15時に病院へ行く予定」)。1行1件、行頭に・を付けた箇条書きだけを出力。【既にあるメモ】と同じ内容・言い換えは出さない。新しく足すべき事実が無ければ「なし」とだけ出力。\n\nもう一つ仕事があります。【既にあるメモ】は番号付きです。この会話の中で、はっきり解決・完了した項目(=知りたかったことが答えてもらえた/頼んだ用が済んだ/その予定が終わった)があれば、出力のいちばん最後の行に「【済】1,3」のように番号だけを書いてください。判断は日付ではなく会話の中身で行い、まだ続きそうなもの・迷ったものは挙げないこと。該当が無ければその行は書かないこと。";
+    const sys = "あなたは会話の記録係です。さきと律の会話から『その日かぎりの出来事』だけを抜き出して、その日のメモにします。\n\n【メモにするもの】その日かぎりの出来事・予定・行動・一時的な状況。たとえば食事、移動、天気、体調、その日の予定や約束、その日にした頼みごとや決めごと。固有名詞・時刻・数値は言い換えずそのまま正確に残す。\n\n【メモにしないもの】\n・人物の性格、関係性、恒常的な習慣など、日をまたいで変わらない情報(これは別の担当=『記憶カード』が持つのでメモには書かない。例:「サングラスはレイバン愛用」「妹は看護師」「朝はコーヒー派」「怒ると黙るタイプ」)\n・会話の再現に不要な些末な情報(あいさつ、相づち、雰囲気、感情の流れ)\n\n行動や出来事は必ず過去形で書くこと(「〜している」「〜する」ではなく「〜した」「〜を食べた」)。これはすでに起きたことの記録なので、進行中のようには書かない。ただし、これから起きる予定は「19時から会場で待ち合わせ」のように予定として書いてよい。1件の本文は30字程度までに短く(例:「昼にパスタを食べた」「夜ごはんはイタリアンに決めた」「明日15時に病院へ行く予定」)。\n\n【出力の形】1行1件、「・HH:MM 本文」の形で出力すること。HH:MMには、その出来事が会話に出てきた時刻を書く。渡す会話の各行の先頭には[HH:MM]という発言時刻が付いているので、その値をそのまま使うこと(自分で時刻を作ったり、今の時刻を書いたりしないこと)。1件が複数の発言にまたがるときは、最初に話題に出た発言の時刻を使う。例:「・08:20 朝ごはんにトーストを食べた」。この箇条書きだけを出力し、前置きや説明は書かない。【既にあるメモ】と同じ内容・言い換えは出さない。新しく足すべき事実が無ければ「なし」とだけ出力。\n\nもう一つ仕事があります。【既にあるメモ】は番号付きです。この会話の中で、はっきり解決・完了した項目(=知りたかったことが答えてもらえた/頼んだ用が済んだ/その予定が終わった)があれば、出力のいちばん最後の行に「【済】1,3」のように番号だけを書いてください。判断は日付ではなく会話の中身で行い、まだ続きそうなもの・迷ったものは挙げないこと。該当が無ければその行は書かないこと。";
     const usr = "【既にあるメモ】\n" + (existing || "(まだ無い)") + "\n\n【新しい会話】\n" + recent + "\n\n新しく足すメモ:";
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers:HEADERS(),
@@ -4295,8 +4336,7 @@ async function generateMemopad(){
         });
       }
       if(out && out!=="なし"){
-        const now = new Date();
-        const hhmm = String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+        const hhmm = memopadHHMM(firstTs);   // 🕐 保険=律くんが時刻を書かなかった行に付ける「この区間の最初の発言時刻」
         out.split(/\r?\n/).forEach(line=>{
           const t = line.replace(/^[・\-\*・•\s]+/,"").trim();
           if(t && t!=="なし"){
