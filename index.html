@@ -3375,10 +3375,8 @@ async function reflectNow(){
   if(reflectBusy) return;
   if(!settings.key){ closeReflect(); openSettings(); showError("先に設定からAPIキーを入れてね"); return; }
   const dayKey = todayReflectKey();
-  const day0 = new Date();
-  if(day0.getHours() < DIARY_DATE_SWITCH_HOUR) day0.setDate(day0.getDate()-1);
-  day0.setHours(DIARY_DATE_SWITCH_HOUR,0,0,0);
-  const base = history.filter(m=>(m.ts||0) >= day0.getTime());
+  const day0Ts = jstDayStartTs(DIARY_DATE_SWITCH_HOUR);   // 🗾 日本時間の「今日の始まり」
+  const base = history.filter(m=>(m.ts||0) >= day0Ts);
   if(base.length < 4){ alert("今日はまだ会話が少ないみたい。もう少し律くんと話してからにしてね😊"); return; }
   reflectBusy = true;
   const btn = $("reflect-now"); const old = btn.textContent; btn.textContent = "律くんが今日を振り返ってる…"; btn.disabled = true;
@@ -3419,7 +3417,7 @@ async function pendingReflectDays(){
   }catch(e){ return []; }
   const cand = [];
   for(let i=7;i>=1;i--){        // i=7(7日前)→i=1(昨日) の順=古い順
-    const d = new Date();
+    const d = jstNow();   // 🗾 日本時間で数える(dayKeyOfと同じ基準にそろえる)
     if(d.getHours() < DIARY_DATE_SWITCH_HOUR) d.setDate(d.getDate()-1);
     d.setHours(DIARY_DATE_SWITCH_HOUR,0,0,0);
     d.setDate(d.getDate()-i);
@@ -3693,7 +3691,7 @@ let memFilter = "all";
 let memEditId = null;   // 編集中カードid (null=新規)
 let memEditCat = "other";
 const CATLABEL = {profile:"プロフィール", likes:"好み", knowledge:"知識", other:"その他"};
-function fmtMemDate(ts){ const d=new Date(ts); return d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate(); }
+function fmtMemDate(ts){ const d=jstDate(ts); return d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate(); }
 function saveMem(){ store.set("ritsu-settings", JSON.stringify(settings)); }
 
 function openMemory(){
@@ -4117,7 +4115,7 @@ function renderFavList(){
 
 /* ---------- 今日のあらすじ（自動要約・1日でリセット・APIはHaiku等） ---------- */
 function todaySynopStr(){                    // あらすじの「今日」も午前4時切り替え(夜ふかし対応・DIARY_DATE_SWITCH_HOUR共用)
-  const d = new Date();
+  const d = jstNow();   // 🗾 日本時間で「今日」を決める
   if(d.getHours() < DIARY_DATE_SWITCH_HOUR) d.setDate(d.getDate()-1);
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 }
@@ -4128,7 +4126,7 @@ function loadAyumi(){ try{ const d=store.get("ritsu-ayumi"); if(d){ const o=JSON
 function loadMemopad(){ try{ const d=store.get("ritsu-memopad"); if(d){ const o=JSON.parse(d); memopad={days:(o&&o.days)||{}, upTs:(o&&o.upTs)||0}; } }catch(e){ memopad={days:{},upTs:0}; } }
 function saveMemopad(){ store.set("ritsu-memopad", JSON.stringify(memopad)); }
 function memopadYesterdayStr(){   // 「昨日」の日付(午前4時切替)。持ち越し注入用
-  const d = new Date();
+  const d = jstNow();   // 🗾 日本時間で決める
   if(d.getHours() < DIARY_DATE_SWITCH_HOUR) d.setDate(d.getDate()-1);
   d.setDate(d.getDate()-1);
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
@@ -4144,7 +4142,7 @@ function memopadAdd(dateStr, text){   // 1行たす(同じ日の同じ文は追�
   saveMemopad(); return true;
 }
 /* 🕐 メモの行頭に付ける時刻(HH:MM)。「抽出した時刻」ではなく「発言があった時刻」から作る */
-function memopadHHMM(ts){ const d = new Date(ts || Date.now()); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+function memopadHHMM(ts){ const d = jstDate(ts || Date.now()); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
 /* ✅ メモの「(済)」印: 終わった用件は消さずに文末へ "(済)" を付けて残す(律くんに「もう済んだ」と伝えるため) */
 function memopadIsDone(text){ return /[（(]済[)）]\s*$/.test((text||"").trim()); }
 function memopadMarkDone(dateStr, id){
@@ -4260,10 +4258,8 @@ async function generateSynopsis(){
   if(synopsisBusy || !settings.key) return;
   ensureSynopsisToday();
   // 「前回あらすじを更新した続き」から今までを読む(取りこぼし防止)。今日の始まりは午前4時
-  const day0 = new Date();
-  if(day0.getHours() < DIARY_DATE_SWITCH_HOUR) day0.setDate(day0.getDate()-1);
-  day0.setHours(DIARY_DATE_SWITCH_HOUR,0,0,0);
-  const fromTs = Math.max(synopsis.upTs||0, day0.getTime());
+  const day0Ts = jstDayStartTs(DIARY_DATE_SWITCH_HOUR);   // 🗾 日本時間の「今日の始まり」
+  const fromTs = Math.max(synopsis.upTs||0, day0Ts);
   let batch = history.filter(m=>(m.ts||0) > fromTs);
   if(batch.length > 60) batch = batch.slice(-60);   // コスト上限
   const lastTs = batch.length ? (batch[batch.length-1].ts||Date.now()) : 0;
@@ -4297,10 +4293,8 @@ async function generateMemopad(){
   if(memopadBusy || !settings.key) return;
   memopadAutoDonePast();   // ✅ まず「日付が過ぎた予定」を自動で(済)にしておく
   const today = todaySynopStr();
-  const day0 = new Date();
-  if(day0.getHours() < DIARY_DATE_SWITCH_HOUR) day0.setDate(day0.getDate()-1);
-  day0.setHours(DIARY_DATE_SWITCH_HOUR,0,0,0);
-  const fromTs = Math.max(memopad.upTs||0, day0.getTime());
+  const day0Ts = jstDayStartTs(DIARY_DATE_SWITCH_HOUR);   // 🗾 日本時間の「今日の始まり」
+  const fromTs = Math.max(memopad.upTs||0, day0Ts);
   let batch = history.filter(m=>(m.ts||0) > fromTs);
   if(batch.length > 60) batch = batch.slice(-60);   // コスト上限(あらすじと同じ)
   const lastTs = batch.length ? (batch[batch.length-1].ts||Date.now()) : 0;
@@ -4363,16 +4357,14 @@ function maybeGenerateSynopsis(){
 function maybeCatchupSynopsis(){
   if(!settings.synopsis || !settings.key || synopsisBusy) return;
   ensureSynopsisToday();
-  const day0 = new Date();
-  if(day0.getHours() < DIARY_DATE_SWITCH_HOUR) day0.setDate(day0.getDate()-1);
-  day0.setHours(DIARY_DATE_SWITCH_HOUR,0,0,0);
-  const fromTs = Math.max(synopsis.upTs||0, day0.getTime());
+  const day0Ts = jstDayStartTs(DIARY_DATE_SWITCH_HOUR);   // 🗾 日本時間の「今日の始まり」
+  const fromTs = Math.max(synopsis.upTs||0, day0Ts);
   const cutoff = Date.now() - 2*3600000;   // 「2時間以上前」の会話だけ対象(直近の話はまだ会話の窓にあるので急がない)
   const stale = history.some(m=> (m.ts||0) > fromTs && (m.ts||0) < cutoff && ((m.text||"").trim() || (m.atts&&m.atts.length)));
   if(stale) generateSynopsis();
   // 📝 メモ帳も同じ流儀で追いつかせる(2時間以上前の未収録会話があれば裏でそっと)
   if(!memopadBusy){
-    const fromTsM = Math.max(memopad.upTs||0, day0.getTime());
+    const fromTsM = Math.max(memopad.upTs||0, day0Ts);
     const staleM = history.some(m=> (m.ts||0) > fromTsM && (m.ts||0) < cutoff && ((m.text||"").trim() || (m.atts&&m.atts.length)));
     if(staleM) generateMemopad();
   }
@@ -4591,15 +4583,41 @@ async function refreshSynopsisNow(){
 let calSelected = "";
 function loadEvents(){ try{ const d=store.get("ritsu-events"); events = d ? (JSON.parse(d)||[]) : []; }catch(e){ events=[]; } }
 function saveEvents(){ store.set("ritsu-events", JSON.stringify(events)); }
+/* ---------- 🗾 日本時間(JST)で日付・曜日を決める道具 ----------
+   端末の時計が日本時間でなくても(旅行中・設定ちがい)、律くんに渡す日付と曜日は必ず日本時間で計算する。
+   ※関数宣言だけで書いてあるので、どこから呼んでも安全(読み込み順を気にしなくてよい) */
+function jstParts(ts){          // 日本時間の「年月日時分秒」を取り出す
+  if(!jstParts._f) jstParts._f = new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Tokyo", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit", hourCycle:"h23"});
+  const p = jstParts._f.formatToParts(ts==null ? new Date() : new Date(ts));
+  const g = k => Number((p.filter(x=>x.type===k)[0]||{}).value);
+  return {y:g("year"), mo:g("month"), d:g("day"), h:g("hour"), mi:g("minute"), s:g("second")};
+}
+function jstDate(ts){           // その時刻を「日本時間の壁時計」に置きかえたDate(以後はふつうのDateとして扱える)
+  try{ const p = jstParts(ts); return new Date(p.y, p.mo-1, p.d, p.h, p.mi, p.s); }
+  catch(e){ return ts==null ? new Date() : new Date(ts); }   // 万一失敗しても止めない(端末の時計にもどる)
+}
+function jstNow(){ return jstDate(null); }
+/* 日本時間の「今日の hour 時」を、本物の時刻(エポックms)で返す。
+   ※jstNow()は“日本時間の壁時計”なので、そのままgetTime()すると端末が日本時間でないときズレる。
+     発言のts(本物の時刻)と比べるときは、必ずこの関数を使うこと。 */
+function jstDayStartTs(hour){
+  const now = Date.now();
+  const off = jstDate(now).getTime() - now;   // 端末の時計と日本時間のズレ(日本国内なら0)
+  const w = jstDate(now);
+  if(w.getHours() < hour) w.setDate(w.getDate()-1);
+  w.setHours(hour,0,0,0);
+  return w.getTime() - off;                   // 壁時計 → 本物の時刻へ戻す
+}
+function wdayJp(d){ return ["日","月","火","水","木","金","土"][d.getDay()]; }   // 曜日はここ1か所で文字にする
 function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-function fmtJDate(ds){ const p=ds.split("-").map(Number); const wd=["日","月","火","水","木","金","土"][new Date(p[0],p[1]-1,p[2]).getDay()]; return p[1]+"月"+p[2]+"日("+wd+")"; }
+function fmtJDate(ds){ const p=ds.split("-").map(Number); return p[1]+"月"+p[2]+"日("+wdayJp(new Date(p[0],p[1]-1,p[2]))+")"; }
 // "YYYY-MM-DD" → "7/8(水)" 形式(曜日はJSで計算。あゆみのラベル用)
-function mdw(ds){ const p=ds.split("-").map(Number); const wd=["日","月","火","水","木","金","土"][new Date(p[0],p[1]-1,p[2]).getDay()]; return p[1]+"/"+p[2]+"("+wd+")"; }
+function mdw(ds){ const p=ds.split("-").map(Number); return p[1]+"/"+p[2]+"("+wdayJp(new Date(p[0],p[1]-1,p[2]))+")"; }
 const DATE_TABLE_DAYS = 14;   // 📅日付早見表に載せる日数(今日をふくむ)。増やすと先の曜日まで正確に・荷物は少し重く
 // 📅 今日から DATE_TABLE_DAYS 日ぶんの「日付(曜日)」一覧。曜日をモデルに計算させないための早見表(1日1回だけ中身が変わる)
 function dateTableContext(){
   // ★ここは午前5時切替を使わない。「# 今の現実の日時」と同じ本物のカレンダー日付に合わせる(深夜に表と現在日時が食い違うのを防ぐ)
-  const base = new Date();
+  const base = jstNow();   // 🗾 早見表も日本時間の「今日」から始める
   const rows = [];
   for(let i=0;i<DATE_TABLE_DAYS;i++){
     const d = new Date(base.getFullYear(), base.getMonth(), base.getDate()+i);
@@ -4674,7 +4692,7 @@ function calForm(ds, ev){
 }
 // 律くんが見る「今後の予定」(直近8件)
 function scheduleContext(){
-  const today = ymd(new Date());
+  const today = ymd(jstNow());   // 🗾 日本時間の今日から先の予定を渡す
   const up = events.filter(e=>e.date>=today)
     .sort((a,b)=>(a.date+(a.time||"")).localeCompare(b.date+(b.time||""))).slice(0,8);
   return up.length ? up.map(e=>"・"+fmtJDate(e.date)+(e.time?" "+e.time:"")+" "+e.title).join("\n") : "";
@@ -4716,25 +4734,24 @@ function extractSchedule(text){
 /* ---------- 律の日記 ---------- */
 function loadDiary(){ try{ const d=store.get("ritsu-diary"); diary = d ? (JSON.parse(d)||[]) : []; }catch(e){ diary=[]; } }
 function saveDiary(){ store.set("ritsu-diary", JSON.stringify(diary)); }
-function fmtDiaryDate(ts){ const d=new Date(ts); const wd=["日","月","火","水","木","金","土"][d.getDay()]; return (d.getMonth()+1)+"月"+d.getDate()+"日("+wd+") "+fmtTime(ts); }
+function fmtDiaryDate(ts){ const d=jstDate(ts); return (d.getMonth()+1)+"月"+d.getDate()+"日("+wdayJp(d)+") "+fmtTime(ts); }
 const DIARY_DATE_SWITCH_HOUR = 5;   // ★1日の区切り=午前5時。午前5時より前の出来事は「前日」として扱う(日記・省察・あらすじ・メモ帳・会話の日付ぜんぶ共通。ここを変えれば切替時刻を調整できる)
 function diaryDayStr(){             // 新しく書く日記に付ける「日記としての日付」(YYYY-MM-DD)
-  const now = new Date();
+  const now = jstNow();   // 🗾 日本時間で決める
   const d = new Date(now);
   if(now.getHours() < DIARY_DATE_SWITCH_HOUR) d.setDate(d.getDate()-1);
   return ymd(d);
 }
 // あるtsが「何日の会話か」(午前4時切替・日記と共通ルール)をYYYY-MM-DDで返す。省察の対象日にも使う
-function dayKeyOf(ts){ const d=new Date(ts); if(d.getHours()<DIARY_DATE_SWITCH_HOUR) d.setDate(d.getDate()-1); return ymd(d); }
+function dayKeyOf(ts){ const d=jstDate(ts); if(d.getHours()<DIARY_DATE_SWITCH_HOUR) d.setDate(d.getDate()-1); return ymd(d); }
 function todayReflectKey(){ return dayKeyOf(Date.now()); }
 // "YYYY-MM-DD" → "8月5日(水)"。曜日はJSで計算する(モデルに曜日を計算させないため。あゆみのmdwと同じ流儀)
-function mdLabel(dayKey){ const p=String(dayKey).split("-").map(Number); const wd=["日","月","火","水","木","金","土"][new Date(p[0],p[1]-1,p[2]).getDay()]; return p[1]+"月"+p[2]+"日("+wd+")"; }
+function mdLabel(dayKey){ const p=String(dayKey).split("-").map(Number); return p[1]+"月"+p[2]+"日("+wdayJp(new Date(p[0],p[1]-1,p[2]))+")"; }
 function diaryDateStr(e){           // 表示用: 日記の日付(d)があればそれ+実際の時刻。無い昔の日記は従来どおり
   if(e && e.d && /^\d{4}-\d{2}-\d{2}$/.test(e.d)){
     const p = e.d.split("-").map(Number);
     const dt = new Date(p[0], p[1]-1, p[2]);
-    const wd = ["日","月","火","水","木","金","土"][dt.getDay()];
-    return p[1]+"月"+p[2]+"日("+wd+") "+fmtTime(e.ts);
+    return p[1]+"月"+p[2]+"日("+wdayJp(dt)+") "+fmtTime(e.ts);
   }
   return fmtDiaryDate(e.ts);
 }
@@ -4825,7 +4842,7 @@ const chat = $("chat"), input = $("input"), send = $("send");
 
 /* ---------- render ---------- */
 function el(tag, cls, text){ const e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e; }
-function fmtTime(ts){ const d=new Date(ts); return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0"); }
+function fmtTime(ts){ const d=jstDate(ts); return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0"); }
 function fmtN(n){ return Number(n||0).toLocaleString("en-US"); }
 function modelRates(model){
   const s = String(model||"").toLowerCase();
@@ -5345,9 +5362,9 @@ function withCache(content){
   return b;
 }
 function chatDayStr(ts){   // その発言が「どの日の会話か」(午前4時切替・日記と共通ルール)
-  const d = new Date(ts);
+  const d = jstDate(ts);   // 🗾 日本時間で判定
   if(d.getHours() < DIARY_DATE_SWITCH_HOUR) d.setDate(d.getDate()-1);
-  return (d.getMonth()+1)+"月"+d.getDate()+"日("+["日","月","火","水","木","金","土"][d.getDay()]+")";
+  return (d.getMonth()+1)+"月"+d.getDate()+"日("+wdayJp(d)+")";
 }
 function buildCachedMsgs(lineOn){
   // 日付が変わる境目に「（※ここから◯月◯日の会話）」の印を入れる。
@@ -5463,8 +5480,8 @@ function memParse(text){
   return out;
 }
 function nowContext(){
-  const d = new Date();
-  const wd = ["日","月","火","水","木","金","土"][d.getDay()];
+  const d = jstNow();   // 🗾 律くんに伝える現実の日時は、端末の時計ではなく日本時間で作る
+  const wd = wdayJp(d);
   const h = d.getHours();
   let band = "深夜";
   if(h>=5 && h<11) band="朝";
@@ -5538,7 +5555,7 @@ function cycleContext(){
   const p = String(settings.cycleStart).split("-").map(Number);
   if(p.length<3 || !p[1] || !p[2]) return "";
   const start = new Date(p[0], p[1]-1, p[2]);
-  const today = new Date(); today.setHours(0,0,0,0);
+  const today = jstNow(); today.setHours(0,0,0,0);   // 🗾 日本時間の今日で数える
   const diff = Math.floor((today - start)/86400000);
   if(diff < 0) return "";                            // 開始日が未来なら何も出さない
   const len = Math.max(15, Math.min(60, Number(settings.cycleLen)||28));
