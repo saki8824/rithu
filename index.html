@@ -3145,18 +3145,22 @@ async function ragSearch(query, embReady){   // 意味が近い気づきを上�
   return scored.slice(0, RAG_TOP_K);
 }
 /* 🔍 検索クエリを賢く: 最新の発言だけだと「うん!」等で意味が薄いので、直近の会話(〜2往復)をつないで意味を濃くする。埋め込みは今までどおり1送信1回=コスト増ゼロ */
-const RAG_QUERY_MAX = 500;   // クエリの最大文字数(長すぎると焦点がぼける)
+const RAG_QUERY_MAX = 500;   // クエリ全体の最大文字数(長すぎると焦点がぼける)
+const RAG_CTX_MSGS  = 2;     // 前の会話を何件まぜるか(=1往復ぶん)。増やすと流れは汲めるが「今の話」がうすまる
+const RAG_CTX_MAX   = 200;   // 前の会話ぶんの合計文字数の上限。今の発言がうもれないようにするための重し
 function ragQueryText(text){
   const cur = (text||"").trim();
   const parts = [cur];
-  let len = cur.length, taken = 0;
-  for(let i=history.length-1; i>=0 && taken<4; i--){
+  let ctxLen = 0, taken = 0;   // ctxLenは「前の会話ぶん」だけ数える(今の発言は主役なので上限に入れない)
+  for(let i=history.length-1; i>=0 && taken<RAG_CTX_MSGS; i--){
     const m = history[i];
-    const t = (m.text||"").trim();
+    let t = (m.text||"").trim();
     if(!t) continue;                                                       // 画像だけ等は飛ばす
     if(i===history.length-1 && m.role==="user" && t===cur) continue;       // 履歴の末尾=今の発言そのものは重複させない
-    if(len + t.length > RAG_QUERY_MAX) break;
-    parts.unshift(t); len += t.length; taken++;
+    const room = Math.min(RAG_CTX_MAX - ctxLen, RAG_QUERY_MAX - cur.length - ctxLen);
+    if(room <= 0) break;
+    if(t.length > room) t = t.slice(-room);   // 長い発言は終わりのほう(話の結び)だけ借りる
+    parts.unshift(t); ctxLen += t.length; taken++;
   }
   return parts.join("\n");
 }
