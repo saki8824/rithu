@@ -3188,16 +3188,24 @@ let reflectBusy = false;
 function openReflect(){
   reflectFilter = "all";
   document.querySelectorAll("#reflect-filters .mem-chip").forEach(c=> c.classList.toggle("on", c.dataset.cat==="all"));
-  renderReflectList(); $("reflect").classList.add("open"); ragBackfill();
+  renderReflectList(true); $("reflect").classList.add("open"); ragBackfill();   // 開くときは一番上から
 }
 function closeReflect(){ $("reflect").classList.remove("open"); }
 let reflectFilter = "all";
-async function renderReflectList(){
-  const box = $("reflect-list"); if(!box) return; box.innerHTML="";
+// toTop=true のときだけ一番上から表示する(画面を開いたとき・ラベルを切り替えたとき)。
+// それ以外(削除・編集・解決の切替など)は、いま見ている場所のまま。
+async function renderReflectList(toTop){
+  const box = $("reflect-list"); if(!box) return;
+  // 📍 いま見ている場所を覚えておく(削除のあとに一番上へ飛ばないように)。スクロールするのは画面全体の#reflect
+  const pane = $("reflect");
+  const keepY = (toTop || !pane) ? 0 : pane.scrollTop;
+  const restoreY = ()=>{ if(pane) pane.scrollTop = keepY; };   // 中身を作り終えてから戻す(先に戻しても高さが足りず0になる)
+  box.innerHTML="";
   let list = await ragAll();
   if(reflectFilter!=="all") list = list.filter(c=>(c.label||"")===reflectFilter);
   if(!list.length){
     box.appendChild(el("div","cal-empty", reflectFilter==="all" ? "まだ気づきはないよ。1日の終わりに「✨今すぐ省察」を押すと、律くんが今日を静かに振り返るよ💭" : "このラベルの気づきはまだないよ"));
+    restoreY();
     return;
   }
   list.sort((a,b)=>(b.ts||0)-(a.ts||0));   // 新しい順
@@ -3235,6 +3243,7 @@ async function renderReflectList(){
     wrap.addEventListener("click", ()=>{ const o = wrap.classList.toggle("open"); arrow.textContent = o ? "▾" : "▸"; });
     box.appendChild(wrap);
   });
+  restoreY();   // 📍 全部並べ終わってから、さっき見ていた場所へ戻す
 }
 async function editInsight(card){   // ✏️編集: 直した1件だけベクトルも作り直す
   const nv = prompt("気づきを編集", card.text);
@@ -5737,7 +5746,7 @@ $("synopsis-refresh").addEventListener("click", refreshSynopsisNow);
 $("close-archive").addEventListener("click", closeArchive);
 $("close-reflect").addEventListener("click", closeReflect);
 $("reflect-now").addEventListener("click", reflectNow);
-$("reflect-filters").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; reflectFilter=b.dataset.cat; document.querySelectorAll("#reflect-filters .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); renderReflectList(); });
+$("reflect-filters").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; reflectFilter=b.dataset.cat; document.querySelectorAll("#reflect-filters .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); renderReflectList(true); });   // ラベル切替は一番上から
 $("reflect-migrate").addEventListener("click", migrateEmbeddings);
 $("home-talk").addEventListener("click", closeHome);
 $("mem-add").addEventListener("click", ()=> openMemEdit(null));
