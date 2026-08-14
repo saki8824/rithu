@@ -3120,7 +3120,8 @@ async function ragAyBackfill(){   // 裏で静かにベクトルを付ける(棚
 }
 
 /* ---------- ベクトル検索(意味の近さで気づきを思い出す) ---------- */
-const RAG_MIN_SIM = 0.5;   // しきい値: これ未満は「意味が遠い」ので出さない
+const RAG_MIN_SIM = 0.6;   // 気づきのしきい値: これ未満は「意味が遠い」ので出さない(0.5→0.6=なんとなく似てるだけのハズレを減らす)
+const MEM_MIN_SIM = 0.5;   // 記憶カードはゆるいまま(大事な事実を取りこぼさないための据え置き)
 const RAG_TOP_K = 4;       // 思い出す最大件数(3〜5件の範囲で)
 function cosSim(a, b){     // 似てる度(コサイン類似度)。ただの算数・無料
   let dot=0, na=0, nb=0;
@@ -3165,7 +3166,7 @@ function ragQueryText(text){
   return parts.join("\n");
 }
 /* 🗂️ 長期記憶(あゆみRAG)ステップ3: 過去の日々を意味で探す */
-const AYUMI_MIN_SIM = 0.5;   // しきい値(ハズレが多ければ上げる・思い出さなすぎたら下げる)
+const AYUMI_MIN_SIM = 0.6;   // しきい値(ハズレが多ければ上げる・思い出さなすぎたら下げる。0.5→0.6=気が散るのを減らす)
 const AYUMI_TOP_K = 3;       // 思い出す最大件数
 const AYUMI_EXCERPT = 400;   // 律くんに渡す1件あたりの最大文字数(長い記録は頭から切り詰め=コスト暴走ふせぎ)
 let ayRecall = [];           // 直近の送信で思い出した過去の日々(ステップ4で律くんに添える)
@@ -4239,7 +4240,9 @@ function saveAyumi(){ store.set("ritsu-ayumi", JSON.stringify(ayumi)); }
 // 長期記憶RAG(ステップ5)から: 常時持つのは「直近」だけ=日ごとの記録ぜんぶ(最大7日で週に圧縮)+新しい週まとめ数個。
 // それより古い週は棚(あゆみRAG検索)から話題に応じて思い出す→律くんの毎回の荷物が軽くなる。
 const AYUMI_CARRY_WEEKS = 2;   // 常時持ち歩く週まとめの数(増やすと荷物が重く・減らすと軽く)
-function ayumiContext(){
+// 🎒 いま律くんが「毎回かならず持ち歩いている」あゆみの記録たち(=システムに入るぶん)。
+//    検索(あゆみRAG)が同じものを引き当てたとき、二重に渡さないよう照合するのにも使う。
+function ayumiCarried(){
   let es = (ayumi.entries||[]).slice();
   if(settings.googleKey){   // 検索(棚)が使えるときだけ古い週を外す。キーが無ければ従来どおり全部持つ(忘れ事故ふせぎ)
     const weeks = es.filter(e=>e.kind==="week");
@@ -4248,7 +4251,11 @@ function ayumiContext(){
   }
   const text = ()=> es.map(e=>"【"+e.label+"】"+e.text).join("\n");
   while(es.length > 3 && text().length > 2200) es.shift();
-  return es.length ? text() : "";
+  return es;
+}
+function ayumiContext(){
+  const es = ayumiCarried();
+  return es.length ? es.map(e=>"【"+e.label+"】"+e.text).join("\n") : "";
 }
 // 日付が変わっていたら「あらすじメモだけ」を新しくする（会話・スレッドには一切さわらない）
 function ensureSynopsisToday(){
@@ -4779,9 +4786,15 @@ function editDiaryDate(e){          // 📅日付ボタン: 日記の日付を�
   saveDiary(); renderDiaryList();
 }
 // 律くんが持ち歩く「最近の日記」(最新2件)
+const DIARY_CTX_N   = 2;     // 律くんに渡す日記の件数(新しいほうから)
+const DIARY_CTX_MAX = 600;   // 1件あたりに渡す最大文字数。長い日記で荷物が重くなるのを防ぐ(日記帳の中身は無傷)
 function diaryContext(){
   if(!diary.length) return "";
-  return diary.slice(-2).map(e=>"［"+diaryDateStr(e)+"］\n"+e.text).join("\n\n");
+  return diary.slice(-DIARY_CTX_N).map(e=>{
+    let t = (e.text||"").trim();
+    if(t.length > DIARY_CTX_MAX) t = t.slice(0, DIARY_CTX_MAX) + "…（この日の日記はまだ続くが、ここまで）";
+    return "［"+diaryDateStr(e)+"］\n"+t;
+  }).join("\n\n");
 }
 function openDiary(){ renderDiaryList(); $("diary").classList.add("open"); }
 function closeDiary(){ $("diary").classList.remove("open"); }
@@ -5420,9 +5433,14 @@ function buildCachedMsgs(lineOn){
       + "\nこれはさきについての記憶です。関係がありそうなときだけ自然に会話へ活かし、文言をそのまま読み上げないでください。無理に触れなくて構いません。";
   }
   // 🗂️ 過去の日々の記録(あゆみRAG): 今の話題と意味が近い日/週のまとめを、日付付きで添える(無ければ何も足さない)
-  if(ayRecall.length){
+  // ♻️ すでにシステム側の「ふたりのあゆみ」で毎回持っている記録は、ここで二重に渡さない
+  //    (同じ文章が2回届くと、その話題だけ声が大きくなって今の話がうもれるため)
+  const ayCarriedIds = {};
+  ayumiCarried().forEach(e=>{ if(e && e.id) ayCarriedIds[e.id] = true; });
+  const ayShow = ayRecall.filter(r=> !(r.rec && r.rec.id && ayCarriedIds[r.rec.id]));
+  if(ayShow.length){
     note += "\n\n# 過去の日々の記録（ふたりのあゆみから思い出したもの）\n"
-      + ayRecall.map(r=>{
+      + ayShow.map(r=>{
           let t = (r.rec.text||"").trim();
           if(t.length > AYUMI_EXCERPT) t = t.slice(0, AYUMI_EXCERPT) + "…";
           return "・【" + (r.rec.kind==="week" ? "週のまとめ " : "") + (r.rec.label||"日付不明") + "】" + t;
@@ -5469,7 +5487,7 @@ function memRagSearch(qEmb){   // 通常カード(ピンオフ&ベクトル有�
       if(memPinnedEff(c)) return;                              // 固定/ベクトル無しはRAG対象外(=システム側で常時注入)
       if(!c.embedding || c.embedding.dim!==qEmb.dim) return;    // 次元ちがいは比べない
       const sim = cosSim(qEmb.vec, c.embedding.vec);
-      if(sim >= RAG_MIN_SIM) scored.push({card:c, sim});
+      if(sim >= MEM_MIN_SIM) scored.push({card:c, sim});   // 記憶カードだけは0.5のまま(事実の取りこぼし防止)
     });
     scored.sort((a,b)=> b.sim - a.sim);
     return scored.slice(0, RAG_TOP_K);
