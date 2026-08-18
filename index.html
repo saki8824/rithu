@@ -2243,12 +2243,12 @@
     <div class="field">
       <label>APIキー(この端末のブラウザにだけ保存されます)</label>
       <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off">
-      <div class="hint">キーは誰にも送らないこと。Anthropicコンソールで月の利用上限(Spend limit)を設定しておくと安心。</div>
+      <div class="hint">キーは誰にも送らないこと。Anthropicコンソールで月の利用上限(Spend limit)を設定しておくと安心。<b>空のまま保存してもキーは消えないよ</b>(消したいときだけ「-」を入れて保存)。</div>
     </div>
     <div class="field">
       <label>Google APIキー(気づきのベクトル用・この端末にだけ保存)</label>
       <input type="password" id="set-gkey" placeholder="AIza…" autocomplete="off">
-      <div class="hint">省察ノートの気づきを「意味で思い出せる」ようにするためのキーだよ(接続テストで使ったやつ)。空っぽでも省察自体はできる(検索の準備だけお休みになる)。料金はほぼ0円。</div>
+      <div class="hint">省察ノートの気づきを「意味で思い出せる」ようにするためのキーだよ(接続テストで使ったやつ)。空っぽでも省察自体はできる(検索の準備だけお休みになる)。料金はほぼ0円。<b>空のまま保存してもキーは消えないよ</b>(消したいときだけ「-」を入れて保存)。</div>
     </div>
     <div class="field">
       <label>モデル</label>
@@ -5870,8 +5870,16 @@ setInterval(applyTheme, 5*60000);            // 自動のとき時間でゆっ�
 $("set-temp").addEventListener("input", e=>{ $("temp-val").textContent = Number(e.target.value).toFixed(2); });
 $("set-fs").addEventListener("input", e=>{ const v=Number(e.target.value); $("fs-val").textContent = Math.round(v*100)+"%"; applyFontScale(v); });
 $("save-settings").addEventListener("click", ()=>{
-  settings.key = $("set-key").value.trim();
-  settings.googleKey = $("set-gkey").value.trim();
+  // 🔑 APIキーは「空っぽ＝変更なし」あつかい(PINと同じ流儀)。
+  //    iPhoneのSafariは、ダウンロード等でページが復帰したとき password 欄を安全のため空にすることがある。
+  //    ×ボタンでも保存が走る作りなので、そのまま上書きするとキーが消えてしまう(毎晩バックアップ後に消えていた原因)。
+  //    本当に消したいときは「-」(ハイフン1文字)を入れて保存する。
+  const kv = $("set-key").value.trim();
+  if(kv === "-") settings.key = "";
+  else if(kv !== "") settings.key = kv;
+  const gv = $("set-gkey").value.trim();
+  if(gv === "-") settings.googleKey = "";
+  else if(gv !== "") settings.googleKey = gv;
   settings.model = $("set-model").value;
   settings.customModel = $("set-model-custom").value.trim();
   settings.think = $("set-think").checked;
