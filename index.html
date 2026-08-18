@@ -3832,7 +3832,9 @@ async function exportBackup(){
     // 律くんの気づき(省察ノート)は「文章+ラベル+日付」だけ入れる。
     // ベクトルはわざと入れない(重い&モデル変更に弱い)。復元後にragBackfillが作り直す。
     const list = await ragAll();
-    out.insights = list.map(c=>({id:c.id, text:c.text, label:c.label, ts:c.ts}));
+    // day=その気づきが「どの日のこと」か / status=✅解決済みの印。
+    // この2つを入れ忘れると、復元したときに✅が全部消えて日付もズレるので必ず同梱する。
+    out.insights = list.map(c=>({id:c.id, text:c.text, label:c.label, ts:c.ts, day:c.day||"", status:c.status||""}));
   }catch(e){}
   try{
     // 🗂️ 長期記憶の棚(あゆみRAG)も「文章+種類+日付」だけ同梱(ベクトルは復元後に自動で作り直る)
@@ -3884,7 +3886,8 @@ function importBackup(file){
         // 気づき入りバックアップ → 倉庫を置き換え。ベクトルは空で戻す(省察ノートを開くと自動で作り直る)
         await ragClear();
         for(const c of obj.insights){
-          if(c && c.text) await ragAdd({id:c.id||uid(), text:c.text, label:c.label||"", ts:c.ts||Date.now(), vec:null, model:"", dim:0});
+          // day/status も一緒に戻す。入っていない古いバックアップは "" になるだけ(=今までどおりの動き)
+          if(c && c.text) await ragAdd({id:c.id||uid(), text:c.text, label:c.label||"", ts:c.ts||Date.now(), day:c.day||"", status:c.status||"", vec:null, model:"", dim:0});
         }
       }
       if(Array.isArray(obj.ayumiVault)){
