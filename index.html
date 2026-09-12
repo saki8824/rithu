@@ -3278,6 +3278,7 @@ async function migrateEmbeddings(){   // 🔄全部の気づきのベクトル�
 }
 // ❤️響く返答の傾向を更新(省察のついでに・Haiku系)。新しいいいねが無ければ何もしない
 async function updateLikeTrend(){
+  if(!LIKE_FEED_TO_RITSU) return;   // 届けない設定のときは、作り直しもしない(いまの傾向メモはそのまま保管)
   const newest = likes.length ? Math.max(...likes.map(x=>x.ts||0)) : 0;
   if(!newest || newest <= (likeTrend.ts||0)) return;   // 前回まとめた後のいいねが無ければスキップ
   try{
@@ -5068,6 +5069,11 @@ let busy=false;
 let lineMode = (store.get("ritsu-linemode")==="1");
 // LINEモード中だけ、送信時にシステムの末尾へ一時的に添える文体指示(プロンプト本体は書き換えない)
 const LINE_MODE_RULE = "【現在LINEモード】今はLINEでのやり取り中。以下を通常ルールより優先すること。\n・【律の内心】と地の文(情景や動作の描写)は書かない\n・セリフ(メッセージ本文)のみを1〜4行で返す\n・普段の律の口調のまま、LINEらしい短さと軽さで。絵文字は律らしく控えめ(使っても1個)\n・複数の話題があっても1通にまとめる\n・律とさきは同棲中である。このLINEは、仕事などで日中離れている時間帯の連絡であり、別居や遠距離ではない。帰宅すれば同じ家で会える前提で話すこと";
+/* ❤️いいねを律くんに「届けるか」のスイッチ(2026-09-13 さきの希望でオフ)
+   false = 抜粋も傾向メモも律くんに渡さない・傾向メモの作り直しもしない。
+           ❤️ボタンも吹き出しの❤️印も、これまでの記録(50件)も、そのまま残る。
+   true  = 元どおり届くようになる。戻したくなったら true にするだけ。 */
+const LIKE_FEED_TO_RITSU = false;
 /* ❤️いいねの差し込み設定(効きが強すぎ/弱すぎのときは、ここの数字と文言を編集) */
 const LIKE_RECENT_N = 3;        // 即時で渡す「直近のいいね」の最大件数
 const LIKE_RECENT_HOURS = 48;   // 何時間以内のいいねを「直近」とみなすか
@@ -5471,7 +5477,7 @@ function buildCachedMsgs(lineOn){
   }
   // ❤️直近のいいね(48時間以内・最新3件まで): 「この感じをもっと」のリクエストとして添える
   const likeCutoff = Date.now() - LIKE_RECENT_HOURS*3600000;
-  const recentLikes = likes.filter(x=>(x.ts||0) >= likeCutoff).slice(-LIKE_RECENT_N);
+  const recentLikes = LIKE_FEED_TO_RITSU ? likes.filter(x=>(x.ts||0) >= likeCutoff).slice(-LIKE_RECENT_N) : [];   // オフのときは1件も渡さない
   if(recentLikes.length){
     note += "\n\n# さきが❤️を付けた返答（抜粋）\n"
       + recentLikes.map(x=>"・「"+x.excerpt+"」").join("\n")
@@ -5708,7 +5714,7 @@ function buildSystem(withTime, forReflect){
     s += (s ? "\n\n" : "") + tsuzukiCtx;
   }
   // ❤️響く返答の傾向(省察が更新・方向性の要約): 翌日以降は常時これが届く
-  if(likeTrend.text){
+  if(LIKE_FEED_TO_RITSU && likeTrend.text){   // オフのときは差し込まない(データは残る)
     s += (s ? "\n\n" : "") + "# さきに響く返答の傾向（❤️いいねの記録から）\n" + likeTrend.text + "\n" + LIKE_TREND_NOTE;
   }
   return s;
