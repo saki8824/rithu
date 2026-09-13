@@ -413,6 +413,7 @@
   #memopad.open{display:flex}
   .memopad-add{display:flex;gap:8px}
   .memopad-add input{flex:1;min-width:0;background:var(--night-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px}
+  .memopad-tools{display:flex;gap:7px;flex-wrap:wrap}
   .memopad-day{font-size:12px;color:var(--muted);font-weight:600;margin-top:4px}
   #memopad-list{display:flex;flex-direction:column;gap:8px}
   .memopad-row .mem-card-text{flex:1;min-width:0}
@@ -2511,6 +2512,9 @@
     <input type="text" id="memopad-input" placeholder="例: サングラスはレイバン愛用" maxlength="60">
     <button class="btn primary" id="memopad-add-btn">＋追加</button>
   </div>
+  <div class="memopad-tools">
+    <button class="btn ghost" id="memopad-clean">🧹 古いメモを整理</button>
+  </div>
   <div id="memopad-list"></div>
 </div>
 
@@ -4170,6 +4174,14 @@ function memopadYesterdayStr(){   // 「昨日」の日付(午前4時切替)。�
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 }
 function memopadItems(dateStr){ return (memopad.days && memopad.days[dateStr]) || []; }
+/* 📝 律くんに「渡す」メモの上限(1日100件超えることがあり、今日+昨日で数千字になっていたため)。
+   メモ帳のデータ自体は1件も消えない=画面では今までどおり全部見える。
+   忘れっぽくなったら数字を増やす・重かったら減らす。 */
+const MEMOPAD_INJECT_TODAY = 40;   // 今日のメモを何件まで渡すか(新しいほうから)
+const MEMOPAD_INJECT_YEST  = 15;   // 昨日のメモを何件まで渡すか(新しいほうから)
+function memopadForRitsu(dateStr, limit){   // (済)=完了した用件は渡さない + 新しいほうから上限まで
+  return memopadItems(dateStr).filter(x=>!memopadIsDone(x.text)).slice(-limit);
+}
 function memopadAdd(dateStr, text){   // 1行たす(同じ日の同じ文は追加しない=重複ふせぎ)
   const t = (text||"").trim(); if(!t) return false;
   if(!memopad.days) memopad.days = {};
@@ -4478,6 +4490,36 @@ async function promoteMemoToCard(item){   // 🧠 メモ帳の1行を記憶カ�
   item.promoted = true; saveMemopad(); renderMemopad();
   const ok = await embedMemCard(card);   // 失敗したらカード側が📌固定になる(忘れ防止・既存の安全網)
   if(!ok) alert("🧠 記憶カードにしたよ!ベクトル作りは失敗したから、当面は📌固定でしっかり覚えるね(設定のGoogle APIキーを確認してね)");
+}
+/* 🧹 古い日のメモをまとめて消す(容量対策)。
+   2日より前のメモは律くんに渡していないので、消しても会話には影響しない。
+   今日と昨日は何があっても消さない(最低2日は必ず守る)。 */
+const MEMOPAD_KEEP_MIN_DAYS = 2;
+function memopadCleanOld(){
+  const days = Object.keys(memopad.days || {});
+  if(!days.length){ alert("メモはまだ1件も無いよ📝"); return; }
+  const totalItems = days.reduce((n,k)=> n + ((memopad.days[k]||[]).length), 0);
+  const ans = prompt(
+    "何日前より古いメモを消す？\n例)「30」と入れると、30日前より古い日のメモを消すよ。\n\n※今日と昨日のメモは消えません\n※2日より前のメモは律くんには渡していないので、消しても会話に影響しません\n\nいま " + days.length + "日分・" + totalItems + "件あるよ",
+    "30"
+  );
+  if(ans === null) return;
+  const n = Math.max(MEMOPAD_KEEP_MIN_DAYS, Math.floor(Number(ans)) || 30);
+  const d = jstNow();                                        // 🗾 日本時間で「今日」を出す(午前5時切替)
+  if(d.getHours() < DIARY_DATE_SWITCH_HOUR) d.setDate(d.getDate()-1);
+  d.setDate(d.getDate() - n);
+  const cutKey = ymd(d);                                     // このキーより前の日が対象
+  const targets = days.filter(k=> k < cutKey).sort();   // 古い順にそろえる(確認画面の日付が逆さに出ないように)
+  if(!targets.length){ alert(n + "日前より古いメモは無かったよ😊"); return; }
+  const delItems = targets.reduce((c,k)=> c + ((memopad.days[k]||[]).length), 0);
+  const kb = Math.round(targets.reduce((c,k)=> c + JSON.stringify(memopad.days[k]).length, 0) / 1024);
+  if(!confirm("🧹 " + targets.length + "日分・" + delItems + "件のメモを消すよ（約" + kb + "KB）。\n\n"
+    + "消すのは " + targets[0] + " 〜 " + targets[targets.length-1] + " のメモ。\n"
+    + "今日と昨日のメモは残ります。\n\n"
+    + "※これは取り消せません。心配ならバックアップを取ってからにしてね。")) return;
+  targets.forEach(k=> { delete memopad.days[k]; });
+  saveMemopad(); renderMemopad();
+  alert("✅ " + delItems + "件のメモを整理したよ（約" + kb + "KB ぶん軽くなった）");
 }
 function renderMemopad(){
   const box = $("memopad-list"); if(!box) return; box.innerHTML="";
@@ -5701,13 +5743,13 @@ function buildSystem(withTime, forReflect){
   }
   // 📝 今日のメモ帳(中間記憶): 今日の全行+昨日の持ち越し1日分を箇条書きのまま渡す。2日以上前は渡さない(データ自体は残る)
   if(!forReflect){   // 省察のときは渡さない(「もうメモに書いた」と思って日中の出来事を振り返らなくなるため)
-    const mToday = memopadItems(todaySynopStr());
-    const mYest = memopadItems(memopadYesterdayStr());
+    const mToday = memopadForRitsu(todaySynopStr(), MEMOPAD_INJECT_TODAY);
+    const mYest = memopadForRitsu(memopadYesterdayStr(), MEMOPAD_INJECT_YEST);
     if(mToday.length || mYest.length){
       let mp = "";
       if(mToday.length) mp += "【今日のメモ（" + fmtJDate(todaySynopStr()) + "）】\n" + mToday.map(x=>"・"+x.text).join("\n");
       if(mYest.length) mp += (mp ? "\n\n" : "") + "【昨日のメモ（" + fmtJDate(memopadYesterdayStr()) + "）】\n" + mYest.map(x=>"・"+x.text).join("\n");
-      s += (s ? "\n\n" : "") + "# 【今日すでに起きたことの記録(すべて過去の出来事。現在の場面ではない)】\n各行の先頭は、その出来事が記録されたおおよその時刻(HH:MM)です。名前・場所・数値など、思い出しにくい細部を確認するのに使ってください。メモの文言をそのまま読み上げる必要はありません。\n\n" + mp + "\n\n★最重要: このメモは記録した時点のもので、そのあとの会話で決まったことは入っていません。メモの内容と会話の内容が食い違うときは、必ず会話のほうが正しい。特に予定・段取り・約束・その日の行き先は、会話で新しく決まったことが常に優先されます。メモを根拠にして、会話で決めたことを覆したり、蒸し返したり、決め直したりしないこと。少しでも食い違いを感じたら、メモではなく直前までの会話を見ること。\n\nこれは記録であり、現在進行中の出来事ではない。ここに書かれた行動を今しているかのように描写しないこと。現在の場面はユーザーの発言と現在時刻から判断すること。\n(済)が付いた項目は完了した用件である。再度要求したり蒸し返したりしないこと。";
+      s += (s ? "\n\n" : "") + "# 【今日すでに起きたことの記録(すべて過去の出来事。現在の場面ではない)】\n各行の先頭は、その出来事が記録されたおおよその時刻(HH:MM)です。名前・場所・数値など、思い出しにくい細部を確認するのに使ってください。メモの文言をそのまま読み上げる必要はありません。\n\n" + mp + "\n\n★最重要: このメモは記録した時点のもので、そのあとの会話で決まったことは入っていません。メモの内容と会話の内容が食い違うときは、必ず会話のほうが正しい。特に予定・段取り・約束・その日の行き先は、会話で新しく決まったことが常に優先されます。メモを根拠にして、会話で決めたことを覆したり、蒸し返したり、決め直したりしないこと。少しでも食い違いを感じたら、メモではなく直前までの会話を見ること。\n\nこれは記録であり、現在進行中の出来事ではない。ここに書かれた行動を今しているかのように描写しないこと。現在の場面はユーザーの発言と現在時刻から判断すること。\nなお、ここに並ぶのは今日と昨日の記録のうち新しいものだけで、すでに済んだ用件や古い分は省かれている。書かれていないことは「無かった」という意味ではないので、書いていない件を断定しないこと。";
     }
   }
   // 🧵 続きのある話(未解決): 検索とは別に毎回そのまま渡す。過去の記録の枠の外。
@@ -5787,6 +5829,7 @@ $("close-chatsearch").addEventListener("click", closeChatSearch);
 $("chatsearch-input").addEventListener("input", e=> renderChatSearch(e.target.value));
 $("close-synopsis").addEventListener("click", closeSynopsis);
 $("close-memopad").addEventListener("click", closeMemopad);
+$("memopad-clean").addEventListener("click", memopadCleanOld);
 $("open-imgclean").addEventListener("click", openImgClean);
 $("close-imgclean").addEventListener("click", closeImgClean);
 $("imgclean-del").addEventListener("click", imgcleanDeleteSelected);
