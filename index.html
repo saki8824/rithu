@@ -514,22 +514,25 @@
   .reflect-card .mem-card-btn{font-size:14px;padding:2px 4px}
   .reflect-card .fav-preview{display:none}   /* 折りたたみ時のプレビューを隠す=スリム化のキモ */
   /* 記憶の編集ポップアップ */
-  #mem-edit{
+  /* 省察の編集ポップアップ(#ins-edit)も、この見た目をそのまま使い回す */
+  #mem-edit, #ins-edit{
     position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
     background:rgba(0,0,0,.55);padding:22px;
   }
-  #mem-edit.open{display:flex}
+  #mem-edit.open, #ins-edit.open{display:flex}
   .mem-edit-box{
     width:100%;max-width:440px;background:var(--night-2);border:1px solid var(--line);
     border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:11px;
     box-shadow:0 12px 40px rgba(0,0,0,.45);
   }
   .mem-edit-box h3{margin:0;font-size:16px;color:var(--text)}
-  #mem-edit-text{
+  #mem-edit-text, #ins-edit-text{
     width:100%;box-sizing:border-box;background:var(--night);border:1px solid var(--line);
     border-radius:12px;color:var(--text);font-family:inherit;font-size:14px;line-height:1.6;
     padding:12px;min-height:90px;resize:vertical;outline:none;
   }
+  /* 省察は文章が長いので、記憶カードより高め。画面の4割くらい・ただし最低240pxは確保 */
+  #ins-edit-text{min-height:240px;min-height:max(240px,40vh)}
   .mem-edit-label{font-size:12px;color:var(--muted);margin-top:2px}
   .mem-edit-cats{display:flex;flex-wrap:wrap;gap:7px}
   .mem-edit-actions{display:flex;gap:9px;margin-top:6px}
@@ -2455,6 +2458,19 @@
   </div>
 </div>
 
+<!-- 省察(気づき)の編集ポップアップ。記憶カードと同じ見た目・入力欄は高め -->
+<div id="ins-edit">
+  <div class="mem-edit-box">
+    <h3>気づきを編集</h3>
+    <textarea id="ins-edit-text" placeholder="律くんの気づき"></textarea>
+    <div class="mem-edit-label" id="ins-edit-info"></div>
+    <div class="mem-edit-actions">
+      <button class="btn ghost" id="ins-edit-cancel">キャンセル</button>
+      <button class="btn primary" id="ins-edit-save">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 絶対(システムプロンプト) ===== -->
 <div id="vault">
   <div class="set-head">
@@ -3263,11 +3279,23 @@ async function renderReflectList(toTop){
   });
   restoreY();   // 📍 全部並べ終わってから、さっき見ていた場所へ戻す
 }
-async function editInsight(card){   // ✏️編集: 直した1件だけベクトルも作り直す
-  const nv = prompt("気づきを編集", card.text);
-  if(nv===null) return;
-  const t = nv.trim();
-  if(!t || t===card.text) return;
+/* ✏️省察の編集: 小さなprompt窓だと長い気づきが直しづらいので、
+   記憶カードと同じ広いポップアップにした(保存の中身は今までと同じ)。 */
+let insEditCard = null;
+function editInsight(card){   // 入口(✏️ボタンから呼ばれる)
+  insEditCard = card;
+  $("ins-edit-text").value = card.text || "";
+  const info = $("ins-edit-info");
+  if(info) info.textContent = "[" + (RAGLABEL[card.label]||"気づき") + "]" + (card.day ? " " + card.day : "") + "　保存すると、この1件だけ検索用の指紋も作り直すよ";
+  $("ins-edit").classList.add("open");
+  setTimeout(()=>{ try{ $("ins-edit-text").focus(); }catch(e){} }, 60);
+}
+function closeInsEdit(){ $("ins-edit").classList.remove("open"); insEditCard = null; }
+async function saveInsEdit(){
+  const card = insEditCard;
+  const t = ($("ins-edit-text").value || "").trim();
+  closeInsEdit();
+  if(!card || !t || t===card.text) return;
   card.text = t;
   const emb = await embedText(t);
   card.vec = emb?emb.vec:null; card.model = emb?emb.model:""; card.dim = emb?emb.dim:0;
@@ -5924,6 +5952,9 @@ $("mem-filters").addEventListener("click", e=>{ const b=e.target.closest(".mem-c
 $("mem-edit-cats").addEventListener("click", e=>{ const b=e.target.closest(".mem-chip"); if(!b) return; memEditCat=b.dataset.cat; document.querySelectorAll("#mem-edit-cats .mem-chip").forEach(c=>c.classList.toggle("on",c===b)); });
 $("mem-edit-cancel").addEventListener("click", closeMemEdit);
 $("mem-edit-save").addEventListener("click", saveMemEdit);
+$("ins-edit-cancel").addEventListener("click", closeInsEdit);
+$("ins-edit-save").addEventListener("click", saveInsEdit);
+$("ins-edit").addEventListener("click", e=>{ if(e.target === $("ins-edit")) closeInsEdit(); });   // 背景をタップしたら閉じる
 $("mem-edit").addEventListener("click", e=>{ if(e.target.id==="mem-edit") closeMemEdit(); });
 $("export-backup").addEventListener("click", exportBackup);
 $("import-backup-btn").addEventListener("click", ()=> $("import-file").click());
