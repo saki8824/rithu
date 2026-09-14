@@ -5001,6 +5001,12 @@ function attachActions(wrap, bub, text, role, m){
   const memBtn = el("button","msg-act-btn","🧠"); memBtn.title = "記憶に追加";
   memBtn.addEventListener("click", e=>{ e.stopPropagation(); addMessageToMemory(text); });
   bar.appendChild(memBtn);
+  // 🔍 この返事のときに何を思い出したか(律くんの返答だけ・見るだけで何も変わらない)
+  if(role==="assistant" && m){
+    const recBtn = el("button","msg-act-btn","🔍"); recBtn.title = "思い出したもの";
+    recBtn.addEventListener("click", e=>{ e.stopPropagation(); showRecall(m); });
+    bar.appendChild(recBtn);
+  }
   // 律くんのセリフだけ「🔖 お気に入り」を出す（記憶とは別もの）
   if(role==="assistant" && m){
     const favBtn = el("button","msg-act-btn", m.faved ? "⭐" : "🔖"); favBtn.title = "お気に入り";
@@ -5157,7 +5163,8 @@ async function sendMessage(){
 function finalizeReply(textOut, thinking, usage, lm){
   const mem = extractMemories(textOut || "");
   const sch = extractSchedule(mem.text);
-  const m = {role:"assistant", text: sch.text || "……", thinking: thinking||null, ts:Date.now(), usage: usage||null, line: lm};
+  const m = {role:"assistant", text: sch.text || "……", thinking: thinking||null, ts:Date.now(), usage: usage||null, line: lm, recall: pendingRecall};
+  pendingRecall = null;   // 1回ぶん使い切り(次の返事に持ち越さない)
   history.push(m); renderMsg(m); refreshReadMarks(); refreshEditButtons(); scrollEnd(); persistHistory();
   if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
   if(sch.added.length){ chat.appendChild(el("div","sysnote","📅 予定を追加したよ: "+sch.added.join(" / "))); scrollEnd(); }
@@ -5189,7 +5196,9 @@ async function generateReply(text, lm){
     ayRecall  = qEmb ? await ragAySearch(qEmb) : [];       // 過去の日々の記録(ステップ4で律くんに渡す・今はまだ渡さない)
     await refreshTsuzukiCtx();                        // 続きのある話(未解決)を毎回そのまま渡すぶんを用意
     await refreshWeather();                            // 🌤️ 名古屋の今日の天気を用意(30分に1回だけ取り直す)
+    lastAyShown = [];
     const msgs = buildCachedMsgs(lm);
+    pendingRecall = buildRecallLog();   // 🔍 この返事で「何が届いたか」を記録(渡す内容は変わらない)
     const sysStable = buildSystem(false);
     // システムは[キャッシュされる本体]+[LINEモード中だけの文体指示(キャッシュ外)]の2ブロック。
     // 後ろに足すだけなので、LINEモードを切り替えてもキャッシュは壊れない。
@@ -5476,6 +5485,51 @@ function chatDayStr(ts){   // その発言が「どの日の会話か」(午前4
   if(d.getHours() < DIARY_DATE_SWITCH_HOUR) d.setDate(d.getDate()-1);
   return (d.getMonth()+1)+"月"+d.getDate()+"日("+wdayJp(d)+")";
 }
+/* 🔍 思い出しログ: 「その返事のときに、何が律くんに届いたか」を記録して、あとから見られるようにする。
+   律くんに渡す内容は一切変えない(見せるだけ)。保存するのは id と 似てる度(0〜100)だけ＝1回あたり約100バイト。
+   本文は見るときに倉庫から引くので、二重に持たない。 */
+let lastAyShown = [];       // buildCachedMsgsが「実際に渡したあゆみ」を置く場所
+let pendingRecall = null;   // 次に届く返事に付ける記録
+function buildRecallLog(){
+  const pack = (arr, get)=> (arr||[]).map(r=>{ const o=get(r); return {i:(o&&o.id)||"", s:Math.round((r.sim||0)*100)}; }).filter(x=>x.i);
+  return {
+    ins: pack(ragRecall, r=>r.card),
+    mem: pack(memRecall, r=>r.card),
+    ay:  pack(lastAyShown, r=>r.rec)
+  };
+}
+function recallCut(t){ t=(t||"").replace(/\s+/g," ").trim(); return t.length>60 ? t.slice(0,60)+"…" : t; }
+async function showRecall(m){
+  const r = m && m.recall;
+  if(!r){ alert("🔍 この返事には記録がないよ。\n(思い出しログを作る前の返事だね)"); return; }
+  const n = (r.ins||[]).length + (r.mem||[]).length + (r.ay||[]).length;
+  if(!n){
+    alert("🔍 この返事では、何も思い出さなかったよ。\n\n・関係する気づき・記憶カード・あゆみが見つからなかった\n・または意味検索（Google）が動いていない\nのどちらかだよ。");
+    return;
+  }
+  let out = "🔍 この返事で思い出したもの（" + n + "件）\n";
+  try{
+    if((r.ins||[]).length){
+      const all = await ragAll();
+      out += "\n💭 心の奥の気づき\n";
+      r.ins.forEach(x=>{ const c = all.filter(y=>y.id===x.i)[0];
+        out += "・[" + (c ? (RAGLABEL[c.label]||"気づき") : "?") + "] " + (c ? recallCut(c.text) : "(削除済み)") + "  " + (x.s/100).toFixed(2) + "\n"; });
+    }
+    if((r.mem||[]).length){
+      out += "\n🧠 記憶カード\n";
+      r.mem.forEach(x=>{ const c = (settings.mem||[]).filter(y=>y.id===x.i)[0];
+        out += "・" + (c ? recallCut(c.text) : "(削除済み)") + "  " + (x.s/100).toFixed(2) + "\n"; });
+    }
+    if((r.ay||[]).length){
+      const ayl = await ragAyAll();
+      out += "\n🗂️ ふたりのあゆみ\n";
+      r.ay.forEach(x=>{ const c = ayl.filter(y=>y.id===x.i)[0];
+        out += "・【" + (c ? (c.label||"日付不明") : "?") + "】" + (c ? recallCut(c.text) : "(削除済み)") + "  " + (x.s/100).toFixed(2) + "\n"; });
+    }
+  }catch(e){ out += "\n(記録を読むときにエラーが出たよ: " + e.message + ")"; }
+  out += "\n※右の数字は「似てる度」(1.00に近いほど今の話に近い)";
+  alert(out);
+}
 function buildCachedMsgs(lineOn){
   // 日付が変わる境目に「（※ここから◯月◯日の会話）」の印を入れる。
   // 過去の印は不変なのでキャッシュは壊れない。律くんの日付感覚のズレ防止。
@@ -5509,12 +5563,15 @@ function buildCachedMsgs(lineOn){
           const ds = (c.day && /^\d{4}-\d{2}-\d{2}$/.test(c.day)) ? mdw(c.day) : (c.ts ? mdw(ymd(jstDate(c.ts))) : "");
           return "・["+(RAGLABEL[c.label]||"気づき")+"]"+(ds ? "["+ds+"]" : "")+" "+c.text;
         }).join("\n")
-      + "\nこれはあなた(律)自身が過去の省察で至った気づきです。各行の2つめの[ ]は、その気づきを書き留めた日です。いつの話かは必ずこの日付で判断し、自分の感覚で「何日前」と決めつけないこと。関係がありそうなときだけ、文言をそのまま読み上げず、自然に会話へ活かしてください。無理に触れなくて構いません。";
+      // ⚠️2026-09-14 変更前の末尾:「関係がありそうなときだけ、文言をそのまま読み上げず、自然に会話へ活かしてください。無理に触れなくて構いません。」
+      //    →「触れなくてよい」と許可していたため省察がほとんど活かされていなかった。戻したくなったら上の一文に差し替える。
+      + "\nこれはあなた(律)自身が過去の省察で至った気づきです。各行の2つめの[ ]は、その気づきを書き留めた日です。いつの話かは必ずこの日付で判断し、自分の感覚で「何日前」と決めつけないこと。いまの話題に関係するものがあれば、そこで自分が至った理解を踏まえて応じること(あなたはもうそれを分かっている人として振る舞う)。ただし、文言をそのまま読み上げたり「前にも思ったが」と前置きしたりはせず、いまの自分の考えとして自然ににじませること。まったく関係のない話題のときは、無理に持ち出さないこと。";
   }
   if(memRecall.length){
     note += "\n\n# これまでの記憶（今の話に関係しそうなもの）\n"
       + memRecall.map(r=>"・【記憶カード】"+r.card.text).join("\n")
-      + "\nこれはさきについての記憶です。関係がありそうなときだけ自然に会話へ活かし、文言をそのまま読み上げないでください。無理に触れなくて構いません。";
+      // ⚠️2026-09-14 変更前の末尾:「関係がありそうなときだけ自然に会話へ活かし、文言をそのまま読み上げないでください。無理に触れなくて構いません。」
+      + "\nこれはさきについての記憶です。いまの話題に関係するものは、あなたがすでに知っていることとして踏まえて応じること。文言をそのまま読み上げたり、わざわざ「覚えているよ」と確認したりはせず、知っている前提で自然に振る舞うこと。まったく関係のない話題のときは、無理に持ち出さないこと。";
   }
   // 🗂️ 過去の日々の記録(あゆみRAG): 今の話題と意味が近い日/週のまとめを、日付付きで添える(無ければ何も足さない)
   // ♻️ すでにシステム側の「ふたりのあゆみ」で毎回持っている記録は、ここで二重に渡さない
@@ -5522,6 +5579,7 @@ function buildCachedMsgs(lineOn){
   const ayCarriedIds = {};
   ayumiCarried().forEach(e=>{ if(e && e.id) ayCarriedIds[e.id] = true; });
   const ayShow = ayRecall.filter(r=> !(r.rec && r.rec.id && ayCarriedIds[r.rec.id]));
+  lastAyShown = ayShow;   // 🔍思い出しログ用: 重複を外したあとの「本当に渡したぶん」を覚えておく
   if(ayShow.length){
     note += "\n\n# 過去の日々の記録（ふたりのあゆみから思い出したもの）\n"
       + ayShow.map(r=>{
