@@ -3055,18 +3055,31 @@ async function ragAyClear(){                     // あゆみ全消し(バック
 /* ---------- ベクトル作り(Google Embedding・失敗しても気づきは守る) ---------- */
 const EMBED_MODEL = "gemini-embedding-001";
 const EMBED_DIM = 768;   // 3072を768に絞って保存(軽い・賢さほぼ同じ)
+/* 🔔 直近の「指紋づくり」失敗の理由。会話は止めないので黙って失敗するが、
+   理由をここに覚えておいて、アラートを出すときに一緒に見せる。
+   (2026-09-14: Googleキーが空のまま何週間も気づけず、律が何も思い出せなくなる事故が起きたため) */
+let lastEmbedError = "";
+function embedErrorNote(){ return lastEmbedError ? "\n\n【理由】" + lastEmbedError : ""; }
 async function embedText(text){
-  if(!settings.googleKey || !text) return null;
+  if(!settings.googleKey){ lastEmbedError = "設定に Google APIキー が入っていません"; return null; }
+  if(!text){ lastEmbedError = "文章が空でした"; return null; }
   try{
     const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+EMBED_MODEL+":embedContent?key="+encodeURIComponent(settings.googleKey),{
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ model:"models/"+EMBED_MODEL, content:{parts:[{text}]}, outputDimensionality: EMBED_DIM })
     });
+    if(!res.ok){
+      let detail = "";
+      try{ const ed = await res.json(); if(ed && ed.error && ed.error.message) detail = ed.error.message; }catch(e2){}
+      lastEmbedError = "Googleがエラーを返したよ (HTTP " + res.status + ")" + (detail ? "\n" + detail : "");
+      return null;
+    }
     const data = await res.json();
     const v = data && data.embedding && data.embedding.values;
-    if(Array.isArray(v) && v.length) return {vec:v, model:EMBED_MODEL, dim:v.length};
-  }catch(e){}
-  return null;   // 失敗は静かに(気づき本文は無事)
+    if(Array.isArray(v) && v.length){ lastEmbedError = ""; return {vec:v, model:EMBED_MODEL, dim:v.length}; }
+    lastEmbedError = "Googleの返事に指紋(ベクトル)が入っていませんでした";
+  }catch(e){ lastEmbedError = "通信に失敗したよ: " + ((e && e.message) ? e.message : "原因不明"); }
+  return null;   // 失敗しても会話は止めない(気づき本文は無事)
 }
 let backfillBusy = false;
 async function ragBackfill(){   // ベクトル無し・型ちがいの気づきに、裏で静かにベクトルを付ける
@@ -3124,7 +3137,7 @@ async function ragAyBackfill(){   // 裏で静かにベクトルを付ける(棚
 }
 
 /* ---------- ベクトル検索(意味の近さで気づきを思い出す) ---------- */
-const RAG_MIN_SIM = 0.6;   // 気づきのしきい値: これ未満は「意味が遠い」ので出さない(0.5→0.6=なんとなく似てるだけのハズレを減らす)
+const RAG_MIN_SIM = 0.5;   // 気づきのしきい値: これ未満は「意味が遠い」ので出さない(2026-09-14: 律が思い出せない事故が起きたため0.6→0.5に戻した)
 const MEM_MIN_SIM = 0.5;   // 記憶カードはゆるいまま(大事な事実を取りこぼさないための据え置き)
 const RAG_TOP_K = 4;       // 思い出す最大件数(3〜5件の範囲で)
 function cosSim(a, b){     // 似てる度(コサイン類似度)。ただの算数・無料
@@ -3170,7 +3183,7 @@ function ragQueryText(text){
   return parts.join("\n");
 }
 /* 🗂️ 長期記憶(あゆみRAG)ステップ3: 過去の日々を意味で探す */
-const AYUMI_MIN_SIM = 0.6;   // しきい値(ハズレが多ければ上げる・思い出さなすぎたら下げる。0.5→0.6=気が散るのを減らす)
+const AYUMI_MIN_SIM = 0.5;   // しきい値(ハズレが多ければ上げる・思い出さなすぎたら下げる。2026-09-14: 思い出せない事故のため0.6→0.5に戻した)
 const AYUMI_TOP_K = 3;       // 思い出す最大件数
 const AYUMI_EXCERPT = 400;   // 律くんに渡す1件あたりの最大文字数(長い記録は頭から切り詰め=コスト暴走ふせぎ)
 let ayRecall = [];           // 直近の送信で思い出した過去の日々(ステップ4で律くんに添える)
@@ -3769,7 +3782,7 @@ async function toggleMemPin(card){   // 📌固定⇔通常を切り替える。
   if(!card.pinned && !(card.embedding && card.embedding.vec)){
     const ok = await embedMemCard(card);
     renderMemList();   // 失敗ならpinned:trueに戻ってるので見た目も戻す
-    if(!ok) alert("⚠️ このカードのベクトル(RAG用)を作れなかったよ。設定のGoogle APIキーやネットを確認してね。\n当面このカードは『📌固定』としてそのまま律くんに伝え続けるね(忘れ防止)。");
+    if(!ok) alert("⚠️ このカードのベクトル(RAG用)を作れなかったよ。\n当面このカードは『📌固定』としてそのまま律くんに伝え続けるね(忘れ防止)。" + embedErrorNote());
   }
 }
 function renderMemList(){
@@ -3830,7 +3843,7 @@ async function saveMemEdit(){
   if(editedCard && textChanged && !editedCard.pinned){   // 通常カードの本文を変えた → ベクトルを作り直す(裏で)
     const ok = await embedMemCard(editedCard);
     renderMemList();
-    if(!ok) alert("⚠️ 編集したカードのベクトルを作り直せなかったよ。当面『📌固定』としてそのまま伝えるね。設定のGoogle APIキーを確認してね。");
+    if(!ok) alert("⚠️ 編集したカードのベクトルを作り直せなかったよ。当面『📌固定』としてそのまま伝えるね。" + embedErrorNote());
   }
 }
 // セリフの「🧠記憶に追加」から呼ぶ：本文を入れた状態で編集ポップアップを開く
@@ -4489,7 +4502,7 @@ async function promoteMemoToCard(item){   // 🧠 メモ帳の1行を記憶カ�
   settings.mem.push(card); saveMem();
   item.promoted = true; saveMemopad(); renderMemopad();
   const ok = await embedMemCard(card);   // 失敗したらカード側が📌固定になる(忘れ防止・既存の安全網)
-  if(!ok) alert("🧠 記憶カードにしたよ!ベクトル作りは失敗したから、当面は📌固定でしっかり覚えるね(設定のGoogle APIキーを確認してね)");
+  if(!ok) alert("🧠 記憶カードにしたよ!ベクトル作りは失敗したから、当面は📌固定でしっかり覚えるね" + embedErrorNote());
 }
 /* 🧹 古い日のメモをまとめて消す(容量対策)。
    2日より前のメモは律くんに渡していないので、消しても会話には影響しない。
