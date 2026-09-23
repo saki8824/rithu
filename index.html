@@ -5227,10 +5227,13 @@ async function generateReply(text, lm){
     lastAyShown = [];
     const msgs = buildCachedMsgs(lm);
     pendingRecall = buildRecallLog();   // 🔍 この返事で「何が届いたか」を記録(渡す内容は変わらない)
-    const sysStable = buildSystem(false);
-    // システムは[キャッシュされる本体]+[LINEモード中だけの文体指示(キャッシュ外)]の2ブロック。
-    // 後ろに足すだけなので、LINEモードを切り替えてもキャッシュは壊れない。
-    const sysBlocks = sysStable ? [{type:"text", text: sysStable, cache_control:{type:"ephemeral", ttl:"1h"}}] : [];
+    const sysStable = buildSystem(false, false, true);   // 🔖 第3引数=true: しおりの目印を入れてもらう
+    // システムは[めったに変わらない荷物🔖]+[よく変わる荷物🔖]+[LINEモード中だけの文体指示(キャッシュ外)]。
+    // 目印で割るだけなので、つなげた文章は今までとまったく同じ=律くんに届く内容は1文字も変わらない。
+    // あらすじ・メモ帳が10往復ごとに更新されても、前半の重い荷物はキャッシュに残るので作り直しが小さくて済む。
+    const sysParts = sysStable ? sysStable.split(SYS_SPLIT_MARK) : [];
+    const sysBlocks = [];
+    sysParts.forEach(part=>{ if(part) sysBlocks.push({type:"text", text: part, cache_control:{type:"ephemeral", ttl:"1h"}}); });
     if(lm) sysBlocks.push({type:"text", text: LINE_MODE_RULE});
     const body = {
       model, max_tokens: settings.think ? (Number(settings.budget)+4096) : 4096,
@@ -5505,7 +5508,7 @@ function asBlocks(content){
 }
 function withCache(content){
   const b = asBlocks(content);
-  b[b.length-1] = Object.assign({}, b[b.length-1], {cache_control:{type:"ephemeral"}});
+  b[b.length-1] = Object.assign({}, b[b.length-1], {cache_control:{type:"ephemeral", ttl:"1h"}});
   return b;
 }
 function chatDayStr(ts){   // その発言が「どの日の会話か」(午前4時切替・日記と共通ルール)
@@ -5778,7 +5781,12 @@ function cycleContext(){
 // forReflect=true(省察のときだけ)は「今日のあらすじ」「今日のメモ帳」を渡さない。
 // 省察は今日の会話そのものを全部読むので要約はいらず、むしろ「もうメモに書いた=省察では書かなくていい」と
 // 誤解させて日中の出来事が抜け落ちる原因になっていたため。ふだんのチャットは今までどおり(引数なし=false)。
-function buildSystem(withTime, forReflect){
+// 🔖 しおりを挟む位置の目印。buildSystem の第3引数に true を渡したときだけ差し込まれる。
+//    目印より前=めったに変わらない荷物(人格・記憶カード・日付早見表・あゆみ・日記)
+//    目印より後=よく変わる荷物(今日のあらすじ・今日のメモ帳・続きのある話)
+//    目印を取りのぞいて前後をつなげると、今までとまったく同じ文章になる(律くんに届く内容は1文字も変わらない)。
+const SYS_SPLIT_MARK = "<<<RITSU_SYS_SPLIT>>>";
+function buildSystem(withTime, forReflect, wantSplit){
   withTime = withTime!==false;
   let s = settings.system || "";
   const prof = [];
@@ -5834,6 +5842,8 @@ function buildSystem(withTime, forReflect){
       pastParts.join("\n\n") +
       "\n\n【過去の記録ここまで】";
   }
+  // 🔖 ここから下は「よく変わる荷物」。ここにしおりを1枚はさむと、上の重い荷物はキャッシュに残せる
+  if(wantSplit) s += SYS_SPLIT_MARK;
   if(settings.synopsis && !forReflect){   // 省察のときは渡さない(会話そのものを読むので要約は不要)
     const syn = synopsisContext();
     if(syn){
