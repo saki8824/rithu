@@ -5230,7 +5230,7 @@ async function generateReply(text, lm){
     const sysStable = buildSystem(false);
     // システムは[キャッシュされる本体]+[LINEモード中だけの文体指示(キャッシュ外)]の2ブロック。
     // 後ろに足すだけなので、LINEモードを切り替えてもキャッシュは壊れない。
-    const sysBlocks = sysStable ? [{type:"text", text: sysStable, cache_control:{type:"ephemeral"}}] : [];
+    const sysBlocks = sysStable ? [{type:"text", text: sysStable, cache_control:{type:"ephemeral", ttl:"1h"}}] : [];
     if(lm) sysBlocks.push({type:"text", text: LINE_MODE_RULE});
     const body = {
       model, max_tokens: settings.think ? (Number(settings.budget)+4096) : 4096,
