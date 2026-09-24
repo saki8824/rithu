@@ -3410,7 +3410,7 @@ async function doReflection(dayKey, base){
     const re = /【(さきのこと|二人のこと|続きのある話)】([\s\S]*?)(?=【(?:さきのこと|二人のこと|続きのある話|解決した話題)】|$)/g;
     let mt;
     while((mt = re.exec(out)) !== null && found.length < 9){
-      const t = mt[2].replace(/\s+/g," ").trim();
+      const t = stripRememberTags(mt[2]).replace(/\s+/g," ").trim();   // 🏷️ 念のため<remember>の記号だけ外す(中身は残す)
       if(t && t!=="(なし)" && t!=="なし") found.push({label: map[mt[1]], text: t});
     }
     // 自動解決: 【解決した話題】の番号を読み取り、そのカードだけ解決済みへ(迷ったら挙げない指示ずみ)
@@ -4957,7 +4957,7 @@ async function writeDiary(){
     if(data.error){ alert("日記の作成に失敗したよ: " + (data.error.message||data.error.type)); }
     else{
       let txt=""; (data.content||[]).forEach(b=>{ if(b.type==="text") txt += b.text||""; });
-      txt = txt.trim();
+      txt = stripRememberTags(txt).trim();   // 🏷️ <remember>の記号だけ外す。律くんが覚えておきたかった中身は、日記の文章として残す
       if(txt){
         diary.push({id:uid(), ts:Date.now(), d:diaryDayStr(), text:txt});
         saveDiary(); renderDiaryList();
@@ -5812,7 +5812,7 @@ function buildSystem(withTime, forReflect, wantSplit){
     const sc = scheduleContext();
     if(sc) s += "\n\n# 今後の予定\n" + sc;
   }
-  if(settings.selfMemory){
+  if(settings.selfMemory && !forReflect){   // 🏷️ 省察には渡さない(省察には<remember>を取り出す係がいないので、記号が省察カードに残ってしまっていた)
     const freqRule = {
       high:  "相手について長く覚えておきたいことが出てきたら、<remember>覚えておく内容</remember> という形でそっと残してください。乱用せず簡潔に。",
       normal:"本当に長く覚えておきたい大切なこと(約束・関係の変化・強い気持ちなど)が出てきたときだけ、<remember>覚えておく内容</remember> という形でそっと残してください。目安は数回の会話に1回程度。日常のささいな事実は残さないこと。",
@@ -5870,6 +5870,34 @@ function buildSystem(withTime, forReflect, wantSplit){
     s += (s ? "\n\n" : "") + "# さきに響く返答の傾向（❤️いいねの記録から）\n" + likeTrend.text + "\n" + LIKE_TREND_NOTE;
   }
   return s;
+}
+// 🏷️ 省察・日記にまぎれこんだ <remember> の「記号だけ」を外す(中の文章は1文字も消さない)。
+//    ふつうの返事は extractMemories が記号を取り出して記憶カードにするが、省察・日記にはその係がいないため、
+//    記号がそのまま残っていた。律くんが「覚えておきたい」と書いた中身は、ふつうの文章として残す(さきの希望)。
+function stripRememberTags(text){
+  if(typeof text!=="string" || text.indexOf("remember>")===-1) return text;
+  return text.replace(/<\/?remember>/g, "").replace(/\n{3,}/g, "\n\n").trim();
+}
+// 🧹 すでに保存ずみの日記・省察カードから、<remember> の記号だけを外すお掃除(文章もベクトルもそのまま)。
+//    記号が無ければ何もしないので、何回走っても安全(古いバックアップを戻したときも、次に開いたとき自動できれいになる)。
+async function cleanRememberTags(){
+  try{
+    let diaryChanged = false;
+    diary.forEach(d=>{
+      if(d && typeof d.text==="string" && d.text.indexOf("remember>")!==-1){
+        const t = stripRememberTags(d.text);
+        if(t){ d.text = t; diaryChanged = true; }   // 万一からっぽになるなら、さわらない
+      }
+    });
+    if(diaryChanged) saveDiary();
+    const all = await ragAll();
+    for(const c of all){
+      if(c && typeof c.text==="string" && c.text.indexOf("remember>")!==-1){
+        const t = stripRememberTags(c.text).replace(/\s+/g," ").trim();   // 省察カードは1行の文章なので、改行もならす
+        if(t){ c.text = t; await ragAdd(c); }   // ベクトル(vec)などほかの中身はそのまま上書き保存
+      }
+    }
+  }catch(e){ /* お掃除に失敗しても、アプリは止めない */ }
 }
 function extractMemories(text){
   if(!settings.selfMemory) return {text, remembered:false};
@@ -6212,6 +6240,7 @@ ensureSynopsisToday();
   initLock();
   scheduleProactive();
   maybeCatchupSynopsis();   // 置き去りの会話(朝の分など)があれば、あらすじを裏で追いつかせる
+  setTimeout(cleanRememberTags, 3000);   // 🧹 日記・省察カードに残った<remember>の記号だけを、起動の3秒後にそっと外す(記号が無ければ何もしない)
 })();
 </script>
 </body>
