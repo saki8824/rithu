@@ -515,24 +515,28 @@
   .reflect-card .fav-preview{display:none}   /* 折りたたみ時のプレビューを隠す=スリム化のキモ */
   /* 記憶の編集ポップアップ */
   /* 省察の編集ポップアップ(#ins-edit)も、この見た目をそのまま使い回す */
-  #mem-edit, #ins-edit{
+  /* あゆみの編集ポップアップ(#ay-edit)も同じ見た目(9/29〜) */
+  #mem-edit, #ins-edit, #ay-edit{
     position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
     background:rgba(0,0,0,.55);padding:22px;
   }
-  #mem-edit.open, #ins-edit.open{display:flex}
+  #mem-edit.open, #ins-edit.open, #ay-edit.open{display:flex}
   .mem-edit-box{
     width:100%;max-width:440px;background:var(--night-2);border:1px solid var(--line);
     border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:11px;
     box-shadow:0 12px 40px rgba(0,0,0,.45);
   }
   .mem-edit-box h3{margin:0;font-size:16px;color:var(--text)}
-  #mem-edit-text, #ins-edit-text{
+  #mem-edit-text, #ins-edit-text, #ay-edit-text{
     width:100%;box-sizing:border-box;background:var(--night);border:1px solid var(--line);
     border-radius:12px;color:var(--text);font-family:inherit;font-size:14px;line-height:1.6;
     padding:12px;min-height:90px;resize:vertical;outline:none;
   }
-  /* 省察は文章が長いので、記憶カードより高め。画面の4割くらい・ただし最低240pxは確保 */
-  #ins-edit-text{min-height:240px;min-height:max(240px,40vh)}
+  /* 省察・あゆみは文章が長いので、記憶カードより高め。画面の4割くらい・ただし最低240pxは確保 */
+  #ins-edit-text, #ay-edit-text{min-height:240px;min-height:max(240px,40vh)}
+  /* ✏️ あゆみ: 「さきが直した」の小さな印 と 週に綴じた日のページの開け閉めボタン */
+  .ay-edited{font-size:11px;color:var(--muted)}
+  .ay-bound-toggle{margin-top:6px}
   .mem-edit-label{font-size:12px;color:var(--muted);margin-top:2px}
   .mem-edit-cats{display:flex;flex-wrap:wrap;gap:7px}
   .mem-edit-actions{display:flex;gap:9px;margin-top:6px}
@@ -2471,6 +2475,19 @@
   </div>
 </div>
 
+<!-- ✏️ あゆみ(1日の記録・週のまとめ)の編集ポップアップ。省察と同じ見た目(9/29〜) -->
+<div id="ay-edit">
+  <div class="mem-edit-box">
+    <h3>あゆみを直す</h3>
+    <textarea id="ay-edit-text" placeholder="この日の記録"></textarea>
+    <div class="mem-edit-label" id="ay-edit-info"></div>
+    <div class="mem-edit-actions">
+      <button class="btn ghost" id="ay-edit-cancel">キャンセル</button>
+      <button class="btn primary" id="ay-edit-save">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 絶対(システムプロンプト) ===== -->
 <div id="vault">
   <div class="set-head">
@@ -2587,8 +2604,10 @@
     <h2>ふたりのあゆみ</h2>
     <button class="set-close" id="close-ayumi" aria-label="閉じる">×</button>
   </div>
-  <div class="hint">律くんが持ち歩いている、ふたりの日々の記録だよ📖 日付が変わると、その日のあらすじが1ページずつここにたまって、7日ぶんたまると1週間のまとめに綴じ直されるの。ここは読み返すためのアルバムだよ（律くんの記憶そのものだから、編集や削除はできないようにしてあるよ）。</div>
+  <div class="hint">律くんが持ち歩いている、ふたりの日々の記録だよ📖 日付が変わると、その日のあらすじが1ページずつここにたまって、7日ぶんたまると1週間のまとめに綴じ直されるの。書きもれや、まちがいがあったら ✏️ で直せるよ。直すと、律くんが思い出すときの記憶(検索の棚)も一緒に直るよ（律くんの記憶そのものだから、削除はできないようにしてあるよ）。</div>
   <div id="ayumi-list"></div>
+  <button class="btn ghost ay-bound-toggle" id="ayumi-bound-toggle">▸ 📚 週にまとめた日のページ</button>
+  <div id="ayumi-bound" style="display:none;flex-direction:column"></div>
 </div>
 
 <script>
@@ -3135,7 +3154,7 @@ async function ragAyBackfill(){   // 裏で静かにベクトルを付ける(棚
       if(r && r.vec && r.model===EMBED_MODEL && r.dim===EMBED_DIM) continue;
       const emb = await embedText(e.text);
       if(!emb){ ok = false; break; }   // 失敗したら今回はここまで(また次の機会に)
-      const rec = { id:e.id, text:e.text, kind:e.kind, label:e.label||"", ts:e.ts||Date.now(),
+      const rec = { id:e.id, text:e.text, kind:e.kind, label:e.label||"", ts:e.ts||Date.now(), edited:e.edited||0,   // edited=さきが直した印を落とさない
         vec:emb.vec, model:emb.model, dim:emb.dim };
       await ragAyAdd(rec); have[e.id] = rec;   // haveも更新(下の②で二度打ちしない)
     }
@@ -3905,7 +3924,7 @@ async function exportBackup(){
   try{
     // 🗂️ 長期記憶の棚(あゆみRAG)も「文章+種類+日付」だけ同梱(ベクトルは復元後に自動で作り直る)
     const ay = await ragAyAll();
-    out.ayumiVault = ay.map(r=>({id:r.id, text:r.text, kind:r.kind, label:r.label, ts:r.ts}));
+    out.ayumiVault = ay.map(r=>({id:r.id, text:r.text, kind:r.kind, label:r.label, ts:r.ts, edited:r.edited||0}));   // edited=さきが✏️で直した印(9/29〜)
   }catch(e){}
   try{
     out.threadsBig = await thAll();   // 大倉庫のチャット本文もまるごと同梱
@@ -3960,7 +3979,7 @@ function importBackup(file){
         // 🗂️ 長期記憶の棚入りバックアップ → 棚を置き換え。ベクトルは空で戻す(あゆみ画面を開くと自動で作り直る)
         await ragAyClear();
         for(const v of obj.ayumiVault){
-          if(v && v.text) await ragAyAdd({id:v.id||uid(), text:v.text, kind:v.kind||"day", label:v.label||"", ts:v.ts||Date.now(), vec:null, model:"", dim:0});
+          if(v && v.text) await ragAyAdd({id:v.id||uid(), text:v.text, kind:v.kind||"day", label:v.label||"", ts:v.ts||Date.now(), edited:v.edited||0, vec:null, model:"", dim:0});
         }
       }
       if(Array.isArray(obj.threadsBig)){
@@ -4373,7 +4392,7 @@ async function generateSynopsis(){
     const usr = "【今日の日付】" + fmtJDate(todaySynopStr()) + "\n\n【これまでの今日のあらすじ】\n" + (synopsis.text || "(まだ無い)") + "\n\n【新しい会話】\n" + recent + "\n\n更新後の今日のあらすじ:";
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers:HEADERS(),
-      body: JSON.stringify({ model, max_tokens:1024, system:sys, messages:[{role:"user", content:usr}] })
+      body: JSON.stringify({ model, max_tokens:2048, system:sys, messages:[{role:"user", content:usr}] })   // ✂️ 1024だと会話の多い日に文の途中で切れていた(1日の記録71件中15件)ので2048に
     });
     const data = await res.json();
     if(!data.error){
@@ -4499,9 +4518,25 @@ async function compressAyumi(){
   }catch(e){}
   ayumiBusy = false;
 }
-/* ---------- ふたりのあゆみ(読むだけのアルバム画面) ---------- */
-function openAyumi(){ renderAyumiList(); $("ayumi").classList.add("open"); ragAyBackfill(); }   // 開いたついでに裏でベクトル付与
+/* ---------- ふたりのあゆみ(アルバム画面) ---------- */
+function openAyumi(){ renderAyumiList(); renderAyumiBound(); $("ayumi").classList.add("open"); ragAyBackfill(); }   // 開いたついでに裏でベクトル付与
 function closeAyumi(){ $("ayumi").classList.remove("open"); }
+// アルバムの1枚(アルバムにいる子も、週に綴じられて棚にだけいる子も、同じ見た目)
+function ayCard(e){
+  const wrap = el("div","mem-card");
+  const top = el("div","mem-card-top");
+  top.appendChild(el("span","mem-card-tag", e.kind==="week" ? "🗓 週のまとめ" : "📄 1日の記録"));
+  top.appendChild(el("span","mem-card-date", e.label||""));
+  if(e.edited) top.appendChild(el("span","ay-edited","✏️ さきが直した"));
+  const acts = el("div","mem-card-acts");
+  const edit = el("button","mem-card-btn","✏️");
+  edit.addEventListener("click", ev=>{ ev.stopPropagation(); openAyEdit(e); });
+  acts.appendChild(edit);
+  top.appendChild(acts);
+  wrap.appendChild(top);
+  wrap.appendChild(el("div","mem-card-text", e.text||""));
+  return wrap;
+}
 function renderAyumiList(){
   const box = $("ayumi-list"); if(!box) return; box.innerHTML="";
   const es = (ayumi.entries||[]).slice().reverse();   // 新しい順に読む
@@ -4509,15 +4544,52 @@ function renderAyumiList(){
     box.appendChild(el("div","cal-empty","まだ記録はないよ。日付が変わると、その日のあらすじが最初のページとしてここに残るよ🌱"));
     return;
   }
-  es.forEach(e=>{
-    const wrap = el("div","mem-card");
-    const top = el("div","mem-card-top");
-    top.appendChild(el("span","mem-card-tag", e.kind==="week" ? "🗓 週のまとめ" : "📄 1日の記録"));
-    top.appendChild(el("span","mem-card-date", e.label||""));
-    wrap.appendChild(top);
-    wrap.appendChild(el("div","mem-card-text", e.text||""));
-    box.appendChild(wrap);
-  });
+  es.forEach(e=> box.appendChild(ayCard(e)));
+}
+// 📚 週のまとめに綴じられて、アルバムからは見えなくなった「日のページ」。律くんの検索用の棚にだけ残っているので、そこから読んで並べる
+let ayBoundOpen = false;
+async function renderAyumiBound(){
+  const box = $("ayumi-bound"), btn = $("ayumi-bound-toggle"); if(!box || !btn) return;
+  const inAlbum = {}; (ayumi.entries||[]).forEach(e=>{ inAlbum[e.id] = 1; });
+  const list = (await ragAyAll()).filter(r=> r.kind==="day" && !inAlbum[r.id]).sort((a,b)=>(b.ts||0)-(a.ts||0));   // 新しい順
+  btn.textContent = (ayBoundOpen ? "▾" : "▸") + " 📚 週にまとめた日のページ（" + list.length + "日ぶん）";
+  box.innerHTML = "";
+  box.style.display = ayBoundOpen ? "flex" : "none";
+  if(!ayBoundOpen) return;
+  if(!list.length){ box.appendChild(el("div","cal-empty","まだ無いよ。1週間のまとめに綴じられた日のページが、ここに残っていくよ📚")); return; }
+  list.forEach(r=> box.appendChild(ayCard(r)));
+}
+/* ✏️ あゆみの編集(9/29 さきの希望): あらすじの伝言ゲームや途中切れで壊れた日を、さきが直せるように。
+   保存すると ①アルバム(律くんが毎回持ち歩くぶん) ②律くんの検索用の棚 ③検索用のしおり(ベクトル) の3つをそろえて直す。
+   しおりづくりに失敗しても文章は保存する(しおりは次にあゆみを開いたとき ragAyBackfill が作り直す)。削除はできないまま。 */
+let ayEditTarget = null;
+function openAyEdit(rec){
+  ayEditTarget = rec;
+  $("ay-edit-text").value = rec.text || "";
+  const info = $("ay-edit-info");
+  if(info) info.textContent = (rec.kind==="week" ? "🗓 " + (rec.label||"") + " の週のまとめ" : "📄 " + (rec.label||"") + " の1日の記録")
+    + "　保存すると、律くんの検索用の棚としおりも一緒に直すよ。律くんが昔の日を思い出すときは最初の400字だけ届くので、いちばん大事なことを最初に書くのがコツだよ";
+  $("ay-edit").classList.add("open");
+  setTimeout(()=>{ try{ $("ay-edit-text").focus(); }catch(e){} }, 60);
+}
+function closeAyEdit(){ $("ay-edit").classList.remove("open"); ayEditTarget = null; }
+async function saveAyEdit(){
+  const rec = ayEditTarget;
+  const t = ($("ay-edit-text").value || "").trim();
+  closeAyEdit();
+  if(!rec || !t || t===rec.text) return;   // 空っぽ・変化なしは何もしない(うっかり全消し事故ふせぎ)
+  const now = Date.now();
+  // ① アルバムに同じ子がいれば直す(週に綴じられた日のページはアルバムにはいないので、②だけ)
+  const ent = (ayumi.entries||[]).find(x=> x.id===rec.id);
+  if(ent){ ent.text = t; ent.edited = now; saveAyumi(); }
+  rec.text = t; rec.edited = now;
+  // ② 検索用の棚 と ③ しおり(ベクトル)
+  const emb = await embedText(t);
+  await ragAyAdd({ id:rec.id, text:t, kind:rec.kind||"day", label:rec.label||"", ts:rec.ts||now, edited:now,
+    vec: emb?emb.vec:null, model: emb?emb.model:null, dim: emb?emb.dim:null });
+  renderAyumiList();
+  await renderAyumiBound();
+  if(!emb) alert("文章は保存したよ😊 でも、検索用のしおりが作れなかったよ。次にあゆみを開いたときに、もう一度作り直してみるね" + embedErrorNote());
 }
 function openSynopsis(){ renderSynopsis(); $("synopsis").classList.add("open"); }
 /* ---------- 📒 今日のメモ帳 画面（閲覧・手動追加・編集・削除） ---------- */
@@ -4893,10 +4965,10 @@ function editDiaryDate(e){          // 📅日付ボタン: 日記の日付を�
   saveDiary(); renderDiaryList();
 }
 // 律くんが持ち歩く「最近の日記」(最新2件)
-const DIARY_CTX_N   = 2;     // 律くんに渡す日記の件数(新しいほうから)
+const DIARY_CTX_N   = 0;     // 律くんに渡す日記の件数(新しいほうから)。0=渡さない(9/29さきの判断: 先頭600字は朝の出来事ばかりで「あゆみ」と重複し、気持ちのまとめ=後半は届いていなかったため)。戻すなら 2 に
 const DIARY_CTX_MAX = 600;   // 1件あたりに渡す最大文字数。長い日記で荷物が重くなるのを防ぐ(日記帳の中身は無傷)
 function diaryContext(){
-  if(!diary.length) return "";
+  if(!diary.length || DIARY_CTX_N <= 0) return "";   // ⚠️ slice(-0) は「全部」になってしまうので、0のときはここで止める
   return diary.slice(-DIARY_CTX_N).map(e=>{
     let t = (e.text||"").trim();
     if(t.length > DIARY_CTX_MAX) t = t.slice(0, DIARY_CTX_MAX) + "…（この日の日記はまだ続くが、ここまで）";
@@ -5993,6 +6065,11 @@ $("mem-edit-save").addEventListener("click", saveMemEdit);
 $("ins-edit-cancel").addEventListener("click", closeInsEdit);
 $("ins-edit-save").addEventListener("click", saveInsEdit);
 $("ins-edit").addEventListener("click", e=>{ if(e.target === $("ins-edit")) closeInsEdit(); });   // 背景をタップしたら閉じる
+// ✏️ あゆみの編集(9/29〜)
+$("ay-edit-cancel").addEventListener("click", closeAyEdit);
+$("ay-edit-save").addEventListener("click", saveAyEdit);
+$("ay-edit").addEventListener("click", e=>{ if(e.target === $("ay-edit")) closeAyEdit(); });   // 背景をタップしたら閉じる
+$("ayumi-bound-toggle").addEventListener("click", ()=>{ ayBoundOpen = !ayBoundOpen; renderAyumiBound(); });
 $("mem-edit").addEventListener("click", e=>{ if(e.target.id==="mem-edit") closeMemEdit(); });
 $("export-backup").addEventListener("click", exportBackup);
 $("import-backup-btn").addEventListener("click", ()=> $("import-file").click());
