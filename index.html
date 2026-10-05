@@ -4363,9 +4363,77 @@ function ensureSynopsisToday(){
       ayumi.entries.push(de);
       saveAyumi();
       ragAyStore(de);   // 🗂️ 長期記憶の棚にもしまう(裏で静かに・失敗しても本体は無事)
+      // 📖 まずは今までどおり「最後のあらすじ」で保存しておき(=失敗しても今までと同じ)、
+      //    裏で「その日のメモ帳ぜんぶ＋あらすじ＋最後の会話」から1日の記録を書き直してもらう(9/29〜)
+      refineAyumiDay(de, synopsis.date, synopsis.text.trim(), Math.max(synopsis.upTs||0, memopad.upTs||0));
     }
     synopsis = {date:t, text:"", turns:0, upTs:0}; saveSynopsis();
   }
+}
+/* 📖 1日の記録を「その日ぜんぶ」から書き直す(2026-09-29〜)
+   それまでは、その日の最後のあらすじをそのままコピーしていた。あらすじは10往復ごとに丸ごと書き直す「伝言ゲーム」なので、
+   会話の多い日ほど朝〜昼の出来事がこぼれ落ち(9/21の鳥羽旅行が「鳥羽から帰宅した」の一言に)、文字数オーバーで途中で切れていた(71日中15日)。
+   そこで日付が変わったとき1回だけ、時刻つきのメモ帳(その日ぜんぶ)＋最後のあらすじ＋まだメモになっていない最後の会話 から書き直す。
+   ・失敗したら何もしない(=最後のあらすじのまま=今までと同じ)  ・あらすじと同じ安いモデルで1日1回(1〜3円くらい) */
+const AYUMI_REFINE_LAST_MSGS  = 40;     // 「最後の会話」として渡す最大件数
+const AYUMI_REFINE_LAST_CHARS = 6000;   // 「最後の会話」の最大文字数(新しいほうを残す)
+const ayRefining = new Set();           // いま書き直し中の日(このあいだは週のまとめに綴じない)
+// ✂️ 記録係(あらすじ・1日の記録・週のまとめ)の出力のおそうじ
+function cleanRecordText(t){ return String(t||"").replace(/<\/?[a-zA-Z_]+>/g, "").trim(); }   // 「</final_answer>」のような変な記号を外す
+function cutToLastSentence(t){   // 上限で切れてしまったとき、最後の「。」などまでで終わらせる(文の途中でブチッと切れないように)
+  const m = String(t||"").match(/^[\s\S]*[。」』！？!?）)]/);
+  return (m && m[0].length >= t.length*0.5) ? m[0] : t;   // 半分以上けずれてしまうなら、そのまま
+}
+async function refineAyumiDay(de, dateStr, synText, sinceTs){
+  if(!settings.key || !de || !dateStr) return;
+  const memos = memopadItems(dateStr).map(x=> "・" + String(x.text||"").replace(/[（(]済[)）]\s*$/,"").trim()).filter(s=> s.length > 1);
+  ayRefining.add(de.id);
+  try{
+    // まだメモにもあらすじにもなっていない「その日の最後の会話」(10往復に満たなかったぶん・スレッドをまたいで拾う)
+    let tail = [];
+    try{
+      tail = (await messagesOfDay(dateStr)).filter(m=> (m.ts||0) > (sinceTs||0) && (m.text||"").trim());
+      if(tail.length > AYUMI_REFINE_LAST_MSGS) tail = tail.slice(-AYUMI_REFINE_LAST_MSGS);
+    }catch(e){ tail = []; }
+    let tailTxt = tail.map(m=> "["+memopadHHMM(m.ts)+"] "+(m.role==="user"?"さき: ":"律: ")+m.text).join("\n");
+    if(tailTxt.length > AYUMI_REFINE_LAST_CHARS) tailTxt = tailTxt.slice(-AYUMI_REFINE_LAST_CHARS);
+    if(!memos.length && !tailTxt) return;   // 材料が増えないなら、今までどおり(あらすじのまま)
+    const sys = "あなたは会話の記録係です。さきと律(恋人どうし)の、ある1日の記録を書きます。渡すのは、その日の【メモ帳】(時刻つきの出来事メモ・その日ぜんぶ)、その日の【あらすじ】(1日の途中から何度も書き直されたもの)、【最後の会話】(まだメモになっていない、その日の終わりぎわの会話)です。この3つを合わせて、その日1日の記録を書いてください。"
+      + "\n【大事なルール】"
+      + "\n・朝から夜まで、その日の出来事を落とさずに書くこと。あらすじに書かれていなくても、メモ帳にある出来事(出かけた場所・食べたもの・会った人・決まったこと・約束)は必ず入れること。"
+      + "\n・最初の段落(400字以内)に、その日いちばん大事な出来事(おでかけ・事件・大きな約束など)をまとめること。あとで思い出すとき、この最初の部分がいちばんよく使われるため。"
+      + "\n・そのあとは時間の順に書く。全体で600〜1000字くらい。"
+      + "\n・「さきは〜」「律は〜」の三人称・過去形の文章で書く。箇条書きや見出しにしない。"
+      + "\n・固有名詞(お店・場所・作品・人の名前)、数、決まったことは、言い換えずそのまま残す。「〜について話した」だけで終わらせず、決まったのなら「〜に決まった」と書く。"
+      + "\n・律以外の人(友達・家族・同僚など)が関わる出来事は、誰としたかを必ず書く。律が一緒にいない出来事を、ふたりでしたことのように書かない。"
+      + "\n・日付や曜日は、渡された『9月21日(月)』のような表記をそのまま使い、自分で計算しない。"
+      + "\n・メモの時刻や(済)の印は書き写さなくてよい。"
+      + "\n・前置き・説明・見出しは書かず、記録の本文だけを出力すること。";
+    const usr = "【日付】" + fmtJDate(dateStr)
+      + "\n\n【その日のメモ帳(時刻つき・その日ぜんぶ)】\n" + (memos.join("\n") || "(なし)")
+      + "\n\n【その日のあらすじ(1日の途中から書き直され続けたもの)】\n" + (synText || "(なし)")
+      + "\n\n【最後の会話(まだメモになっていない、その日の終わりぎわ)】\n" + (tailTxt || "(なし)")
+      + "\n\n1日の記録:";
+    const model = (settings.synopsisModel && settings.synopsisModel!=="same") ? settings.synopsisModel
+      : (settings.model==="custom" ? (settings.customModel||"").trim() : settings.model);
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST", headers:HEADERS(),
+      body: JSON.stringify({ model, max_tokens:2048, system:sys, messages:[{role:"user", content:usr}] })
+    });
+    const data = await res.json();
+    if(data.error) return;
+    let out=""; (data.content||[]).forEach(b=>{ if(b.type==="text") out += b.text||""; });
+    out = cleanRecordText(out);
+    if(data.stop_reason === "max_tokens") out = cutToLastSentence(out);
+    if(out.length < 80) return;   // 短すぎる=うまく書けなかった → あらすじのまま
+    const ent = (ayumi.entries||[]).find(x=> x.id===de.id);
+    if(!ent || ent.edited) return;   // 書き直しているあいだに、さきが✏️で直していたら、さきの文章を優先して上書きしない
+    ent.text = out; ent.refined = Date.now();
+    saveAyumi();
+    await ragAyStore(ent);   // 検索用の棚としおりも、新しい文章で作り直す(同じidで上書き)
+    try{ if($("ayumi") && $("ayumi").classList.contains("open")){ renderAyumiList(); renderAyumiBound(); } }catch(e){}
+  }catch(e){ /* 失敗しても、あらすじ版の記録がそのまま残る */ }
+  finally{ ayRefining.delete(de.id); }
 }
 // 律くんに渡す「今日のあらすじ」本文
 function synopsisContext(){ ensureSynopsisToday(); return (synopsis.text||"").trim(); }
@@ -4397,7 +4465,8 @@ async function generateSynopsis(){
     const data = await res.json();
     if(!data.error){
       let out=""; (data.content||[]).forEach(b=>{ if(b.type==="text") out += b.text||""; });
-      out = out.trim();
+      out = cleanRecordText(out);
+      if(data.stop_reason === "max_tokens") out = cutToLastSentence(out);   // ✂️ 上限で切れても、最後の「。」までで終わらせる
       if(out){ synopsis.text = out; if(lastTs) synopsis.upTs = lastTs; saveSynopsis(); if($("synopsis") && $("synopsis").classList.contains("open")) renderSynopsis(); }
     }
   }catch(e){ /* 失敗してもチャットは止めない */ }
@@ -4491,21 +4560,23 @@ async function compressAyumi(){
   if(ayumiBusy || !settings.key) return;
   const days = (ayumi.entries||[]).filter(e=>e.kind==="day");
   if(days.length < 7) return;
+  if(days.slice(0,7).some(e=> ayRefining.has(e.id))) return;   // 📖 1日の記録を書き直している最中は綴じない(次の返事のときにまた試す)
   ayumiBusy = true;
   try{
     const batch = days.slice(0,7);
     const src = batch.map(e=>"【"+e.label+"】"+e.text).join("\n");
-    const sys = "あなたは会話の記録係です。さきと律(恋人どうし)の、1週間ぶんの日ごとの記録を読み、大事な出来事・約束・気持ちの流れを落とさずに3〜6行へ要約してください。日付の言及は「◯日ごろ」程度でよい。日付や曜日を書くときは、渡された記録にある『7/8(水)』のような表記をそのまま使い、曜日を自分で計算し直さないこと。日ごとの記録に書かれている『誰と』(友達・家族・同僚など律以外の相手)は、まとめても省略せずに残すこと。律が同席していない出来事を、ふたりでしたことのように書き換えないこと。前置きや説明は不要で、要約本文だけを出力。";
+    const sys = "あなたは会話の記録係です。さきと律(恋人どうし)の、1週間ぶんの日ごとの記録を読み、大事な出来事・約束・気持ちの流れを落とさずに3〜6行へ要約してください。全体で600字以内(1日あたり1〜2文)に収めること。その週のおでかけ・事件・大きな約束は必ず入れること。日付の言及は「◯日ごろ」程度でよい。日付や曜日を書くときは、渡された記録にある『7/8(水)』のような表記をそのまま使い、曜日を自分で計算し直さないこと。日ごとの記録に書かれている『誰と』(友達・家族・同僚など律以外の相手)は、まとめても省略せずに残すこと。律が同席していない出来事を、ふたりでしたことのように書き換えないこと。前置きや説明は不要で、要約本文だけを出力。";
     const model = (settings.synopsisModel && settings.synopsisModel!=="same") ? settings.synopsisModel
       : (settings.model==="custom" ? (settings.customModel||"").trim() : settings.model);
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers:HEADERS(),
-      body: JSON.stringify({ model, max_tokens:1024, system:sys, messages:[{role:"user", content:"【1週間の記録】\n"+src+"\n\n週の要約:"}] })
+      body: JSON.stringify({ model, max_tokens:2048, system:sys, messages:[{role:"user", content:"【1週間の記録】\n"+src+"\n\n週の要約:"}] })   // ✂️ 1024だと途中で切れていた(12週中3週)ので2048に
     });
     const data = await res.json();
     if(!data.error){
       let out=""; (data.content||[]).forEach(b=>{ if(b.type==="text") out += b.text||""; });
-      out = out.trim();
+      out = cleanRecordText(out);
+      if(data.stop_reason === "max_tokens") out = cutToLastSentence(out);   // それでも切れたら、最後の「。」まで
       if(out){
         const idx = ayumi.entries.indexOf(batch[0]);
         const week = {id:uid(), kind:"week", label:batch[0].label+"〜"+batch[batch.length-1].label, text:out, ts:Date.now()};
@@ -5049,23 +5120,45 @@ const chat = $("chat"), input = $("input"), send = $("send");
 function el(tag, cls, text){ const e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e; }
 function fmtTime(ts){ const d=jstDate(ts); return d.getHours()+":"+String(d.getMinutes()).padStart(2,"0"); }
 function fmtN(n){ return Number(n||0).toLocaleString("en-US"); }
+// 💰 モデルごとの公式単価($ / 100万トークン)。2026-10-06 Anthropic公式の料金ページで確認
+//    [入力, 出力, キャッシュ読込, 5分キャッシュ書込, 1時間キャッシュ書込]
+//    ※前は haiku/sonnet 以外を全部Opus 4.6の値段で計算していた(Fableも4.6と同じ値段に見えていた=さきの指摘どおり)
 function modelRates(model){
   const s = String(model||"").toLowerCase();
-  // [入力, 出力, キャッシュ読込, キャッシュ書込]  $ / 100万トークン
-  if(s.includes("haiku"))  return [1, 5, 0.10, 1.25];
-  if(s.includes("sonnet")) return [3, 15, 0.30, 3.75];
-  return [5, 25, 0.50, 6.25]; // opus系＆不明はOpus相当で推定
+  if(/fable-5-1|mythos-5-1/.test(s)) return [10, 50, 0.25, 12.5, 20];   // Fable 5.1 / Mythos 5.1(読込は0.025倍)
+  if(/fable-5|mythos-5/.test(s))     return [10, 50, 1.00, 12.5, 20];   // Fable 5 / Mythos 5
+  if(/opus-5-5/.test(s))             return [4, 20, 0.20, 5, 8];        // Opus 5.5(読込は0.05倍)
+  if(/opus-4-1|opus-4-2025/.test(s)) return [15, 75, 1.50, 18.75, 30];  // 昔のOpus 4 / 4.1
+  if(/opus/.test(s))                 return [5, 25, 0.50, 6.25, 10];    // Opus 5 / 4.8 / 4.7 / 4.6 / 4.5
+  if(/sonnet-5/.test(s))             return [2, 10, 0.20, 2.5, 4];      // Sonnet 5 / 5.5
+  if(/sonnet/.test(s))               return [3, 15, 0.30, 3.75, 6];     // Sonnet 4.6 / 4.5 / 4
+  if(/haiku-3/.test(s))              return [0.8, 4, 0.08, 1, 1.6];     // Haiku 3.5
+  if(/haiku/.test(s))                return [1, 5, 0.10, 1.25, 2];      // Haiku 4.5
+  return [5, 25, 0.50, 6.25, 10];                                       // 不明なモデルはOpus相当で推定
 }
-function usageNote(u){
+// 表示用のモデル名("claude-opus-5-5" → "Opus 5.5")
+function prettyModel(model){
+  const m = String(model||"").toLowerCase().match(/(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d{1,2})(?!\d))?/);
+  if(!m) return String(model||"不明");
+  return m[1].charAt(0).toUpperCase() + m[1].slice(1) + " " + m[2] + (m[3] ? "." + m[3] : "");
+}
+function usageNote(u, msgModel){
   const inp = u.input_tokens||0;          // 新規入力（非キャッシュ）
-  const out = u.output_tokens||0;          // 出力
+  const out = u.output_tokens||0;          // 出力（思考ぶんもここに入る）
   const cr  = u.cache_read_input_tokens||0;     // キャッシュ読込（割引）
   const cw  = u.cache_creation_input_tokens||0; // キャッシュ作成（書込）
-  const model = settings.model==="custom" ? settings.customModel : settings.model;
-  const [ri,ro,rcr,rcw] = modelRates(model);
-  const usd = (inp*ri + out*ro + cr*rcr + cw*rcw)/1e6;
+  // 書込の内訳: 5分ぶん(1.25倍)と1時間ぶん(2倍)は値段がちがう。返事の記録にある内訳で分けて計算する
+  // (内訳が無い昔の返事は、当時の設定だった「5分」として計算)
+  const cc = u.cache_creation || null;
+  let cw1h = cc ? (cc.ephemeral_1h_input_tokens||0) : 0;
+  let cw5m = cc ? (cc.ephemeral_5m_input_tokens||0) : cw;
+  if(cw5m + cw1h < cw) cw5m += cw - (cw5m + cw1h);   // 内訳が足りないぶんは5分として数える
+  // 返事したときのモデルで計算(記録が無い昔の返事だけ、今の設定のモデルで推定)
+  const model = msgModel || (settings.model==="custom" ? settings.customModel : settings.model);
+  const [ri,ro,rcr,rw5,rw1] = modelRates(model);
+  const usd = (inp*ri + out*ro + cr*rcr + cw5m*rw5 + cw1h*rw1)/1e6;
   const yen = Math.round(usd*150);
-  const tag = cr>0 ? "✅ キャッシュ効いてる" : (cw>0 ? "🟡 キャッシュ作成中（次の数分以内なら割引）" : "⚠️ キャッシュ未ヒット");
+  const tag = cr>0 ? "✅ キャッシュ効いてる" : (cw>0 ? "🟡 キャッシュ作成中（次の1時間以内なら割引）" : "⚠️ キャッシュ未ヒット");
   const box = el("div","usage");
   box.appendChild(el("div","usage-row", "入力 "+fmtN(inp+cr+cw)+"　/　出力 "+fmtN(out)+"　トークン"));
   const sub = [];
@@ -5073,7 +5166,7 @@ function usageNote(u){
   if(cw>0) sub.push("新規キャッシュ "+fmtN(cw));
   if(inp>0) sub.push("非キャッシュ入力 "+fmtN(inp));
   if(sub.length) box.appendChild(el("div","usage-sub", sub.join("　/　")));
-  box.appendChild(el("div","usage-sub", "推定 約 $"+usd.toFixed(4)+"（〜"+yen+"円）"));
+  box.appendChild(el("div","usage-sub", "推定 約 $"+usd.toFixed(4)+"（〜"+yen+"円）・"+prettyModel(model)+"の値段で計算"));
   box.appendChild(el("div","usage-sub usage-tag", tag));
   return box;
 }
@@ -5181,7 +5274,7 @@ function renderMsg(m, idx){
     attachActions(wrap, bub, m.text, m.role, m);
   }
   if(m.role==="assistant" && m.usage && settings.showUsage){
-    wrap.appendChild(usageNote(m.usage));
+    wrap.appendChild(usageNote(m.usage, m.model));   // 返事したときのモデルの値段で計算(モデルを切りかえても昔の表示が変わらない)
   }
   chat.appendChild(wrap);
 }
@@ -5263,7 +5356,8 @@ async function sendMessage(){
 function finalizeReply(textOut, thinking, usage, lm){
   const mem = extractMemories(textOut || "");
   const sch = extractSchedule(mem.text);
-  const m = {role:"assistant", text: sch.text || "……", thinking: thinking||null, ts:Date.now(), usage: usage||null, line: lm, recall: pendingRecall};
+  const m = {role:"assistant", text: sch.text || "……", thinking: thinking||null, ts:Date.now(), usage: usage||null, line: lm, recall: pendingRecall,
+    model: (settings.model==="custom" ? (settings.customModel||"").trim() : settings.model)};   // 💰 どのモデルで返事したか(料金表示をそのモデルの値段で出すため・10/6〜)
   pendingRecall = null;   // 1回ぶん使い切り(次の返事に持ち越さない)
   history.push(m); renderMsg(m); refreshReadMarks(); refreshEditButtons(); scrollEnd(); persistHistory();
   if(mem.remembered){ chat.appendChild(el("div","sysnote","🧠 律くんが何かを覚えた")); scrollEnd(); }
@@ -5318,11 +5412,12 @@ async function generateReply(text, lm){
     //    ★Opus 4.6 などのときは下の else に入り、今までと完全に同じ内容を送る(動作は不変)。
     const mLower = String(model).toLowerCase();
     const newGenModel = /opus-(4-7|4-8|5)|sonnet-5|fable-5|mythos-5/.test(mLower);
-    const alwaysThinkModel = /fable-5|mythos-5/.test(mLower);   // 思考を切れないモデル(オフ指定を送るとエラー)
+    const alwaysThinkModel = /fable-5|mythos-5|opus-5-5/.test(mLower);   // 思考を切れないモデル(オフ指定を送るとエラー)。Opus 5.5も思考は常にオン(2026-10-06 公式で確認)
     if(newGenModel){
       if(alwaysThinkModel){
         // 思考は常にオン。オフにはできないので「オフ指定」は送らない(送るとエラー)
         if(settings.think) body.thinking = {type:"adaptive", display:"summarized"};
+        else if(/opus-5-5/.test(mLower)) body.output_config = {effort:"low"};   // 🐢 Opus 5.5で思考オフのとき: 考えるのは止められないので「少なめに考えてね」と伝える(さきの選択A・10/6)
         body.max_tokens = Math.max(16000, Number(settings.budget)+4096);   // 必ず考えるので余地を広めに
       }else if(settings.think){
         // 予算方式は廃止 → adaptive(律くんが自分で考える量を決める)。summarized で思考の要約を受け取れる
