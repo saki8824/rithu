@@ -5094,7 +5094,7 @@ async function writeDiary(){
     const ask = {role:"user", content:"（※これはメタなお願いです。今日の会話の流れ全体を振り返って、律の今日の日記を書いてください。日記の本文だけ。）"};
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers: HEADERS(),
-      body: JSON.stringify({ model, max_tokens:4096, system: sys, messages:[...base, ask] })
+      body: JSON.stringify({ model, max_tokens:16000, system: sys, messages:[...base, ask] })   // 📔 4096だと、必ず考えるモデル(Opus 5.5・Fableなど)は考えたぶんで枠を使い、日記が途中で切れるので16000に(上限=天井なので、書いたぶんしかお金はかからない・10/6)
     });
     const data = await res.json();
     if(data.error){ alert("日記の作成に失敗したよ: " + (data.error.message||data.error.type)); }
