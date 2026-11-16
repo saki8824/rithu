@@ -412,7 +412,10 @@
   }
   #memopad.open{display:flex}
   .memopad-add{display:flex;gap:8px}
-  .memopad-add input{flex:1;min-width:0;background:var(--night-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px}
+  .memopad-add input{flex:1;min-width:0;background:var(--night-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:16px}   /* 16px=iPhoneが入力のたびに画面を勝手に拡大しない大きさ */
+  /* ＋追加ボタンは文字ぶんの幅だけ。(.btn の width:100% のままだと横幅いっぱいに広がり、入力欄が26pxにつぶれて打てなかった。2026-11-16) */
+  .memopad-add .btn{width:auto;flex:none;white-space:nowrap;padding:10px 16px}
+  .memopad-row.flash{outline:2px solid var(--ritsu-pink-deep);outline-offset:1px}   /* いま足したメモを少しのあいだ目立たせる */
   .memopad-tools{display:flex;gap:7px;flex-wrap:wrap}
   .memopad-day{font-size:12px;color:var(--muted);font-weight:600;margin-top:4px}
   #memopad-list{display:flex;flex-direction:column;gap:8px}
@@ -2542,7 +2545,7 @@
   </div>
   <div class="hint">律くんが会話の中の「具体的な事実」（人の名前・予定・好みなど）を自動で書きとめるメモだよ📝 その日じゅうは律くんがいつも見ながら話すの。まちがいは✏️で直して、足りないことは下の欄から自分で足してOK🌷 昨日のぶんは翌日まで持ち越して見えるよ。ずっと覚えてほしい事実は🧠を押すと記憶カードになるよ。</div>
   <div class="memopad-add">
-    <input type="text" id="memopad-input" placeholder="例: サングラスはレイバン愛用" maxlength="60">
+    <input type="text" id="memopad-input" placeholder="例: 19時に駅で待ち合わせ" maxlength="120">
     <button class="btn primary" id="memopad-add-btn">＋追加</button>
   </div>
   <div class="memopad-tools">
@@ -3201,8 +3204,12 @@ async function ragSearch(query, embReady){   // 意味が近い気づきを上�
 const RAG_QUERY_MAX = 500;   // クエリ全体の最大文字数(長すぎると焦点がぼける)
 const RAG_CTX_MSGS  = 2;     // 前の会話を何件まぜるか(=1往復ぶん)。増やすと流れは汲めるが「今の話」がうすまる
 const RAG_CTX_MAX   = 200;   // 前の会話ぶんの合計文字数の上限。今の発言がうもれないようにするための重し
+const RAG_SOLO_MIN  = 40;    // 今の発言がこの文字数以上あれば、前の会話をまぜずに「今の発言だけ」で探す(短いときだけ前の会話を借りる)
 function ragQueryText(text){
   const cur = (text||"").trim();
+  // 🎯 2026-11-17: さきの発言は平均100字ほどあり、それだけで話題が分かる。前の会話をまぜると、届く資料が「1つ前の話題」に寄ってしまい、
+  //    律くんが1つ前の場面に返事をする一因になっていた。「うん!」のような短い発言のときだけ、今までどおり前の会話を借りる。
+  if(cur.length >= RAG_SOLO_MIN) return cur;
   const parts = [cur];
   let ctxLen = 0, taken = 0;   // ctxLenは「前の会話ぶん」だけ数える(今の発言は主役なので上限に入れない)
   for(let i=history.length-1; i>=0 && taken<RAG_CTX_MSGS; i--){
@@ -4225,7 +4232,7 @@ function loadSynopsis(){ try{ const d=store.get("ritsu-synopsis"); if(d){ const 
 function saveSynopsis(){ store.set("ritsu-synopsis", JSON.stringify(synopsis)); }
 function loadAyumi(){ try{ const d=store.get("ritsu-ayumi"); if(d){ const o=JSON.parse(d); ayumi={entries:(o.entries||[])}; } }catch(e){ ayumi={entries:[]}; } }
 /* 📝 今日のメモ帳(中間記憶): 保存と読み書きの土台。「今日」は午前4時切替(todaySynopStr共用) */
-function loadMemopad(){ try{ const d=store.get("ritsu-memopad"); if(d){ const o=JSON.parse(d); memopad={days:(o&&o.days)||{}, upTs:(o&&o.upTs)||0}; } }catch(e){ memopad={days:{},upTs:0}; } }
+function loadMemopad(){ try{ const d=store.get("ritsu-memopad"); if(d){ const o=JSON.parse(d); memopad={days:(o&&o.days)||{}, upTs:(o&&o.upTs)||0, carryDay:(o&&o.carryDay)||""}; } }catch(e){ memopad={days:{},upTs:0}; } }   // carryDay=昨日の取りこぼしを拾い終えた日(1日1回の印)
 function saveMemopad(){ store.set("ritsu-memopad", JSON.stringify(memopad)); }
 function memopadYesterdayStr(){   // 「昨日」の日付(午前4時切替)。持ち越し注入用
   const d = jstNow();   // 🗾 日本時間で決める
@@ -4399,8 +4406,21 @@ const ayRefining = new Set();           // いま書き直し中の日(このあ
 // ✂️ 記録係(あらすじ・1日の記録・週のまとめ)の出力のおそうじ
 function cleanRecordText(t){ return String(t||"").replace(/<\/?[a-zA-Z_]+>/g, "").trim(); }   // 「</final_answer>」のような変な記号を外す
 function cutToLastSentence(t){   // 上限で切れてしまったとき、最後の「。」などまでで終わらせる(文の途中でブチッと切れないように)
-  const m = String(t||"").match(/^[\s\S]*[。」』！？!?）)]/);
-  return (m && m[0].length >= t.length*0.5) ? m[0] : t;   // 半分以上けずれてしまうなら、そのまま
+  // ✂️ セリフの途中では終わらせない(2026-11-16): 前は「」の中の「。」でも止まっていたので、
+  //    『さらに「さきと結婚する。』のようにカギカッコが開いたまま終わっていた。「」の外にある文の終わりだけを数える。
+  t = String(t||"");
+  let depth = 0, end = -1;   // depth=いま開いているカギカッコの数 / end=「ここまでなら文がちゃんと終わっている」位置
+  for(let i=0;i<t.length;i++){
+    const c = t[i];
+    if(c==="「" || c==="『") depth++;
+    else if(c==="」" || c==="』"){
+      if(depth > 0) depth--;
+      if(depth===0 && i>0 && "。！？!?…".indexOf(t[i-1])>=0) end = i;   // 「おやすみ。」のように、セリフだけで終わる文
+    }
+    else if(depth===0 && "。！？!?".indexOf(c)>=0) end = i;
+  }
+  const cutAt = Math.max(end+1, t.lastIndexOf("\n"));   // 箇条書きのとき用: 最後の改行(=書きかけの行の手前)も候補にする
+  return (cutAt > 0 && cutAt >= t.length*0.5) ? t.slice(0, cutAt).trim() : t;   // 半分以上けずれてしまうなら、そのまま
 }
 async function refineAyumiDay(de, dateStr, synText, sinceTs){
   if(!settings.key || !de || !dateStr) return;
@@ -4418,13 +4438,18 @@ async function refineAyumiDay(de, dateStr, synText, sinceTs){
     if(!memos.length && !tailTxt) return;   // 材料が増えないなら、今までどおり(あらすじのまま)
     const sys = "あなたは会話の記録係です。さきと律(恋人どうし)の、ある1日の記録を書きます。渡すのは、その日の【メモ帳】(時刻つきの出来事メモ・その日ぜんぶ)、その日の【あらすじ】(1日の途中から何度も書き直されたもの)、【最後の会話】(まだメモになっていない、その日の終わりぎわの会話)です。この3つを合わせて、その日1日の記録を書いてください。"
       + "\n【大事なルール】"
-      + "\n・朝から夜まで、その日の出来事を落とさずに書くこと。あらすじに書かれていなくても、メモ帳にある出来事(出かけた場所・食べたもの・会った人・決まったこと・約束)は必ず入れること。"
+      // ✂️ 2026-11-16: 前は「落とさずに書く」と「600〜1000字」を同時に頼んでいて、係が2000字以上書いて上限で切れ、夜の出来事が消えていた(7日中5日)。
+      //    記録係は字数を数えるのが苦手なので、段落と文の「数」で長さを決め、セリフの書き写しを止め、夜まで書き切ることを最優先にした。
       + "\n・最初の段落(400字以内)に、その日いちばん大事な出来事(おでかけ・事件・大きな約束など)をまとめること。あとで思い出すとき、この最初の部分がいちばんよく使われるため。"
-      + "\n・そのあとは時間の順に書く。全体で600〜1000字くらい。"
+      + "\n・そのあとは時間の順に、「朝〜昼」「夕方〜夜」「夜ふけ〜寝るまで」の段落を書く(出来事が無い時間帯の段落は書かなくてよい)。"
+      + "\n・★長さの決まり: 段落は全部で4つまで。1つの段落は3〜5文。全体で1000字を超えないこと。"
+      + "\n・★いちばん大事: 記録は必ず、その日の最後の出来事(夜ふけ・寝る前のやりとり)まで書いて終えること。朝や昼を細かく書きすぎて、夜の出来事が入らなくなるのがいちばん良くない。朝・昼・夜を同じくらいの重さで書くこと。【最後の会話】に書かれていることは、その日の終わりの出来事なので必ず入れること。"
+      + "\n・メモ帳の出来事を1件ずつ全部書き写さないこと。似た出来事はまとめ、1つの出来事は1〜2文で書く。ただし、出かけた場所・会った人・決まったこと・約束・ケンカや仲直りのような大きな出来事は、あらすじに無くても落とさないこと。"
+      + "\n・セリフをそのまま書き写さないこと。「〜と伝えた」「〜と約束した」のように中身を短くまとめる。どうしても残したい一言だけ、全体で2つまで「」で引用してよい。"
       + "\n・「さきは〜」「律は〜」の三人称・過去形の文章で書く。箇条書きや見出しにしない。"
       + "\n・固有名詞(お店・場所・作品・人の名前)、数、決まったことは、言い換えずそのまま残す。「〜について話した」だけで終わらせず、決まったのなら「〜に決まった」と書く。"
       + "\n・律以外の人(友達・家族・同僚など)が関わる出来事は、誰としたかを必ず書く。律が一緒にいない出来事を、ふたりでしたことのように書かない。"
-      + "\n・日付や曜日は、渡された『9月21日(月)』のような表記をそのまま使い、自分で計算しない。"
+      + "\n・日付や曜日は、渡された『9月21日(月)』や、メモ帳の中にある『11/16(月)』のような表記をそのまま使い、自分で計算しない。"
       + "\n・メモの時刻や(済)の印は書き写さなくてよい。"
       + "\n・前置き・説明・見出しは書かず、記録の本文だけを出力すること。";
     const usr = "【日付】" + fmtJDate(dateStr)
@@ -4436,7 +4461,7 @@ async function refineAyumiDay(de, dateStr, synText, sinceTs){
       : (settings.model==="custom" ? (settings.customModel||"").trim() : settings.model);
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers:HEADERS(),
-      body: JSON.stringify({ model, max_tokens:2048, system:sys, messages:[{role:"user", content:usr}] })
+      body: JSON.stringify({ model, max_tokens:4096, system:sys, messages:[{role:"user", content:usr}] })   // ✂️ 2048だと長く書いた日に夜の部分が切れていたので、保険として2倍に(ふだんは1000字ほどで終わるので料金はほぼ変わらない)
     });
     const data = await res.json();
     if(data.error) return;
@@ -4455,14 +4480,24 @@ async function refineAyumiDay(de, dateStr, synText, sinceTs){
 }
 // 律くんに渡す「今日のあらすじ」本文
 function synopsisContext(){ ensureSynopsisToday(); return (synopsis.text||"").trim(); }
-// あらすじを作る／更新する（手動でも自動でも呼ばれる）
-async function generateSynopsis(){
+/* ✋ 記録(あらすじ・メモ帳)に「いま進んでいる場面」を入れないための部品(2026-11-17)
+   最後のさきの発言から後ろ(=最後の1往復)を外して返す。外したぶんは消えない: 「ここまで読んだ」の印が手前で止まるので、次の回にちゃんと読まれる。
+   (その日の終わりの残りは、メモ帳=翌朝の取りこぼし拾い / 1日の記録=「最後の会話」として拾われる)
+   理由: 10往復目に記録を作り直すと、たった今の場面(例:「お腹が鳴った」)が記録の最後の行にも入り、会話の中と二重に届いていた。
+        その直後、律くんがさきの新しい発言ではなく、その場面をもう一度やり直す実例が出た(11/16 21:32)。 */
+function holdLastExchange(batch){
+  for(let i=batch.length-1;i>=0;i--){ if(batch[i].role==="user") return batch.slice(0,i); }
+  return batch;   // さきの発言が1つも無いときは、そのまま
+}
+// あらすじを作る／更新する（手動でも自動でも呼ばれる）。holdLast=true のときは最後の1往復を入れない(自動で作るとき用。手動の「今すぐ更新」は全部入れる)
+async function generateSynopsis(holdLast){
   if(synopsisBusy || !settings.key) return;
   ensureSynopsisToday();
   // 「前回あらすじを更新した続き」から今までを読む(取りこぼし防止)。今日の始まりは午前4時
   const day0Ts = jstDayStartTs(DIARY_DATE_SWITCH_HOUR);   // 🗾 日本時間の「今日の始まり」
   const fromTs = Math.max(synopsis.upTs||0, day0Ts);
   let batch = history.filter(m=>(m.ts||0) > fromTs);
+  if(holdLast === true) batch = holdLastExchange(batch);   // ✋ いま進んでいる場面は、まだ記録にしない
   if(batch.length > 60) batch = batch.slice(-60);   // コスト上限
   const lastTs = batch.length ? (batch[batch.length-1].ts||Date.now()) : 0;
   const recent = batch
@@ -4492,21 +4527,63 @@ async function generateSynopsis(){
 }
 /* 📝 今日のメモ帳: 直近の会話から「具体的な事実」だけを箇条書きで抽出して足す(あらすじと同じ安いモデル・差分だけ読む) */
 let memopadBusy = false;
-async function generateMemopad(){
-  if(memopadBusy || !settings.key) return;
+/* 🌙 前の日の「取りこぼし」を拾う(2026-11-16)
+   メモは10往復ごとにしか作られないので、寝る前の最後の数往復はメモにならないまま朝になる。
+   朝になると「今日の会話」しか読まないので、その夜の話(仲直り・寝る前の約束など)は二度とメモにならなかった。
+   → 日付が変わって最初にアプリを使うとき1回だけ、昨日の「最後にメモを作ったあと」の会話を全スレッドから集めて、昨日のメモ帳に足す。
+   ・拾えたとき/拾うものが無かったときは memopad.carryDay に今日の日付を書く(=同じ日に二度やらない)
+   ・失敗したときは印を付けない(=次の機会にもう一度ためす) */
+let memopadCarryP = null;   // いま拾っている最中ならその約束(Promise)。二重に走らせず、後から来た人は終わるのを待てる
+function memopadCatchupPrevDay(){
+  if(memopadCarryP) return memopadCarryP;
+  memopadCarryP = (async ()=>{
+    if(memopadBusy || !settings.key || !settings.synopsis) return;
+    const today = todaySynopStr();
+    if(memopad.carryDay === today) return;
+    const day0Ts = jstDayStartTs(DIARY_DATE_SWITCH_HOUR);   // 🗾 日本時間の「今日の始まり」
+    if((memopad.upTs||0) >= day0Ts){ memopad.carryDay = today; saveMemopad(); return; }   // もう今日のメモを作り始めている=昨日の続きは見分けられないので何もしない
+    try{
+      const yest = memopadYesterdayStr();
+      const batch = (await messagesOfDay(yest)).filter(m=> (m.ts||0) > (memopad.upTs||0) && ((m.text||"").trim() || (m.atts&&m.atts.length)));
+      if(!batch.length){ memopad.carryDay = today; saveMemopad(); return; }
+      if(await generateMemopad({date:yest, batch:batch})){
+        memopad.carryDay = today; saveMemopad();
+        try{ if($("memopad") && $("memopad").classList.contains("open")) renderMemopad(); }catch(e){}
+      }
+    }catch(e){ /* 失敗してもチャットは止めない(次の機会にまた試す) */ }
+  })();
+  const p = memopadCarryP;
+  p.then(()=>{ memopadCarryP = null; }, ()=>{ memopadCarryP = null; });
+  return p;
+}
+// carry={date, batch} = 前の日の取りこぼしを拾うとき(memopadCatchupPrevDay から呼ぶ)。ふだん(carryなし)は今日の会話の続きを読む。うまく読めたら true を返す
+// holdLast=true のときは最後の1往復を入れない(いま進んでいる場面はまだメモにしない)
+async function generateMemopad(carry, holdLast){
+  if(memopadBusy || !settings.key) return false;
+  if(!carry){   // 🌙 今日のメモを作る前に、昨日の取りこぼしを先に拾っておく(順番が逆になると昨日の続きが見分けられなくなる)
+    try{ await memopadCatchupPrevDay(); }catch(e){}
+    if(memopadBusy) return false;
+  }
   memopadAutoDonePast();   // ✅ まず「日付が過ぎた予定」を自動で(済)にしておく
-  const today = todaySynopStr();
-  const day0Ts = jstDayStartTs(DIARY_DATE_SWITCH_HOUR);   // 🗾 日本時間の「今日の始まり」
-  const fromTs = Math.max(memopad.upTs||0, day0Ts);
-  let batch = history.filter(m=>(m.ts||0) > fromTs);
+  const today = carry ? carry.date : todaySynopStr();   // carryのときの「今日」=拾う対象の日(メモの入れ先・日付の表の基準もその日)
+  let batch;
+  if(carry){
+    batch = (carry.batch||[]).slice();
+  }else{
+    const day0Ts = jstDayStartTs(DIARY_DATE_SWITCH_HOUR);   // 🗾 日本時間の「今日の始まり」
+    const fromTs = Math.max(memopad.upTs||0, day0Ts);
+    batch = history.filter(m=>(m.ts||0) > fromTs);
+    if(holdLast === true) batch = holdLastExchange(batch);   // ✋ いま進んでいる場面は、まだメモにしない(次の回に入る)
+  }
   if(batch.length > 60) batch = batch.slice(-60);   // コスト上限(あらすじと同じ)
   const lastTs = batch.length ? (batch[batch.length-1].ts||Date.now()) : 0;
   const firstTs = batch.length ? (batch[0].ts||Date.now()) : Date.now();   // 🕐 この区間の最初の発言時刻(律くんが時刻を書かなかったときの保険)
   const recent = batch
     .map(m=>"["+memopadHHMM(m.ts)+"] "+(m.role==="user"?"さき: ":"律: ") + (m.text || (m.atts && m.atts.length ? "[画像/ファイル]" : "")))
     .join("\n").trim();
-  if(!recent) return;
+  if(!recent) return false;
   memopadBusy = true;
+  let ok = false;
   try{
     const model = (settings.synopsisModel && settings.synopsisModel!=="same")
       ? settings.synopsisModel
@@ -4520,16 +4597,17 @@ async function generateMemopad(){
     const usr = "【今日の日付】" + exToday + "\n\n【日付の表】\n" + memopadDateTable(today) + "\n\n【既にあるメモ】\n" + (existing || "(まだ無い)") + "\n\n【新しい会話】\n" + recent + "\n\n新しく足すメモ:";
     const res = await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST", headers:HEADERS(),
-      body: JSON.stringify({ model, max_tokens:512, system:sys, messages:[{role:"user", content:usr}] })
+      body: JSON.stringify({ model, max_tokens:1536, system:sys, messages:[{role:"user", content:usr}] })   // ✂️ 512だと、たくさん話した回にメモが途中で切れていた(「02:17 02」のような切れはしが保存されていた)ので3倍に
     });
     const data = await res.json();
     if(!data.error){
       let out=""; (data.content||[]).forEach(b=>{ if(b.type==="text") out += b.text||""; });
       out = out.trim();
+      const cutOff = (data.stop_reason === "max_tokens");   // ✂️ それでも上限で切れた=最後の行は書きかけ
       const doneM = out.match(/【済】\s*([0-9０-９,，、\s]+)/);   // ✅ 解決した番号の行を先に取り出して本文から外す(箇条書きの解析に混ざらないように)
       if(doneM){
         out = out.replace(doneM[0], "").trim();
-        doneM[1].split(/[,，、\s]+/).forEach(numStr=>{
+        if(!cutOff) doneM[1].split(/[,，、\s]+/).forEach(numStr=>{   // 切れたときは番号も書きかけかもしれない(「12」が「1」で切れる等)ので、(済)は付けない
           const half = numStr.replace(/[０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
           const n = parseInt(half, 10);
           if(n >= 1 && n <= openItems.length) memopadMarkDone(today, openItems[n-1].id);
@@ -4537,18 +4615,23 @@ async function generateMemopad(){
       }
       if(out && out!=="なし"){
         const hhmm = memopadHHMM(firstTs);   // 🕐 保険=律くんが時刻を書かなかった行に付ける「この区間の最初の発言時刻」
-        out.split(/\r?\n/).forEach(line=>{
+        const lines = out.split(/\r?\n/);
+        if(cutOff && lines.length > 1) lines.pop();   // ✂️ 上限で切れたときの最後の行は書きかけなので捨てる
+        lines.forEach(line=>{
           const t = line.replace(/^[・\-\*・•\s]+/,"").trim();
           if(t && t!=="なし"){
             const withTime = /^\d{1,2}:\d{2}/.test(t) ? t : (hhmm + " " + t);   // 先頭に記録時刻(HH:MM)。既に時刻付きならそのまま
+            if(withTime.replace(/^\d{1,2}:\d{2}\s*/,"").length < 3) return;   // 「02:17 02」のような中身のない切れはしは保存しない
             memopadAdd(today, withTime);   // memopadAdd側でも重複は弾く(二重ガード)
           }
         });
       }
-      if(lastTs){ memopad.upTs = lastTs; saveMemopad(); }   // 成功したときだけ「ここまで読んだ」を進める(失敗時は次回また読む)
+      if(lastTs){ memopad.upTs = Math.max(memopad.upTs||0, lastTs); saveMemopad(); }   // 成功したときだけ「ここまで読んだ」を進める(失敗時は次回また読む)。後ろには戻さない
+      ok = true;
     }
   }catch(e){ /* 失敗してもチャットは止めない */ }
   memopadBusy = false;
+  return ok;
 }
 // 返事のたびに呼ばれ、10往復ごとに自動であらすじを更新する
 function maybeGenerateSynopsis(){
@@ -4556,7 +4639,7 @@ function maybeGenerateSynopsis(){
   ensureSynopsisToday();
   compressAyumi();   // 日ごとの記録が7日ぶんたまっていたら週まとめに(中では何もしない日がほとんど)
   synopsis.turns = (synopsis.turns||0) + 1; saveSynopsis();
-  if(synopsis.turns % 10 === 0){ generateSynopsis(); generateMemopad(); }   // 📝 メモ帳もあらすじと同じタイミングで抽出
+  if(synopsis.turns % 10 === 0){ generateSynopsis(true); generateMemopad(null, true); }   // 📝 メモ帳もあらすじと同じタイミングで抽出。✋ どちらも最後の1往復は入れない
 }
 // 朝の会話などが「10往復たまる前」に途切れると、あらすじに入らないまま置き去りになる。
 // アプリを開いたとき等に呼ばれ、2時間以上前の未収録会話があれば裏でそっとあらすじを追いつかせる(会話は邪魔しない)。
@@ -4567,13 +4650,15 @@ function maybeCatchupSynopsis(){
   const fromTs = Math.max(synopsis.upTs||0, day0Ts);
   const cutoff = Date.now() - 2*3600000;   // 「2時間以上前」の会話だけ対象(直近の話はまだ会話の窓にあるので急がない)
   const stale = history.some(m=> (m.ts||0) > fromTs && (m.ts||0) < cutoff && ((m.text||"").trim() || (m.atts&&m.atts.length)));
-  if(stale) generateSynopsis();
+  if(stale) generateSynopsis(true);   // ✋ 追いつくときも最後の1往復は入れない(戻ってきて最初の発言のとき、同じ場面が二重に届かないように)
   // 📝 メモ帳も同じ流儀で追いつかせる(2時間以上前の未収録会話があれば裏でそっと)
-  if(!memopadBusy){
+  // 🌙 その前に、昨日の夜の取りこぼしを拾う(1日1回だけ動く。終わってから今日の分を見る=順番を守る)
+  memopadCatchupPrevDay().then(()=>{
+    if(memopadBusy) return;
     const fromTsM = Math.max(memopad.upTs||0, day0Ts);
     const staleM = history.some(m=> (m.ts||0) > fromTsM && (m.ts||0) < cutoff && ((m.text||"").trim() || (m.atts&&m.atts.length)));
-    if(staleM) generateMemopad();
-  }
+    if(staleM) generateMemopad(null, true);
+  }, ()=>{});
 }
 // 「ふたりのあゆみ」圧縮: 日ごとの記録7日ぶん→週まとめ1つ(Haiku・週1回だけ動く)
 let ayumiBusy = false;
@@ -4738,6 +4823,7 @@ function renderMemopad(){
     box.appendChild(el("div","memopad-day", label));
     items.forEach(item=>{
       const wrap = el("div","mem-card memopad-row");
+      wrap.dataset.mid = item.id;   // 手で足した直後に「この行だよ」と見せるための目印
       const top = el("div","mem-card-top");
       top.appendChild(el("div","mem-card-text", item.text));
       const acts = el("div","mem-card-acts");
@@ -5768,6 +5854,19 @@ function buildCachedMsgs(lineOn){
   const last = arr.length-1;
   // 最新メッセージにだけ現実の時刻＋今後の予定を添える（毎回変わる＝キャッシュの外側に置く）
   const lb = asBlocks(arr[last].content);
+  // 🏷️ さきの最新の発言に見出しを付ける(2026-11-17)。
+  //    下で頭に足す案内文(時刻・予定・気づき・記憶・あゆみ)は約4,000字あり、さきの発言(平均100字)は目印なしでその後ろに続いていた。
+  //    見出しが付くのは「送る瞬間のいちばん新しい発言」だけ。保存される会話にも、次の回の履歴にも残らない(=キャッシュにも影響しない)。
+  const NOW_LABEL = "【さきの今の発言】";
+  let labeled = false;
+  if(arr[last].role === "user"){
+    const li = lb.length - 1;   // さきが打った文章は、いつもいちばん最後のかたまり(画像やファイルはその前に並ぶ)
+    const tx = lb[li] && lb[li].type === "text" ? (lb[li].text||"") : "";
+    if(tx && tx !== "…" && !/^（※ここから .* の会話）$/.test(tx) && tx.indexOf("[ファイル: ") !== 0){
+      lb[li] = Object.assign({}, lb[li], {text: NOW_LABEL + "\n" + tx});
+      labeled = true;
+    }
+  }
   let note = "（※今は " + nowContext() + "）";
   if(weatherCtx) note += "\n（※" + weatherCtx + "）";
   const cyc = cycleContext();
@@ -5823,7 +5922,12 @@ function buildCachedMsgs(lineOn){
   // 🎯 いちばん最後に念押し(さきの発言のすぐ手前＝一番届く場所)。
   //    上の参考資料(あらすじ・メモ・気づき・記憶・あゆみ)に引っぱられて、
   //    「1つ前の話題」に返事してしまうのを防ぐための一文。
-  note += "\n\n──────────\n※ここまでは参考資料であって、今の話題ではありません。この案内文そのものに返事をしないこと。\nあなたがいま返事をするのは、このすぐ下にある「さきの今の発言」に対してです。まずその発言をきちんと受け止めてから答えること。上の資料や、自分の前の返答をむし返さないこと。";
+  // 2026-11-17: 「1つ前の場面をもう一度やり直す」実例(11/16 21:32・自分の直前の返事の反復)が出たので、見出しの案内と「前の場面は済んでいる」を足した。
+  note += "\n\n──────────\n※ここまでは参考資料であって、今の話題ではありません。この案内文そのものに返事をしないこと。\nあなたがいま返事をするのは、このすぐ下にある"
+    + (labeled ? NOW_LABEL + "という見出しのあとの言葉" : "「さきの今の発言」")
+    + "に対してです。まずその発言をきちんと受け止めてから答えること。上の資料や、自分の前の返答をむし返さないこと。"
+    + "\nそれより前のやりとりは、もう済んだ場面です。あなた自身の直前の返答で書いた行動やセリフは、すでに起きたこととして扱い、同じ場面・同じ行動・同じセリフをもう一度書き直さないこと。その続きから書くこと。"
+    + (labeled ? "\n見出しの文字(" + NOW_LABEL + ")は目印なので、返事の中では口にしないこと。" : "");
   lb.unshift({type:"text", text: note});
   arr[last].content = lb;
   // 直前のメッセージまで（＝これまでの履歴）をキャッシュ対象にする
@@ -6162,12 +6266,23 @@ $("close-imgclean").addEventListener("click", closeImgClean);
 $("imgclean-del").addEventListener("click", imgcleanDeleteSelected);
 $("imgclean-clear").addEventListener("click", ()=>{ imgcleanSel=new Set(); renderImgClean(); });
 document.querySelectorAll("#imgclean [data-before]").forEach(b=> b.addEventListener("click", ()=> imgcleanSelectBefore(parseInt(b.dataset.before,10))));
-$("memopad-add-btn").addEventListener("click", ()=>{
+function memopadAddManual(){   // ✍️ さきが手でメモを足す(自動のメモと同じく、頭に今の時刻を付ける)
   const inp = $("memopad-input");
   const t = (inp.value||"").trim(); if(!t) return;
-  if(memopadAdd(todaySynopStr(), t)){ inp.value=""; renderMemopad(); }
-  else alert("同じメモがもうあるみたいだよ😊");
-});
+  const today = todaySynopStr();
+  const withTime = /^\d{1,2}:\d{2}/.test(t) ? t : (memopadHHMM(Date.now()) + " " + t);
+  if(memopadItems(today).some(x=> x.text===withTime || x.text.replace(/^\d{1,2}:\d{2}\s*/,"")===t)){ alert("同じメモがもうあるみたいだよ😊"); return; }
+  if(!memopadAdd(today, withTime)){ alert("同じメモがもうあるみたいだよ😊"); return; }
+  inp.value = ""; renderMemopad();
+  // 足したメモは「今日のメモ」のいちばん下に入る。メモが多い日は画面の外になるので、そこまで動かして少し光らせる
+  try{
+    const items = memopadItems(today), added = items[items.length-1];
+    const row = added ? document.querySelector('#memopad-list .memopad-row[data-mid="' + added.id + '"]') : null;
+    if(row){ row.scrollIntoView({block:"center"}); row.classList.add("flash"); setTimeout(()=> row.classList.remove("flash"), 2500); }
+  }catch(e){}
+}
+$("memopad-add-btn").addEventListener("click", memopadAddManual);
+$("memopad-input").addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.isComposing){ e.preventDefault(); memopadAddManual(); } });   // キーボードの「改行」でも追加(変換の確定中は除く)
 $("synopsis-refresh").addEventListener("click", refreshSynopsisNow);
 $("close-archive").addEventListener("click", closeArchive);
 $("close-reflect").addEventListener("click", closeReflect);
